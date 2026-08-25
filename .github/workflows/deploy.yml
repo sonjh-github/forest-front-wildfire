@@ -1,0 +1,71 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: forest-front-wildfire-production
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: Verify production image
+        run: |
+          docker build             --build-arg VITE_API_BASE_URL=https://api.forest.tobeunicorn.kr             --build-arg VITE_DASHBOARD_API_BASE_URL=https://api.forest.tobeunicorn.kr             -t forest-front-wildfire:verify .
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            APP_DIR=/home/ubuntu/server/forest-front-wildfire
+
+            test -d "$APP_DIR/.git" || {
+              echo "EC2 repository is not prepared: $APP_DIR"
+              exit 1
+            }
+
+            cd "$APP_DIR"
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            docker build               --build-arg VITE_API_BASE_URL=https://api.forest.tobeunicorn.kr               --build-arg VITE_DASHBOARD_API_BASE_URL=https://api.forest.tobeunicorn.kr               -t forest-front-wildfire .
+
+            docker rm -f forest-front-wildfire || true
+
+            docker run -d               --name forest-front-wildfire               --restart unless-stopped               --log-opt max-size=10m               --log-opt max-file=5               -p 127.0.0.1:18030:80               forest-front-wildfire
+
+            for attempt in $(seq 1 20); do
+              status=$(docker inspect --format='{{.State.Health.Status}}' forest-front-wildfire)
+              test "$status" = healthy && exit 0
+              test "$status" = unhealthy && docker logs --tail 100 forest-front-wildfire && exit 1
+              sleep 3
+            done
+
+            docker logs --tail 100 forest-front-wildfire
+            exit 1

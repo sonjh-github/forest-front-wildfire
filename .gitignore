@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+
+.env
+.env.*
+!.env.example
+
+*.local
+
+# TypeScript build cache
+*.tsbuildinfo
+.vite/
+*.log
