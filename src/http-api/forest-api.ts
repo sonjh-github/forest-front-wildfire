@@ -106,6 +106,7 @@ export interface IntegrationCapability {
 }
 
 const DASHBOARD_ASSET_CACHE_TTL_MS = 10_000;
+const DASHBOARD_ASSET_ONLY_MODE = true;
 
 type DashboardAssetCacheEntry = {
   expiresAt: number;
@@ -114,7 +115,7 @@ type DashboardAssetCacheEntry = {
 
 const dashboardAssetCache = new Map<string, DashboardAssetCacheEntry>();
 
-function loadDashboardDisasterAssetsCached(
+export function loadDashboardDisasterAssetsCached(
   disasterId: string,
 ): Promise<DashboardDisasterAssetsResponse> {
   const now = Date.now();
@@ -325,6 +326,16 @@ export async function loadEventTimeline(
   from: string,
   to: string,
 ): Promise<EventTimeline> {
+  if (DASHBOARD_ASSET_ONLY_MODE) {
+    return {
+      from,
+      to,
+      stepMinutes: 1,
+      assetStatuses: [],
+      personnelPositions: [],
+    };
+  }
+
   try {
     return (
       await forestApi.timeline(
@@ -413,6 +424,63 @@ export async function loadEventOverview(
   event: ForestEvent,
 ): Promise<EventOverview> {
   const eventId = event.eventId;
+
+  if (DASHBOARD_ASSET_ONLY_MODE) {
+    const dashboardAssets = await loadDashboardDisasterAssetsCached(eventId);
+    const disaster = dashboardAssets.data.disaster;
+    const rawDisasterType = String(
+      disaster.disasterType ?? event.disasterType ?? "WILDFIRE",
+    ).toUpperCase();
+    const disasterType: ForestEvent["disasterType"] =
+      rawDisasterType === "LANDSLIDE" || rawDisasterType === "COMPLEX"
+        ? rawDisasterType
+        : "WILDFIRE";
+
+    const activeDashboardAssets = dashboardAssets.data.assets.filter(
+      (row) => row.assignment.released_at === null,
+    );
+
+    return {
+      event: {
+        ...event,
+        eventId: disaster.disasterId || eventId,
+        eventCode: disaster.disasterCode ?? event.eventCode,
+        disasterType,
+        eventName: disaster.disasterName ?? event.eventName,
+        status: disaster.status ?? event.status,
+      },
+      assets: activeDashboardAssets.map(({ assignment, asset }) => ({
+        assetId: asset.asset_id,
+        assetCode: asset.asset_code,
+        assetType: asset.asset_type,
+        assetName: asset.asset_name,
+        ownerOrgCode: asset.owner_org_code,
+        modelName: asset.model_name,
+        serialNumber: asset.serial_number,
+        status: asset.status,
+        specifications: asset.specifications,
+        createdAt: asset.created_at,
+        updatedAt: asset.updated_at,
+        eventResourceId: assignment.event_resource_id,
+        eventId: assignment.event_id,
+        assignedOrgCode: assignment.assigned_org_code,
+        mission: assignment.mission,
+        assignedAt: assignment.assigned_at,
+        releasedAt: assignment.released_at,
+        eventRegistrationStatus: "REGISTERED",
+      })),
+      unregisteredAssets: [],
+      personnel: [],
+      networks: [],
+      topology: { networks: [], nodes: [], links: [] },
+      alerts: [],
+      reports: [],
+      kpis: [],
+      integrations: [],
+      domainDetail: null,
+      domainLayers: {},
+    };
+  }
 
   const domain =
     event.disasterType === "LANDSLIDE"

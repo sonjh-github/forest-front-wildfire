@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { forestApi, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
+import { loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
 import LivePositionMap from "./LivePositionMap";
 import MapTimelinePlayer, { type MapTimelineSnapshot } from "./MapTimelinePlayer";
 import { OperationsPanel, type PanelTab } from "./OperationsPanel";
@@ -9,6 +9,7 @@ import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_CHANGE_HIGHLIGHT_MS = POLL_INTERVAL_MS * 0.3;
+const DEFAULT_EVENT_ID = "10000000-0000-4000-8000-000000000001";
 
 function text(value: unknown, fallback = "-") { return value == null || value === "" ? fallback : String(value); }
 const koreanLabels: Record<string, string> = {
@@ -556,16 +557,24 @@ export default function UnifiedDisasterDashboard() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   const refreshEvents = useCallback(async () => {
-    const result = await forestApi.events(100);
-    const severityRank: Record<string, number> = { CRITICAL: 0, SEVERE: 1, WARNING: 2, MODERATE: 3, LOW: 4 };
-    const statusRank: Record<string, number> = { RESPONDING: 0, CONFIRMED: 1, CONTROLLED: 2, CLOSED: 9 };
-    const sorted = [...result.data].sort((a, b) =>
-      (statusRank[String(a.status)] ?? 5) - (statusRank[String(b.status)] ?? 5)
-      || (severityRank[String(a.severityCode)] ?? 5) - (severityRank[String(b.severityCode)] ?? 5)
-      || Date.parse(String(b.updatedAt ?? b.occurredAt ?? 0)) - Date.parse(String(a.updatedAt ?? a.occurredAt ?? 0)),
-    );
-    setEvents(sorted);
-    setSelectedId((current) => current || sorted[0]?.eventId || "");
+    const result = await loadDashboardDisasterAssetsCached(DEFAULT_EVENT_ID);
+    const disaster = result.data.disaster;
+    const rawDisasterType = String(disaster.disasterType ?? "WILDFIRE").toUpperCase();
+    const disasterType: ForestEvent["disasterType"] =
+      rawDisasterType === "LANDSLIDE" || rawDisasterType === "COMPLEX"
+        ? rawDisasterType
+        : "WILDFIRE";
+
+    const currentEvent: ForestEvent = {
+      eventId: disaster.disasterId || DEFAULT_EVENT_ID,
+      eventCode: disaster.disasterCode,
+      disasterType,
+      eventName: disaster.disasterName,
+      status: disaster.status,
+    };
+
+    setEvents([currentEvent]);
+    setSelectedId((current) => current || currentEvent.eventId);
   }, []);
 
   const refreshOverview = useCallback(async () => {
