@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 concurrency:
   group: forest-front-wildfire-production
   cancel-in-progress: true
@@ -35,24 +38,32 @@ jobs:
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GH_TOKEN
           script: |
             set -e
 
             APP_DIR=/home/ubuntu/server/forest-front-wildfire
+            REPO_URL=https://github.com/sonjh-github/forest-front-wildfire.git
+            AUTH_REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/sonjh-github/forest-front-wildfire.git"
 
-            test -d "$APP_DIR/.git" || {
-              echo "EC2 repository is not prepared: $APP_DIR"
-              exit 1
-            }
+            mkdir -p "$APP_DIR"
 
-            cd "$APP_DIR"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              cd "$APP_DIR"
+              git init
+              git remote add origin "$REPO_URL"
+            else
+              cd "$APP_DIR"
+            fi
 
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch "$AUTH_REPO_URL" main
+            git reset --hard FETCH_HEAD
 
             docker build               --build-arg VITE_API_BASE_URL=https://api.forest.tobeunicorn.kr               --build-arg VITE_DASHBOARD_API_BASE_URL=https://api.forest.tobeunicorn.kr               -t forest-front-wildfire .
 
