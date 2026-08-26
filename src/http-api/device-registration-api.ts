@@ -1,4 +1,4 @@
-import { dashboardApi, HttpApiError } from "./client";
+import { dashboardApi } from "./client";
 
 export type DashboardVendor = "NDPS" | "JININFRA";
 export type DashboardMappingStatus = "ACTIVE" | "PENDING" | "SUSPENDED";
@@ -60,75 +60,6 @@ export interface DashboardAssetDetail extends Record<string, unknown> {
   asset_type?: DashboardAssetType | null;
 }
 
-export interface VendorRegisterRequest {
-  vendor: DashboardVendor;
-  reportedByDeviceId: string;
-  observedAt: string;
-  devices: Array<{
-    vendorDeviceId: string;
-    deviceType: string;
-    modelName?: string | null;
-    firmwareVersion?: string | null;
-    attributes?: Record<string, unknown>;
-  }>;
-}
-
-export interface VendorMappingResult {
-  vendorDeviceId: string;
-  assetId: string | null;
-  mapped: boolean;
-  assetExists: boolean;
-  mappingStatus:
-    | "ACTIVE"
-    | "PENDING"
-    | "SUSPENDED"
-    | "UNMAPPED"
-    | "CONFLICT"
-    | string;
-}
-
-export interface VendorRegisterResult {
-  vendor: DashboardVendor;
-  registrationStatus: "MAPPED" | "UNMAPPED" | "PARTIALLY_MAPPED" | string;
-  mappedDevices: VendorMappingResult[];
-  unmappedDeviceIds: string[];
-  checkedAt: string;
-}
-
-const DEVICE_API_BASE_URL = (
-  import.meta.env.VITE_DEVICE_API_BASE_URL?.trim() ||
-  "https://device.forest.tobeunicorn.kr"
-).replace(/\/+$/, "");
-
-async function deviceApi<T>(
-  path: string,
-  init: RequestInit,
-): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(
-    `${DEVICE_API_BASE_URL}${path}`,
-    {
-      ...init,
-      headers,
-    },
-  );
-
-  const payload =
-    response.status === 204
-      ? null
-      : await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new HttpApiError(response.status, payload);
-  }
-
-  return payload as T;
-}
-
 export function extractRegisteredAssetId(
   data: DashboardRegisteredAsset | null | undefined,
 ): string | null {
@@ -182,17 +113,5 @@ export const dashboardDeviceApi = {
   asset: (assetId: string) =>
     dashboardApi<{ data: DashboardAssetDetail }>(
       `/api/v1/dashboard/assets/${encodeURIComponent(assetId)}`,
-    ),
-
-  vendorRegister: (
-    vendor: DashboardVendor,
-    payload: VendorRegisterRequest,
-  ) =>
-    deviceApi<{ data: VendorRegisterResult }>(
-      `/${vendor.toLowerCase()}/register`,
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      },
     ),
 };
