@@ -15,8 +15,6 @@ import {
   type DashboardMappingStatus,
   type DashboardRegisteredAsset,
   type DashboardVendor,
-  type VendorRegisterRequest,
-  type VendorRegisterResult,
 } from "../../http-api/device-registration-api";
 
 const DEVICE_TYPE_SUGGESTIONS: Record<DashboardVendor, string[]> = {
@@ -57,9 +55,6 @@ type RegistrationResult = {
   assetId: string;
   coreData: DashboardRegisteredAsset;
   detail: DashboardAssetDetail | null;
-  vendorResult: VendorRegisterResult | null;
-  vendorError: string | null;
-  vendorRequest: VendorRegisterRequest;
   registrationRequest: DashboardAssetRegistrationRequest;
   assetTypeName: string;
 };
@@ -115,22 +110,10 @@ function parseSpecifications(
   return parsed as Record<string, unknown>;
 }
 
-function vendorRegisterStatusLabel(
+function registrationStatusLabel(
   result: RegistrationResult | null,
 ) {
-  if (!result) return "등록 전";
-  if (result.vendorError) return "연결 오류";
-
-  const status =
-    result.vendorResult?.registrationStatus;
-
-  if (status === "MAPPED") return "사용 가능";
-  if (status === "UNMAPPED") return "연결 오류";
-  if (status === "PARTIALLY_MAPPED") {
-    return "연결 일부 확인";
-  }
-
-  return "업체 연결 확인 필요";
+  return result ? "등록 완료" : "등록 전";
 }
 
 function typeDisplay(
@@ -154,8 +137,6 @@ export default function AssetRegistryModal({
   const [loadingTypes, setLoadingTypes] =
     useState(true);
   const [saving, setSaving] =
-    useState(false);
-  const [rechecking, setRechecking] =
     useState(false);
   const [message, setMessage] =
     useState<Message | null>(null);
@@ -224,82 +205,6 @@ export default function AssetRegistryModal({
       deviceType:
         DEVICE_TYPE_SUGGESTIONS[vendor][0],
     }));
-  };
-
-  const buildVendorRequest = (
-    current: RegistrationForm,
-  ): VendorRegisterRequest => ({
-    vendor: current.vendor,
-    reportedByDeviceId:
-      current.vendorDeviceId.trim(),
-    observedAt: new Date().toISOString(),
-    devices: [
-      {
-        vendorDeviceId:
-          current.vendorDeviceId.trim(),
-        deviceType:
-          current.deviceType.trim(),
-        modelName:
-          current.modelName.trim() ||
-          null,
-      },
-    ],
-  });
-
-  const recheckVendor = async () => {
-    if (!result) return;
-
-    setRechecking(true);
-    setMessage(null);
-
-    try {
-      const response =
-        await dashboardDeviceApi.vendorRegister(
-          result.vendorRequest.vendor,
-          {
-            ...result.vendorRequest,
-            observedAt:
-              new Date().toISOString(),
-          },
-        );
-
-      const nextResult: RegistrationResult = {
-        ...result,
-        vendorResult: response.data,
-        vendorError: null,
-      };
-
-      setResult(nextResult);
-      setMessage({
-        kind:
-          response.data.registrationStatus ===
-          "MAPPED"
-            ? "success"
-            : "error",
-        text:
-          response.data.registrationStatus ===
-          "MAPPED"
-            ? "업체 캐시의 MAPPED 상태까지 확인했습니다. 장비를 사용할 수 있습니다."
-            : `업체 등록 상태가 ${response.data.registrationStatus}입니다. 매핑 정보를 확인해 주세요.`,
-      });
-    } catch (error) {
-      const text = errorText(
-        error,
-        "업체 캐시 상태를 확인하지 못했습니다.",
-      );
-
-      setResult({
-        ...result,
-        vendorResult: null,
-        vendorError: text,
-      });
-      setMessage({
-        kind: "error",
-        text: `Core 등록은 유지되어 있습니다. 업체 /register 확인에 실패했습니다. ${text}`,
-      });
-    } finally {
-      setRechecking(false);
-    }
   };
 
   const submit = async (
@@ -382,9 +287,6 @@ export default function AssetRegistryModal({
         form.mappingStatus,
     };
 
-    const vendorRequest =
-      buildVendorRequest(form);
-
     setSaving(true);
 
     try {
@@ -417,32 +319,10 @@ export default function AssetRegistryModal({
         detail = null;
       }
 
-      let vendorResult:
-        VendorRegisterResult | null = null;
-      let vendorError: string | null = null;
-
-      try {
-        const vendorResponse =
-          await dashboardDeviceApi.vendorRegister(
-            form.vendor,
-            vendorRequest,
-          );
-        vendorResult =
-          vendorResponse.data;
-      } catch (error) {
-        vendorError = errorText(
-          error,
-          "업체 /register 확인 실패",
-        );
-      }
-
       const nextResult: RegistrationResult = {
         assetId,
         coreData: coreResponse.data,
         detail,
-        vendorResult,
-        vendorError,
-        vendorRequest,
         registrationRequest: payload,
         assetTypeName:
           selectedAssetType?.name ??
@@ -451,25 +331,10 @@ export default function AssetRegistryModal({
 
       setResult(nextResult);
 
-      if (
-        vendorResult?.registrationStatus ===
-        "MAPPED"
-      ) {
-        setMessage({
-          kind: "success",
-          text: "물리 장비 등록, 업체 연결, Vendor 캐시 MAPPED 확인까지 완료했습니다.",
-        });
-      } else if (vendorError) {
-        setMessage({
-          kind: "error",
-          text: `물리 장비와 업체 매핑은 Core에 등록되었습니다. Vendor 캐시 확인만 실패했습니다. ${vendorError}`,
-        });
-      } else {
-        setMessage({
-          kind: "error",
-          text: `Core 등록은 완료됐지만 Vendor 상태가 ${vendorResult?.registrationStatus ?? "확인 필요"}입니다.`,
-        });
-      }
+      setMessage({
+        kind: "success",
+        text: "물리 장비 등록과 업체 매핑이 Core에 정상 저장되었습니다.",
+      });
 
       onRegistered?.();
     } catch (error) {
@@ -489,9 +354,6 @@ export default function AssetRegistryModal({
     extractVendorMapping(
       result?.coreData,
     );
-
-  const mappedDevice =
-    result?.vendorResult?.mappedDevices?.[0];
 
   const resetForm = () => {
     const next = initialForm();
@@ -556,9 +418,9 @@ export default function AssetRegistryModal({
           </div>
           <i>→</i>
           <div>
-            <b>③ 사용 가능 확인</b>
+            <b>③ Core 저장 확인</b>
             <span>
-              Vendor /register의 MAPPED 확인
+              assetId + vendor mapping 저장 결과 확인
             </span>
           </div>
         </div>
@@ -572,14 +434,14 @@ export default function AssetRegistryModal({
               <div>
                 <small>등록 흐름</small>
                 <strong>
-                  {vendorRegisterStatusLabel(
+                  {registrationStatusLabel(
                     result,
                   )}
                 </strong>
               </div>
               <span>
-                UUID만 발급됐다고 사용 가능으로
-                판정하지 않습니다.
+                Core 장비 등록과 업체 매핑 성공을
+                기준으로 판정합니다.
               </span>
             </header>
 
@@ -665,49 +527,44 @@ export default function AssetRegistryModal({
                   <span>STEP 3</span>
                   <em
                     data-status={
-                      result?.vendorResult
-                        ?.registrationStatus ===
-                      "MAPPED"
+                      result
                         ? "ACTIVE"
-                        : result
-                          ? "PENDING"
-                          : "INACTIVE"
+                        : "INACTIVE"
                     }
                   >
-                    {result?.vendorResult
-                      ?.registrationStatus ??
-                      (result?.vendorError
-                        ? "ERROR"
-                        : "대기")}
+                    {result
+                      ? "확인 완료"
+                      : "대기"}
                   </em>
                 </div>
                 <strong>
-                  Vendor 캐시 확인
+                  Core 저장 결과 확인
                 </strong>
                 <small>
-                  {(result?.vendorRequest.vendor ??
-                    form.vendor) === "NDPS"
-                    ? "POST /ndps/register"
-                    : "POST /jininfra/register"}
+                  GET /api/v1/dashboard/assets/&#123;assetId&#125;
                 </small>
                 <dl>
                   <div>
-                    <dt>매핑</dt>
+                    <dt>Core 상태</dt>
                     <dd>
-                      {mappedDevice
-                        ? mappedDevice.mapped
-                          ? "MAPPED"
-                          : mappedDevice.mappingStatus
+                      {result
+                        ? String(
+                            result.detail?.status ??
+                            result.coreData.status ??
+                            result.registrationRequest.status ??
+                            "-",
+                          )
                         : "-"}
                     </dd>
                   </div>
                   <div>
-                    <dt>업체 장비번호</dt>
+                    <dt>업체 매핑</dt>
                     <dd>
-                      {mappedDevice?.vendorDeviceId ??
-                        result?.vendorRequest
-                          .reportedByDeviceId ??
-                        "-"}
+                      {vendorMapping?.status
+                        ? String(vendorMapping.status)
+                        : result
+                          ? "등록됨"
+                          : "-"}
                     </dd>
                   </div>
                 </dl>
@@ -717,18 +574,8 @@ export default function AssetRegistryModal({
                 <article className="asset-catalog-row">
                   <div>
                     <span>등록 결과</span>
-                    <em
-                      data-status={
-                        result.vendorResult
-                          ?.registrationStatus ===
-                        "MAPPED"
-                          ? "ACTIVE"
-                          : "PENDING"
-                      }
-                    >
-                      {vendorRegisterStatusLabel(
-                        result,
-                      )}
+                    <em data-status="ACTIVE">
+                      등록 완료
                     </em>
                   </div>
                   <strong>
@@ -773,21 +620,11 @@ export default function AssetRegistryModal({
                     <div>
                       <dt>업체</dt>
                       <dd>
-                        {result.vendorRequest.vendor}
+                        {result.registrationRequest.vendor}
                       </dd>
                     </div>
                   </dl>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void recheckVendor()
-                    }
-                    disabled={rechecking}
-                  >
-                    {rechecking
-                      ? "업체 캐시 확인 중…"
-                      : "업체 캐시 다시 확인"}
-                  </button>
+
                 </article>
               )}
             </div>
