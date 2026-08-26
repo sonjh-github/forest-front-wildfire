@@ -60,6 +60,8 @@ type RegistrationResult = {
   vendorResult: VendorRegisterResult | null;
   vendorError: string | null;
   vendorRequest: VendorRegisterRequest;
+  registrationRequest: DashboardAssetRegistrationRequest;
+  assetTypeName: string;
 };
 
 type Message = {
@@ -441,6 +443,10 @@ export default function AssetRegistryModal({
         vendorResult,
         vendorError,
         vendorRequest,
+        registrationRequest: payload,
+        assetTypeName:
+          selectedAssetType?.name ??
+          form.assetTypeId,
       };
 
       setResult(nextResult);
@@ -679,7 +685,8 @@ export default function AssetRegistryModal({
                   Vendor 캐시 확인
                 </strong>
                 <small>
-                  {form.vendor === "NDPS"
+                  {(result?.vendorRequest.vendor ??
+                    form.vendor) === "NDPS"
                     ? "POST /ndps/register"
                     : "POST /jininfra/register"}
                 </small>
@@ -726,9 +733,12 @@ export default function AssetRegistryModal({
                   </div>
                   <strong>
                     {String(
-                      result.detail?.asset_name ||
-                      form.assetName ||
-                      form.assetCode,
+                      result.detail?.asset_name ??
+                      result.coreData.asset_name ??
+                      result.registrationRequest
+                        .assetName ??
+                      result.registrationRequest
+                        .assetCode,
                     )}
                   </strong>
                   <small>
@@ -741,7 +751,11 @@ export default function AssetRegistryModal({
                         {String(
                           result.detail
                             ?.asset_code ??
-                            form.assetCode,
+                            result.coreData
+                              .asset_code ??
+                            result
+                              .registrationRequest
+                              .assetCode,
                         )}
                       </dd>
                     </div>
@@ -751,8 +765,7 @@ export default function AssetRegistryModal({
                         {String(
                           result.detail
                             ?.asset_type?.name ??
-                            selectedAssetType
-                              ?.name ??
+                            result.assetTypeName ??
                             "-",
                         )}
                       </dd>
