@@ -3,7 +3,7 @@ import { loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline
 import LivePositionMap from "./LivePositionMap";
 import MapTimelinePlayer, { type MapTimelineSnapshot } from "./MapTimelinePlayer";
 import { OperationsPanel, type PanelTab } from "./OperationsPanel";
-import AssetRegistryModal from "./AssetRegistryModal";
+
 import DroneVideoModal from "./DroneVideoModal";
 import "./unified-disaster-dashboard.css";
 
@@ -542,7 +542,7 @@ export default function UnifiedDisasterDashboard() {
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(null);
   const [topologyLocationKey, setTopologyLocationKey] = useState<string | null>(null);
   const [resourceDialogGroup, setResourceDialogGroup] = useState<ResourceGroup | "ALL" | "ALL_ASSETS" | null>(null);
-  const [assetRegistryOpen, setAssetRegistryOpen] = useState(false);
+
   const [videoDrone, setVideoDrone] = useState<LiveLocation | null>(null);
   const [timeline, setTimeline] = useState<EventTimeline | null>(null);
   const [timelineIndex, setTimelineIndex] = useState<number | null>(null);
@@ -636,19 +636,19 @@ export default function UnifiedDisasterDashboard() {
   }, [selectedId]);
 
   useEffect(() => {
-    if (!selectedLocationKey && !resourceDialogGroup && !topologyLocationKey && !assetRegistryOpen && !videoDrone) return;
+    if (!selectedLocationKey && !resourceDialogGroup && !topologyLocationKey && !videoDrone) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSelectedLocationKey(null);
         setResourceDialogGroup(null);
         setTopologyLocationKey(null);
-        setAssetRegistryOpen(false);
+
         setVideoDrone(null);
       }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [assetRegistryOpen, resourceDialogGroup, selectedLocationKey, topologyLocationKey, videoDrone]);
+  }, [resourceDialogGroup, selectedLocationKey, topologyLocationKey, videoDrone]);
 
   useEffect(() => {
     let active = true;
@@ -837,7 +837,7 @@ export default function UnifiedDisasterDashboard() {
           <header>
             <div className="readiness-brand"><span>산림청</span><strong>산림재난 통합상황판</strong><small>FOREST DISASTER COMMON OPERATIONAL PICTURE</small></div>
             <div className="readiness-actions">
-              <button type="button" className="asset-registry-open" onClick={() => setAssetRegistryOpen(true)}>자산 등록·관리</button>
+              <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
               <div className={`readiness-connection ${error ? "is-error" : eventsLoaded ? "is-ready" : "is-loading"}`}><i />{error ? "연결 점검 필요" : eventsLoaded ? "연결 정상" : "데이터 연결 중"}</div>
             </div>
           </header>
@@ -887,7 +887,7 @@ export default function UnifiedDisasterDashboard() {
             <button type="button" onClick={() => setOperationsTab("networks")}><span>통신망</span><b>{overview.networks.length}</b></button>
             <button type="button" data-alert={activeAlertCount > 0} onClick={() => setOperationsTab("alerts")}><span>경보</span><b>{activeAlertCount}</b></button>
           </nav>
-          <button type="button" className="asset-registry-open" onClick={() => setAssetRegistryOpen(true)}>자산 등록·관리</button>
+          <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
@@ -1113,7 +1113,7 @@ export default function UnifiedDisasterDashboard() {
         </section>
         </>
       )}
-      {assetRegistryOpen && <AssetRegistryModal onClose={() => setAssetRegistryOpen(false)} onRegistered={() => { if (selectedId) void refreshOverview(); }} />}
+
       {videoDrone && <DroneVideoModal drone={videoDrone} onClose={() => setVideoDrone(null)} />}
     </main>
   );
