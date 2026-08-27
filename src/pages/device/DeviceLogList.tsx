@@ -25,9 +25,7 @@ function formatReceivedAt(value: string) {
 }
 
 function summarizePayload(log: DashboardDeviceLog) {
-  const payload =
-    log.normalized_payload ??
-    log.payload;
+  const payload = log.payload;
 
   if (!payload) {
     return "-";
@@ -308,11 +306,7 @@ export default function DeviceLogList({
                   </td>
                   <td
                     className="device-log-message-cell"
-                    title={JSON.stringify(
-                      log.normalized_payload ??
-                        log.payload ??
-                        {},
-                    )}
+                    title={JSON.stringify(log.payload ?? {})}
                   >
                     {summarizePayload(log)}
                   </td>
