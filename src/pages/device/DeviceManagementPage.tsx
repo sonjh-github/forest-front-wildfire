@@ -49,9 +49,9 @@ export default function DeviceManagementPage() {
           <small>DEVICE LOG</small>
           <strong>장비 로그</strong>
           <span>
-            Core 로그 API 계약 확인 후 실제 등록·조회 기능을 연결합니다.
+            Core에 저장된 장비 연동 메시지를 assetId 기준으로 조회합니다.
           </span>
-          <em>API 연결 대기</em>
+          <em>assetId 조회</em>
         </article>
       </section>
 

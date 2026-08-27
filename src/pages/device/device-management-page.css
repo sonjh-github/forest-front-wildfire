@@ -269,3 +269,58 @@
 .device-log-filter input[aria-invalid="true"] {
   border-color: #c97b7b;
 }
+.device-log-query-note {
+  margin: 0 0 12px;
+  color: #65776f;
+  font-size: 12px;
+}
+
+.device-log-id-cell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.device-log-message-cell {
+  max-width: 360px;
+  color: #536a61;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-log-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #edf5f1;
+  color: #27644f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.device-log-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.device-log-pagination button {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid #c9dbd3;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #21473c;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.device-log-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
