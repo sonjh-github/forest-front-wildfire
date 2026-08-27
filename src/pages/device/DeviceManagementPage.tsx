@@ -19,15 +19,6 @@ export default function DeviceManagementPage() {
         </div>
 
         <div className="device-management-actions">
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => {
-              window.location.href = "/";
-            }}
-          >
-            통합상황판으로
-          </button>
 
           <button
             type="button"
