@@ -12,7 +12,6 @@ export interface DashboardDeviceLog {
   received_at: string;
   status?: string | null;
   payload?: Record<string, unknown> | null;
-  normalized_payload?: Record<string, unknown> | null;
 }
 
 export interface DashboardDeviceLogPage {
