@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
+import { externalDisasterApi, loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
 import LivePositionMap from "./LivePositionMap";
 import MapTimelinePlayer, { type MapTimelineSnapshot } from "./MapTimelinePlayer";
-import { OperationsPanel, type PanelTab } from "./OperationsPanel";
+import {
+  OperationsPanel,
+  type ExternalIntegrationStatus,
+  type PanelTab,
+} from "./OperationsPanel";
 
 import DroneVideoModal from "./DroneVideoModal";
 import "./unified-disaster-dashboard.css";
@@ -523,6 +527,37 @@ function buildTimelineSnapshots(timeline: EventTimeline | null, currentAssets: A
   return snapshots;
 }
 
+function webMercatorToLngLat(x: number, y: number): [number, number] | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  const originShift = 20037508.342789244;
+
+  if (
+    Math.abs(x) > originShift * 1.05 ||
+    Math.abs(y) > originShift * 1.05
+  ) {
+    return null;
+  }
+
+  const longitude = (x / originShift) * 180;
+  const latitude =
+    (Math.atan(Math.exp((y / originShift) * Math.PI)) * 360) / Math.PI -
+    90;
+
+  if (
+    !Number.isFinite(longitude) ||
+    !Number.isFinite(latitude) ||
+    longitude < -180 ||
+    longitude > 180 ||
+    latitude < -90 ||
+    latitude > 90
+  ) {
+    return null;
+  }
+
+  return [longitude, latitude];
+}
+
 export default function UnifiedDisasterDashboard() {
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -556,6 +591,19 @@ export default function UnifiedDisasterDashboard() {
   ]));
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
+  const [externalFirmsRows, setExternalFirmsRows] = useState<ApiRecord[]>([]);
+  const [externalLandslideHistoryRows, setExternalLandslideHistoryRows] =
+    useState<ApiRecord[]>([]);
+
+  const [externalIntegrationStatus, setExternalIntegrationStatus] =
+    useState<ExternalIntegrationStatus>({
+      firms: { status: "idle", count: 0, checkedAt: null },
+      wildfireRisk: { status: "idle", count: 0, checkedAt: null },
+      landslideForecast: { status: "idle", count: 0, checkedAt: null },
+      landslideHistory: { status: "idle", count: 0, checkedAt: null },
+      landslideRegionalRisk: { status: "idle", count: 0, checkedAt: null },
+    });
+
   const refreshEvents = useCallback(async () => {
     const result = await loadDashboardDisasterAssetsCached(DEFAULT_EVENT_ID);
     const disaster = result.data.disaster;
@@ -575,6 +623,167 @@ export default function UnifiedDisasterDashboard() {
 
     setEvents([currentEvent]);
     setSelectedId((current) => current || currentEvent.eventId);
+  }, []);
+
+  const refreshExternalIntegrations = useCallback(async () => {
+    setExternalIntegrationStatus((current) => ({
+      firms: { ...current.firms, status: "loading", message: undefined },
+      wildfireRisk: { ...current.wildfireRisk, status: "loading", message: undefined },
+      landslideForecast: { ...current.landslideForecast, status: "loading", message: undefined },
+      landslideHistory: { ...current.landslideHistory, status: "loading", message: undefined },
+      landslideRegionalRisk: {
+        ...current.landslideRegionalRisk,
+        status: "loading",
+        message: undefined,
+      },
+    }));
+
+    const [
+      firms,
+      wildfireRisk,
+      landslideForecast,
+      landslideHistory,
+      landslideRegionalRisk,
+    ] = await Promise.allSettled([
+      externalDisasterApi.wildfireFirms(),
+      externalDisasterApi.wildfireRisk(1, 100),
+      externalDisasterApi.landslideForecast(1, 100),
+      externalDisasterApi.landslideHistory(1, 100),
+      externalDisasterApi.landslideRegionalRisk(1, 100),
+    ]);
+
+    const checkedAt = new Date().toISOString();
+
+    const errorMessage = (reason: unknown) =>
+      reason instanceof Error ? reason.message : "외부 API 요청 실패";
+
+    if (firms.status === "fulfilled") {
+      setExternalFirmsRows(
+        firms.value.data.flatMap((item, index) => {
+          const longitude = Number(item.longitude);
+          const latitude = Number(item.latitude);
+
+          if (
+            !Number.isFinite(longitude) ||
+            !Number.isFinite(latitude) ||
+            longitude < -180 ||
+            longitude > 180 ||
+            latitude < -90 ||
+            latitude > 90
+          ) {
+            return [];
+          }
+
+          return [{
+            id: `firms-${index}-${item.acquiredAt ?? "unknown"}`,
+            observedAt: item.acquiredAt ?? checkedAt,
+            provider: "NASA FIRMS",
+            confidence: item.confidence,
+            frp: item.frp,
+            resultGeometry: {
+              type: "Point",
+              coordinates: [longitude, latitude],
+            },
+          } as ApiRecord];
+        }),
+      );
+    } else {
+      setExternalFirmsRows([]);
+    }
+
+    if (landslideHistory.status === "fulfilled") {
+      setExternalLandslideHistoryRows(
+        landslideHistory.value.data.flatMap((item) => {
+          const position = webMercatorToLngLat(
+            Number(item.x),
+            Number(item.y),
+          );
+
+          if (!position) return [];
+
+          return [{
+            id: `landslide-history-${item.serialNumber}`,
+            observedAt: item.occurredDate,
+            provider: "재난안전데이터",
+            disasterName: item.disasterName,
+            address: item.address,
+            resultGeometry: {
+              type: "Point",
+              coordinates: position,
+            },
+          } as ApiRecord];
+        }),
+      );
+    } else {
+      setExternalLandslideHistoryRows([]);
+    }
+
+    setExternalIntegrationStatus({
+      firms: firms.status === "fulfilled"
+        ? {
+            status: "ok",
+            count: firms.value.meta.count,
+            checkedAt,
+          }
+        : {
+            status: "error",
+            count: 0,
+            checkedAt,
+            message: errorMessage(firms.reason),
+          },
+
+      wildfireRisk: wildfireRisk.status === "fulfilled"
+        ? {
+            status: "ok",
+            count: wildfireRisk.value.meta.count,
+            checkedAt,
+          }
+        : {
+            status: "error",
+            count: 0,
+            checkedAt,
+            message: errorMessage(wildfireRisk.reason),
+          },
+
+      landslideForecast: landslideForecast.status === "fulfilled"
+        ? {
+            status: "ok",
+            count: landslideForecast.value.meta.count,
+            checkedAt,
+          }
+        : {
+            status: "error",
+            count: 0,
+            checkedAt,
+            message: errorMessage(landslideForecast.reason),
+          },
+
+      landslideHistory: landslideHistory.status === "fulfilled"
+        ? {
+            status: "ok",
+            count: landslideHistory.value.meta.count,
+            checkedAt,
+          }
+        : {
+            status: "error",
+            count: 0,
+            checkedAt,
+            message: errorMessage(landslideHistory.reason),
+          },
+
+      landslideRegionalRisk: landslideRegionalRisk.status === "fulfilled"
+        ? {
+            status: "ok",
+            count: landslideRegionalRisk.value.meta.count,
+            checkedAt,
+          }
+        : {
+            status: "error",
+            count: 0,
+            checkedAt,
+            message: errorMessage(landslideRegionalRisk.reason),
+          },
+    });
   }, []);
 
   const refreshOverview = useCallback(async () => {
@@ -696,6 +905,19 @@ export default function UnifiedDisasterDashboard() {
     const timer = window.setInterval(refreshTimeline, 60_000);
     return () => { active = false; window.clearInterval(timer); };
   }, [selectedId]);
+
+  const mapDomainLayers = useMemo<Record<string, ApiRecord[]>>(
+    () => ({
+      ...overview?.domainLayers,
+      "external-firms": externalFirmsRows,
+      "external-landslide-history": externalLandslideHistoryRows,
+    }),
+    [
+      overview?.domainLayers,
+      externalFirmsRows,
+      externalLandslideHistoryRows,
+    ],
+  );
 
   const liveLocations = useMemo(() => overview ? overviewLocations(overview) : [], [overview]);
   const timelineSnapshots = useMemo(
@@ -912,7 +1134,7 @@ export default function UnifiedDisasterDashboard() {
                   topologyFocusKey={topologyLocationKey}
                   showTopology={visibleLayerIds.has("topology")}
                   referenceTimeMs={playbackSnapshot ? Date.parse(playbackSnapshot.at) + 59_999 : Date.now()}
-                  domainLayers={overview.domainLayers}
+                  domainLayers={mapDomainLayers}
                   visibleLayerIds={visibleLayerIds}
                 />
                 <MapTimelinePlayer
@@ -943,6 +1165,7 @@ export default function UnifiedDisasterDashboard() {
                 lastUpdatedAt={lastUpdatedAt}
                 activeTab={operationsTab}
                 onActiveTabChange={setOperationsTab}
+                externalIntegrationStatus={externalIntegrationStatus}
               />
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
