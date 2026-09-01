@@ -95,6 +95,18 @@ const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color
   "road-segmentations": { type: "fill", color: "#53677a", opacity: 0.13 },
   "change-detections": { type: "fill", color: "#d88324", opacity: 0.15 },
   "vital-signal-detections": { type: "circle", color: "#d92f85" },
+
+  "external-firms": {
+    type: "circle",
+    color: "#e33b2e",
+    opacity: 0.88,
+  },
+
+  "external-landslide-history": {
+    type: "circle",
+    color: "#7651a8",
+    opacity: 0.8,
+  },
 };
 
 const DEFAULT_EXPECTED_TELEMETRY_INTERVAL_MS = 30_000;
@@ -324,7 +336,12 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         if (!map.getLayer(mapLayerId)) {
           if (style.type === "line") map.addLayer({ id: mapLayerId, type: "line", source: sourceId, paint: { "line-color": style.color, "line-width": 4, "line-opacity": 0.88 } });
           if (style.type === "fill") map.addLayer({ id: mapLayerId, type: "fill", source: sourceId, paint: { "fill-color": style.color, "fill-opacity": style.opacity ?? 0.16, "fill-outline-color": style.color } });
-          if (style.type === "circle") map.addLayer({ id: mapLayerId, type: "circle", source: sourceId, paint: { "circle-color": style.color, "circle-radius": layerId === "victim-candidates" ? 11 : 7, "circle-opacity": 0.75, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+          if (style.type === "circle") map.addLayer({ id: mapLayerId, type: "circle", source: sourceId, paint: { "circle-color": style.color, "circle-radius":
+            layerId === "victim-candidates"
+              ? 11
+              : layerId === "external-firms"
+                ? 9
+                : 7, "circle-opacity": 0.75, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
         }
         map.setLayoutProperty(mapLayerId, "visibility", visibleLayerIds.has(layerId) ? "visible" : "none");
       }

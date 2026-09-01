@@ -4,6 +4,23 @@ import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
+export type ExternalSourceId =
+  | "firms"
+  | "wildfireRisk"
+  | "landslideForecast"
+  | "landslideHistory"
+  | "landslideRegionalRisk";
+
+export type ExternalSourceState = {
+  status: "idle" | "loading" | "ok" | "error";
+  count: number;
+  checkedAt: string | null;
+  message?: string;
+};
+
+export type ExternalIntegrationStatus = Record<ExternalSourceId, ExternalSourceState>;
+
+
 interface OperationsPanelProps {
   overview: EventOverview;
   visibleLayerIds: Set<string>;
@@ -15,6 +32,7 @@ interface OperationsPanelProps {
   lastUpdatedAt: Date | null;
   activeTab: PanelTab;
   onActiveTabChange: (tab: PanelTab) => void;
+  externalIntegrationStatus: ExternalIntegrationStatus;
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -87,7 +105,19 @@ function occurredAt(row: ApiRecord, keys: string[]) {
   return raw ? relativeTime(raw) : "시각 없음";
 }
 
-export function OperationsPanel({ overview, visibleLayerIds, onLayerToggle, visibleResourceGroups, onResourceGroupToggle, onResourceGroupInspect, locations, lastUpdatedAt, activeTab, onActiveTabChange }: OperationsPanelProps) {
+export function OperationsPanel({
+  overview,
+  visibleLayerIds,
+  onLayerToggle,
+  visibleResourceGroups,
+  onResourceGroupToggle,
+  onResourceGroupInspect,
+  locations,
+  lastUpdatedAt,
+  activeTab,
+  onActiveTabChange,
+  externalIntegrationStatus,
+}: OperationsPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const activeAlerts = useMemo(() => {
     const rank: Record<string, number> = { CRITICAL: 0, SEVERE: 1, WARNING: 2, CAUTION: 3, NORMAL: 4 };
@@ -118,7 +148,34 @@ export function OperationsPanel({ overview, visibleLayerIds, onLayerToggle, visi
       { id: "vehicle-detections", label: "차량 탐지", description: "현장 차량 인식 결과" },
       { id: "road-segmentations", label: "도로 분할", description: "진입 가능 도로 분석" },
     ];
-  const allLayerIds = ["resources", "topology", "event", ...domainLayers.map((layer) => layer.id)];
+  const externalMapLayers = [
+    {
+      id: "external-firms",
+      label: "NASA FIRMS 위성 화점",
+      description: "위성에서 탐지된 산불 열원·화점",
+      count:
+        externalIntegrationStatus.firms.status === "ok"
+          ? externalIntegrationStatus.firms.count
+          : 0,
+    },
+    {
+      id: "external-landslide-history",
+      label: "산사태 발생이력",
+      description: "재난안전데이터 산사태 발생 지점",
+      count:
+        externalIntegrationStatus.landslideHistory.status === "ok"
+          ? externalIntegrationStatus.landslideHistory.count
+          : 0,
+    },
+  ];
+
+  const allLayerIds = [
+    "resources",
+    "topology",
+    "event",
+    ...domainLayers.map((layer) => layer.id),
+    ...externalMapLayers.map((layer) => layer.id),
+  ];
   const layerRows = (id: string) => id === "resources" ? [...overview.assets, ...overview.personnel]
     : id === "event" ? [overview.event as unknown as ApiRecord]
     : overview.domainLayers[id] ?? [];
@@ -133,6 +190,39 @@ export function OperationsPanel({ overview, visibleLayerIds, onLayerToggle, visi
   };
   const latestPrediction = overview.domainLayers["spread-predictions"]?.[0];
   const victimCandidates = overview.domainLayers["victim-candidates"] ?? [];
+
+  const externalSourceRows = [
+    {
+      id: "firms" as const,
+      provider: "NASA",
+      name: "FIRMS 위성 산불감지",
+      impact: "위성 열원·화점 지도 표시",
+    },
+    {
+      id: "wildfireRisk" as const,
+      provider: "산림청",
+      name: "산불위험예보",
+      impact: "지역별 산불 위험도 표시",
+    },
+    {
+      id: "landslideForecast" as const,
+      provider: "재난안전데이터",
+      name: "산사태 예측정보",
+      impact: "산사태 예측·예보 정보",
+    },
+    {
+      id: "landslideHistory" as const,
+      provider: "재난안전데이터",
+      name: "산사태 발생이력",
+      impact: "과거 산사태 발생정보",
+    },
+    {
+      id: "landslideRegionalRisk" as const,
+      provider: "재난안전데이터",
+      name: "산사태 지역위험정보",
+      impact: "지역별 산사태 위험정보",
+    },
+  ];
   const assetGroups = resourceGroups.filter((group) => group.id !== "PERSONNEL");
   const allAssetsVisible = assetGroups.every((group) => visibleResourceGroups.has(group.id));
   const toggleAllAssets = () => {
@@ -212,6 +302,43 @@ export function OperationsPanel({ overview, visibleLayerIds, onLayerToggle, visi
               )}
             </div>
           </section>}
+                      <section
+              className="layer-level-group"
+              aria-labelledby="external-layer-title"
+            >
+              <header>
+                <strong id="external-layer-title">
+                  외부기관 데이터 레이어
+                </strong>
+              </header>
+
+              {externalMapLayers.map((layer) => {
+                const enabled = visibleLayerIds.has(layer.id);
+
+                return (
+                  <button
+                    key={layer.id}
+                    type="button"
+                    className={enabled ? "enabled" : ""}
+                    onClick={() => onLayerToggle(layer.id)}
+                    aria-pressed={enabled}
+                    disabled={layer.count === 0}
+                  >
+                    <span>
+                      <b>{layer.label}</b>
+                      <small>{layer.description}</small>
+                    </span>
+                    <em>{layer.count}건</em>
+                  </button>
+                );
+              })}
+
+              <p className="operation-readonly-note">
+                산불위험예보·산사태 예측·지역위험정보는 현재 응답 계약에서
+                지도 좌표가 확정되지 않아 상태·건수만 표시합니다.
+              </p>
+            </section>
+
           {activeTab === "alerts" && <section className="operations-records" aria-label="활성 경보" aria-live="polite">
             {activeAlerts.length === 0 && <p className="operation-empty-state"><b>현재 활성 경보 없음</b><span>정상 상태입니다.</span></p>}
             {activeAlerts.slice(0, 12).map((alert) => {
@@ -264,7 +391,50 @@ export function OperationsPanel({ overview, visibleLayerIds, onLayerToggle, visi
             </article>)}
             <p className="operation-readonly-note">공식 판정은 실장비 원시로그와 시험실행 ID가 연결된 측정값만 사용합니다.</p>
           </section>}
-          {activeTab === "integrations" && <section className="operations-records" aria-label="외부 연계 상태">
+          {activeTab === "integrations" && <section className="operations-records" aria-label="외부기관 데이터 연계 상태">
+            <p className="operation-section-title"><strong>외부기관 실시간 연계</strong></p>
+
+            {externalSourceRows.map((source) => {
+              const state = externalIntegrationStatus[source.id];
+
+              const statusLabel =
+                state.status === "ok"
+                  ? "정상"
+                  : state.status === "loading"
+                    ? "확인 중"
+                    : state.status === "error"
+                      ? "연계 실패"
+                      : "미확인";
+
+              const statusCode =
+                state.status === "ok"
+                  ? "ACTIVE"
+                  : state.status === "error"
+                    ? "FAILED"
+                    : "INACTIVE";
+
+              return <article key={source.id} data-status={statusCode}>
+                <div>
+                  <strong>{source.provider} · {source.name}</strong>
+                  <span>{statusLabel}</span>
+                </div>
+
+                <p>{source.impact} · 수신 {state.count}건</p>
+
+                <small>
+                  {state.checkedAt
+                    ? `마지막 확인 ${relativeTime(state.checkedAt)}`
+                    : "아직 확인하지 않음"}
+                  {state.message ? ` · ${state.message}` : ""}
+                </small>
+              </article>;
+            })}
+
+            <p className="operation-readonly-note">
+              외부 API 인증정보 누락 또는 요청 실패는 정상 상태로 표시하지 않습니다.
+            </p>
+
+            <p className="operation-section-title"><strong>시스템 연계 기능 계약</strong></p>
             {overview.integrations.length === 0 && <p className="operation-empty-state"><b>등록된 연계 기능 없음</b><span>처리건 0이 아닌 연계 미등록 상태입니다.</span></p>}
             {overview.integrations.map((integration) => <article key={integration.id} data-status={integration.configured ? "ACTIVE" : "INACTIVE"}>
               <div><strong>{integration.id.replaceAll("-", " ")}</strong><span>{integration.configured ? "사용 가능" : "설정 필요"}</span></div>
