@@ -226,7 +226,26 @@ function featureCollection(layerId: string, rows: ApiRecord[]): GeoJSON.FeatureC
     type: "FeatureCollection",
     features: displayRows.flatMap((row, index) => {
       const geometry = geometryOf(layerId, row);
-      return geometry ? [{ type: "Feature", id: String(row.id ?? row.firelineId ?? row.predictionId ?? row.assessmentId ?? row.victimCandidateId ?? row.detectionId ?? index), geometry, properties: { layerId } } as GeoJSON.Feature] : [];
+      return geometry ? [{
+        type: "Feature",
+        id: String(
+          row.id ??
+          row.firelineId ??
+          row.predictionId ??
+          row.assessmentId ??
+          row.victimCandidateId ??
+          row.detectionId ??
+          index
+        ),
+        geometry,
+        properties: {
+          layerId,
+          provider: String(row.provider ?? ""),
+          observedAt: String(row.observedAt ?? ""),
+          confidence: row.confidence == null ? "" : String(row.confidence),
+          frp: Number.isFinite(Number(row.frp)) ? Number(row.frp) : null,
+        },
+      } as GeoJSON.Feature] : [];
     }),
   };
 }
@@ -349,6 +368,94 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     if (map.isStyleLoaded()) render(); else map.once("load", render);
     return () => { map.off("load", render); };
   }, [domainLayers, visibleLayerIds]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const layerId = "domain-layer-external-firms";
+
+    const showFirmsPopup = (event: maplibregl.MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+
+      const properties = feature.properties ?? {};
+      const observedAt = String(properties.observedAt ?? "");
+      const confidence = String(properties.confidence ?? "-");
+      const frpValue = Number(properties.frp);
+      const frp = Number.isFinite(frpValue) ? `${frpValue} MW` : "-";
+
+      const detectedAt = observedAt
+        ? new Date(observedAt).toLocaleString("ko-KR")
+        : "-";
+
+      const popupContent = document.createElement("div");
+      popupContent.style.minWidth = "180px";
+      popupContent.style.fontFamily = "sans-serif";
+
+      const title = document.createElement("strong");
+      title.textContent = "NASA FIRMS 위성 화점";
+      popupContent.appendChild(title);
+
+      const detectedAtRow = document.createElement("div");
+      detectedAtRow.style.marginTop = "8px";
+      detectedAtRow.textContent = `탐지시각: ${detectedAt}`;
+      popupContent.appendChild(detectedAtRow);
+
+      const frpRow = document.createElement("div");
+      frpRow.textContent = `FRP: ${frp}`;
+      popupContent.appendChild(frpRow);
+
+      const confidenceRow = document.createElement("div");
+      confidenceRow.textContent = `신뢰도: ${confidence}`;
+      popupContent.appendChild(confidenceRow);
+
+      const notice = document.createElement("div");
+      notice.style.marginTop = "6px";
+      notice.style.fontSize = "11px";
+      notice.style.color = "#667";
+      notice.textContent = "위성 열원 탐지값 · 산불 확정정보 아님";
+      popupContent.appendChild(notice);
+
+      new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: true,
+        offset: 12,
+      })
+        .setLngLat(event.lngLat)
+        .setDOMContent(popupContent)
+        .addTo(map);
+    };
+
+    const pointer = () => {
+      map.getCanvas().style.cursor = "pointer";
+    };
+
+    const unpointer = () => {
+      map.getCanvas().style.cursor = "";
+    };
+
+    const bind = () => {
+      if (!map.getLayer(layerId)) return;
+
+      map.on("click", layerId, showFirmsPopup);
+      map.on("mouseenter", layerId, pointer);
+      map.on("mouseleave", layerId, unpointer);
+    };
+
+    if (map.isStyleLoaded()) bind();
+    else map.once("load", bind);
+
+    return () => {
+      map.off("load", bind);
+
+      if (map.getLayer(layerId)) {
+        map.off("click", layerId, showFirmsPopup);
+        map.off("mouseenter", layerId, pointer);
+        map.off("mouseleave", layerId, unpointer);
+      }
+    };
+  }, [domainLayers]);
 
   useEffect(() => {
     const map = mapRef.current;
