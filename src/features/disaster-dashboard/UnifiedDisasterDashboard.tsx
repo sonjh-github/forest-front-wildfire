@@ -786,6 +786,16 @@ export default function UnifiedDisasterDashboard() {
     });
   }, []);
 
+  useEffect(() => {
+    void refreshExternalIntegrations();
+
+    const timer = window.setInterval(() => {
+      void refreshExternalIntegrations();
+    }, 30_000);
+
+    return () => window.clearInterval(timer);
+  }, [refreshExternalIntegrations]);
+
   const refreshOverview = useCallback(async () => {
     const selected = events.find((event) => event.eventId === selectedId);
     if (!selected) return;
