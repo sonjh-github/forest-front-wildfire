@@ -223,6 +223,31 @@ export function OperationsPanel({
       impact: "지역별 산사태 위험정보",
     },
   ];
+  const externalStates = Object.values(externalIntegrationStatus);
+
+  const externalHealthyCount = externalStates.filter(
+    (state) => state.status === "ok",
+  ).length;
+
+  const externalFailedCount = externalStates.filter(
+    (state) => state.status === "error",
+  ).length;
+
+  const externalCheckingCount = externalStates.filter(
+    (state) => state.status === "loading",
+  ).length;
+
+  const externalUncheckedCount =
+    externalStates.length
+    - externalHealthyCount
+    - externalFailedCount
+    - externalCheckingCount;
+
+  const latestExternalCheckedAt = externalStates
+    .map((state) => state.checkedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+
   const assetGroups = resourceGroups.filter((group) => group.id !== "PERSONNEL");
   const allAssetsVisible = assetGroups.every((group) => visibleResourceGroups.has(group.id));
   const toggleAllAssets = () => {
@@ -393,6 +418,43 @@ export function OperationsPanel({
           </section>}
           {activeTab === "integrations" && <section className="operations-records" aria-label="외부기관 데이터 연계 상태">
             <p className="operation-section-title"><strong>외부기관 실시간 연계</strong></p>
+
+            <article
+              data-status={
+                externalFailedCount > 0
+                  ? "FAILED"
+                  : externalCheckingCount > 0 || externalUncheckedCount > 0
+                    ? "INACTIVE"
+                    : "ACTIVE"
+              }
+            >
+              <div>
+                <strong>외부기관 연계 요약</strong>
+                <span>
+                  {externalCheckingCount > 0
+                    ? "갱신 중"
+                    : externalFailedCount > 0
+                      ? "일부 장애"
+                      : externalHealthyCount === externalStates.length
+                        ? "정상"
+                        : "확인 필요"}
+                </span>
+              </div>
+
+              <p>
+                정상 {externalHealthyCount} · 장애 {externalFailedCount}
+                {" · "}확인 중 {externalCheckingCount}
+                {" · "}미확인 {externalUncheckedCount}
+              </p>
+
+              <small>
+                30초 자동 갱신 · {
+                  latestExternalCheckedAt
+                    ? `마지막 확인 ${relativeTime(latestExternalCheckedAt)}`
+                    : "아직 확인하지 않음"
+                }
+              </small>
+            </article>
 
             {externalSourceRows.map((source) => {
               const state = externalIntegrationStatus[source.id];
