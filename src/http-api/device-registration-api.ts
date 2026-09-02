@@ -58,6 +58,7 @@ export interface DashboardAssetDetail extends Record<string, unknown> {
   model_name?: string | null;
   specifications?: Record<string, unknown> | null;
   asset_type?: DashboardAssetType | null;
+  vendor_mappings?: DashboardVendorMapping[];
 }
 
 export function extractRegisteredAssetId(
@@ -108,6 +109,11 @@ export const dashboardDeviceApi = {
         method: "POST",
         body: JSON.stringify(payload),
       },
+    ),
+
+  assets: (limit = 100) =>
+    dashboardApi<{ data: DashboardAssetDetail[] }>(
+      `/api/v1/dashboard/assets?limit=${limit}`,
     ),
 
   asset: (assetId: string) =>

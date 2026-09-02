@@ -8,7 +8,6 @@ import {
 import {
   dashboardDeviceApi,
   extractRegisteredAssetId,
-  extractVendorMapping,
   type DashboardAssetDetail,
   type DashboardAssetRegistrationRequest,
   type DashboardAssetType,
@@ -110,12 +109,6 @@ function parseSpecifications(
   return parsed as Record<string, unknown>;
 }
 
-function registrationStatusLabel(
-  result: RegistrationResult | null,
-) {
-  return result ? "등록 완료" : "등록 전";
-}
-
 function typeDisplay(
   type: DashboardAssetType | undefined,
 ) {
@@ -123,6 +116,33 @@ function typeDisplay(
   return type.description
     ? `${type.name} · ${type.description}`
     : type.name;
+}
+
+function recommendedDeviceType(
+  vendor: DashboardVendor,
+  assetTypeName = "",
+) {
+  const normalized = assetTypeName.toUpperCase();
+  if (vendor === "JININFRA") {
+    if (normalized.includes("GATEWAY") || normalized.includes("게이트웨이")) return "RTK_LPWA_GATEWAY";
+    if (normalized.includes("BASE") || normalized.includes("기지국")) return "RTK_BASE_STATION";
+    return "RTK_TERMINAL";
+  }
+  if (normalized.includes("NMS") || normalized.includes("관리")) return "TVWS_NMS";
+  if (normalized.includes("CPE") || normalized.includes("단말")) return "TVWS_CPE";
+  return "TVWS_BASE";
+}
+
+function suggestedAssetCode(
+  vendor: DashboardVendor,
+  deviceType: string,
+  vendorDeviceId: string,
+) {
+  const suffix = vendorDeviceId.trim().replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return [vendor === "JININFRA" ? "JIN" : "NDPS", deviceType.replace(/^(RTK_|TVWS_)/, ""), suffix || "001"]
+    .filter(Boolean)
+    .join("-")
+    .toUpperCase();
 }
 
 export default function AssetRegistryModal({
@@ -134,6 +154,12 @@ export default function AssetRegistryModal({
 }) {
   const [assetTypes, setAssetTypes] =
     useState<DashboardAssetType[]>([]);
+  const [registeredAssets, setRegisteredAssets] =
+    useState<DashboardAssetDetail[]>([]);
+  const [loadingAssets, setLoadingAssets] =
+    useState(true);
+  const [assetSearch, setAssetSearch] =
+    useState("");
   const [loadingTypes, setLoadingTypes] =
     useState(true);
   const [saving, setSaving] =
@@ -144,6 +170,8 @@ export default function AssetRegistryModal({
     useState<RegistrationForm>(initialForm);
   const [result, setResult] =
     useState<RegistrationResult | null>(null);
+  const [showOptional, setShowOptional] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const selectedAssetType = useMemo(
     () =>
@@ -154,6 +182,31 @@ export default function AssetRegistryModal({
       ),
     [assetTypes, form.assetTypeId],
   );
+
+  const visibleAssets = useMemo(() => {
+    const query = assetSearch.trim().toLowerCase();
+    if (!query) return registeredAssets;
+    return registeredAssets.filter((asset) => {
+      const mapping = asset.vendor_mappings?.[0];
+      return [asset.asset_id, asset.asset_code, asset.asset_name, asset.asset_type?.name, mapping?.vendor_code, mapping?.vendor_device_id, mapping?.device_type]
+        .some((value) => String(value ?? "").toLowerCase().includes(query));
+    });
+  }, [assetSearch, registeredAssets]);
+
+  const loadRegisteredAssets = useCallback(async () => {
+    setLoadingAssets(true);
+    try {
+      const response = await dashboardDeviceApi.assets();
+      setRegisteredAssets(response.data);
+    } catch (error) {
+      setMessage({
+        kind: "error",
+        text: errorText(error, "등록 장비 목록을 불러오지 못했습니다."),
+      });
+    } finally {
+      setLoadingAssets(false);
+    }
+  }, []);
 
   const loadAssetTypes = useCallback(
     async () => {
@@ -194,7 +247,8 @@ export default function AssetRegistryModal({
 
   useEffect(() => {
     void loadAssetTypes();
-  }, [loadAssetTypes]);
+    void loadRegisteredAssets();
+  }, [loadAssetTypes, loadRegisteredAssets]);
 
   const updateVendor = (
     vendor: DashboardVendor,
@@ -202,9 +256,15 @@ export default function AssetRegistryModal({
     setForm((current) => ({
       ...current,
       vendor,
-      deviceType:
-        DEVICE_TYPE_SUGGESTIONS[vendor][0],
+      deviceType: recommendedDeviceType(vendor, selectedAssetType?.name),
     }));
+  };
+
+  const copyAssetId = async () => {
+    if (!result) return;
+    await navigator.clipboard.writeText(result.assetId);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   };
 
   const submit = async (
@@ -330,6 +390,7 @@ export default function AssetRegistryModal({
       };
 
       setResult(nextResult);
+      await loadRegisteredAssets();
 
       setMessage({
         kind: "success",
@@ -350,11 +411,6 @@ export default function AssetRegistryModal({
     }
   };
 
-  const vendorMapping =
-    extractVendorMapping(
-      result?.coreData,
-    );
-
   const resetForm = () => {
     const next = initialForm();
     next.assetTypeId =
@@ -362,6 +418,8 @@ export default function AssetRegistryModal({
     setForm(next);
     setResult(null);
     setMessage(null);
+    setShowOptional(false);
+    setCopied(false);
   };
 
   return (
@@ -402,231 +460,54 @@ export default function AssetRegistryModal({
           </button>
         </header>
 
-        <div className="asset-boundary-guide">
-          <div>
-            <b>① 장비 유형 조회</b>
-            <span>
-              asset_type_id를 Core에서 조회
-            </span>
-          </div>
-          <i>→</i>
-          <div>
-            <b>② 등록·업체 연결</b>
-            <span>
-              asset + vendor mapping을 한 번에 저장
-            </span>
-          </div>
-          <i>→</i>
-          <div>
-            <b>③ Core 저장 확인</b>
-            <span>
-              assetId + vendor mapping 저장 결과 확인
-            </span>
-          </div>
-        </div>
-
         <div className="asset-registry-body">
           <section
             className="asset-catalog-panel"
-            aria-label="장비 등록 상태"
+            aria-label="등록 장비 목록"
           >
             <header>
               <div>
-                <small>등록 흐름</small>
-                <strong>
-                  {registrationStatusLabel(
-                    result,
-                  )}
-                </strong>
+                <small>DEVICE LIST</small>
+                <strong>등록 장비 {registeredAssets.length}대</strong>
               </div>
-              <span>
-                Core 장비 등록과 업체 매핑 성공을
-                기준으로 판정합니다.
-              </span>
+              <span>Core에 등록된 장비와 업체 연결 정보입니다.</span>
             </header>
 
+            <div className="asset-catalog-filter">
+              <input
+                value={assetSearch}
+                onChange={(event) => setAssetSearch(event.target.value)}
+                placeholder="관리코드, assetId, 업체 장비번호로 검색"
+                aria-label="등록 장비 검색"
+              />
+              <button type="button" onClick={() => void loadRegisteredAssets()} disabled={loadingAssets}>
+                {loadingAssets ? "불러오는 중…" : "목록 새로고침"}
+              </button>
+            </div>
+
             <div className="asset-catalog-list">
-              <article className="asset-catalog-row">
-                <div>
-                  <span>STEP 1</span>
-                  <em
-                    data-status={
-                      assetTypes.length
-                        ? "READY"
-                        : "PENDING"
-                    }
-                  >
-                    {loadingTypes
-                      ? "조회 중"
-                      : assetTypes.length
-                        ? "준비됨"
-                        : "확인 필요"}
-                  </em>
-                </div>
-                <strong>
-                  장비 유형 조회
-                </strong>
-                <small>
-                  GET /api/v1/dashboard/asset-types
-                </small>
-                <dl>
-                  <div>
-                    <dt>유형 수</dt>
-                    <dd>
-                      {assetTypes.length}개
-                    </dd>
-                  </div>
-                </dl>
-              </article>
-
-              <article className="asset-catalog-row">
-                <div>
-                  <span>STEP 2</span>
-                  <em
-                    data-status={
-                      result
-                        ? "ACTIVE"
-                        : "PENDING"
-                    }
-                  >
-                    {result
-                      ? "등록 완료"
-                      : "대기"}
-                  </em>
-                </div>
-                <strong>
-                  물리 장비 + 업체 매핑
-                </strong>
-                <small>
-                  POST /api/v1/dashboard/assets
-                </small>
-                <dl>
-                  <div>
-                    <dt>assetId</dt>
-                    <dd>
-                      {result?.assetId ?? "-"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Core 매핑</dt>
-                    <dd>
-                      {vendorMapping?.status
-                        ? String(
-                            vendorMapping.status,
-                          )
-                        : result
-                          ? "등록됨"
-                          : "-"}
-                    </dd>
-                  </div>
-                </dl>
-              </article>
-
-              <article className="asset-catalog-row">
-                <div>
-                  <span>STEP 3</span>
-                  <em
-                    data-status={
-                      result
-                        ? "ACTIVE"
-                        : "INACTIVE"
-                    }
-                  >
-                    {result
-                      ? "확인 완료"
-                      : "대기"}
-                  </em>
-                </div>
-                <strong>
-                  Core 저장 결과 확인
-                </strong>
-                <small>
-                  GET /api/v1/dashboard/assets/&#123;assetId&#125;
-                </small>
-                <dl>
-                  <div>
-                    <dt>Core 상태</dt>
-                    <dd>
-                      {result
-                        ? String(
-                            result.detail?.status ??
-                            result.coreData.status ??
-                            result.registrationRequest.status ??
-                            "-",
-                          )
-                        : "-"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>업체 매핑</dt>
-                    <dd>
-                      {vendorMapping?.status
-                        ? String(vendorMapping.status)
-                        : result
-                          ? "등록됨"
-                          : "-"}
-                    </dd>
-                  </div>
-                </dl>
-              </article>
-
-              {result && (
-                <article className="asset-catalog-row">
-                  <div>
-                    <span>등록 결과</span>
-                    <em data-status="ACTIVE">
-                      등록 완료
-                    </em>
-                  </div>
-                  <strong>
-                    {String(
-                      result.detail?.asset_name ??
-                      result.coreData.asset_name ??
-                      result.registrationRequest
-                        .assetName ??
-                      result.registrationRequest
-                        .assetCode,
-                    )}
-                  </strong>
-                  <small>
-                    {result.assetId}
-                  </small>
-                  <dl>
-                    <div>
-                      <dt>관리 코드</dt>
-                      <dd>
-                        {String(
-                          result.detail
-                            ?.asset_code ??
-                            result.coreData
-                              .asset_code ??
-                            result
-                              .registrationRequest
-                              .assetCode,
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>장비 유형</dt>
-                      <dd>
-                        {String(
-                          result.detail
-                            ?.asset_type?.name ??
-                            result.assetTypeName ??
-                            "-",
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>업체</dt>
-                      <dd>
-                        {result.registrationRequest.vendor}
-                      </dd>
-                    </div>
-                  </dl>
-
-                </article>
+              {loadingAssets && !registeredAssets.length && <p className="asset-catalog-empty">등록 장비를 불러오는 중입니다.</p>}
+              {!loadingAssets && !visibleAssets.length && (
+                <p className="asset-catalog-empty">{assetSearch ? "검색 결과가 없습니다." : "아직 등록된 장비가 없습니다. 오른쪽에서 첫 장비를 등록하세요."}</p>
               )}
+              {visibleAssets.map((asset) => {
+                const mapping = asset.vendor_mappings?.[0];
+                return (
+                  <article className="asset-catalog-row asset-device-row" key={asset.asset_id}>
+                    <div>
+                      <span>{asset.asset_type?.name ?? "장비"}</span>
+                      <em data-status={String(mapping?.status ?? asset.status ?? "READY")}>{String(mapping?.status ?? asset.status ?? "READY")}</em>
+                    </div>
+                    <strong>{asset.asset_name || asset.asset_code || asset.asset_id}</strong>
+                    <small>{asset.asset_id}</small>
+                    <dl>
+                      <div><dt>관리 코드</dt><dd>{asset.asset_code ?? "-"}</dd></div>
+                      <div><dt>업체 장비번호</dt><dd>{mapping?.vendor_device_id ?? "-"}</dd></div>
+                      <div><dt>업체 / 유형</dt><dd>{mapping ? `${mapping.vendor_code ?? "-"} · ${mapping.device_type ?? "-"}` : "미연결"}</dd></div>
+                    </dl>
+                  </article>
+                );
+              })}
             </div>
           </section>
 
@@ -642,16 +523,32 @@ export default function AssetRegistryModal({
                 물리 장비 등록
               </strong>
               <span>
-                사건 배정은 이 화면의 범위가
-                아닙니다. 먼저 전역 장비와 업체
-                식별자를 연결합니다.
+                빨간색 필수 항목 5개만 입력하면 Core UUID 발급과 업체 연결이 한 번에 완료됩니다.
               </span>
             </header>
+
+            <div className="asset-required-guide">
+              <strong>처음 등록하시나요?</strong>
+              <span>장비 유형·업체·실제 장비번호를 입력하고 추천된 업체 장비 유형을 확인하세요. 관리코드는 아래의 자동 만들기 버튼으로 만들 수 있습니다.</span>
+            </div>
+
+            {result && (
+              <section className="asset-id-result" aria-live="polite">
+                <div>
+                  <small>장비 등록 완료 · Core 발급 UUID</small>
+                  <strong>{result.assetId}</strong>
+                  <span>이 값이 통합 시스템에서 장비를 식별하는 assetId입니다.</span>
+                </div>
+                <button type="button" onClick={() => void copyAssetId()}>
+                  {copied ? "복사됨" : "assetId 복사"}
+                </button>
+              </section>
+            )}
 
             <div className="asset-form-grid">
               <label>
                 <span>
-                  assetCode <b>필수</b>
+                  통합 장비 관리코드 <b>필수</b>
                 </span>
                 <input
                   value={form.assetCode}
@@ -662,9 +559,17 @@ export default function AssetRegistryModal({
                         event.target.value,
                     })
                   }
-                  placeholder="예: DASH-RTK-01"
+                  placeholder="예: JIN-RTK-GATEWAY-001"
                   required
                 />
+                <small>통합 시스템에서 찾기 쉬운 고유 관리번호입니다.</small>
+                <button
+                  className="asset-inline-action"
+                  type="button"
+                  onClick={() => setForm({ ...form, assetCode: suggestedAssetCode(form.vendor, form.deviceType, form.vendorDeviceId) })}
+                >
+                  업체 정보로 관리코드 자동 만들기
+                </button>
               </label>
 
               <label>
@@ -674,10 +579,14 @@ export default function AssetRegistryModal({
                 <select
                   value={form.assetTypeId}
                   onChange={(event) =>
-                    setForm({
-                      ...form,
-                      assetTypeId:
-                        event.target.value,
+                    setForm((current) => {
+                      const nextId = event.target.value;
+                      const nextType = assetTypes.find((item) => item.asset_type_id === nextId);
+                      return {
+                        ...current,
+                        assetTypeId: nextId,
+                        deviceType: recommendedDeviceType(current.vendor, nextType?.name),
+                      };
                     })
                   }
                   disabled={loadingTypes}
@@ -702,75 +611,6 @@ export default function AssetRegistryModal({
                     selectedAssetType,
                   )}
                 </small>
-              </label>
-
-              <label className="wide">
-                <span>장비명</span>
-                <input
-                  value={form.assetName}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      assetName:
-                        event.target.value,
-                    })
-                  }
-                  placeholder="예: 진화대원 RTK 단말 1호"
-                />
-              </label>
-
-              <label>
-                <span>상태</span>
-                <select
-                  value={form.status}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      status:
-                        event.target.value,
-                    })
-                  }
-                >
-                  <option value="READY">
-                    READY
-                  </option>
-                  <option value="ACTIVE">
-                    ACTIVE
-                  </option>
-                  <option value="SUSPENDED">
-                    SUSPENDED
-                  </option>
-                </select>
-              </label>
-
-              <label>
-                <span>제품명</span>
-                <input
-                  value={form.productName}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      productName:
-                        event.target.value,
-                    })
-                  }
-                  placeholder="제품명"
-                />
-              </label>
-
-              <label>
-                <span>모델명</span>
-                <input
-                  value={form.modelName}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      modelName:
-                        event.target.value,
-                    })
-                  }
-                  placeholder="모델명"
-                />
               </label>
 
               <label>
@@ -811,13 +651,14 @@ export default function AssetRegistryModal({
                   placeholder="예: RTK-TERM-001"
                   required
                 />
+                <small>장비 본체나 업체 시스템에서 사용하는 실제 고유번호를 입력하세요.</small>
               </label>
 
               <label>
                 <span>
-                  deviceType <b>필수</b>
+                  업체 장비 유형 <b>필수</b>
                 </span>
-                <input
+                <select
                   value={form.deviceType}
                   onChange={(event) =>
                     setForm({
@@ -826,74 +667,32 @@ export default function AssetRegistryModal({
                         event.target.value,
                     })
                   }
-                  list={`device-types-${form.vendor}`}
-                  placeholder="업체 계약상의 장비 유형"
                   required
-                />
-                <datalist
-                  id={`device-types-${form.vendor}`}
                 >
                   {DEVICE_TYPE_SUGGESTIONS[
                     form.vendor
                   ].map((type) => (
-                    <option
-                      key={type}
-                      value={type}
-                    />
+                    <option key={type} value={type}>{type}</option>
                   ))}
-                </datalist>
-              </label>
-
-              <label>
-                <span>매핑 상태</span>
-                <select
-                  value={form.mappingStatus}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      mappingStatus:
-                        event.target
-                          .value as DashboardMappingStatus,
-                    })
-                  }
-                >
-                  <option value="ACTIVE">
-                    ACTIVE
-                  </option>
-                  <option value="PENDING">
-                    PENDING
-                  </option>
-                  <option value="SUSPENDED">
-                    SUSPENDED
-                  </option>
                 </select>
-              </label>
-
-              <label className="wide">
-                <span>
-                  상세 사양 JSON
-                </span>
-                <textarea
-                  value={
-                    form.specificationsText
-                  }
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      specificationsText:
-                        event.target.value,
-                    })
-                  }
-                  rows={7}
-                  spellCheck={false}
-                  placeholder={'{"camera":"thermal"}'}
-                  style={{
-                    width: "100%",
-                    resize: "vertical",
-                  }}
-                />
+                <small>선택한 업체와 장비 유형에 맞는 값을 자동 추천합니다.</small>
               </label>
             </div>
+
+            <button className="asset-optional-toggle" type="button" onClick={() => setShowOptional((value) => !value)}>
+              {showOptional ? "선택 정보 닫기" : "장비명·제품명 등 선택 정보 입력"}
+            </button>
+
+            {showOptional && (
+              <div className="asset-form-grid asset-optional-grid">
+                <label className="wide"><span>장비명</span><input value={form.assetName} onChange={(event) => setForm({ ...form, assetName: event.target.value })} placeholder="예: 진화대원 RTK 단말 1호" /></label>
+                <label><span>제품명</span><input value={form.productName} onChange={(event) => setForm({ ...form, productName: event.target.value })} placeholder="제품명" /></label>
+                <label><span>모델명</span><input value={form.modelName} onChange={(event) => setForm({ ...form, modelName: event.target.value })} placeholder="모델명" /></label>
+                <label><span>장비 상태</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="READY">READY</option><option value="ACTIVE">ACTIVE</option><option value="SUSPENDED">SUSPENDED</option></select></label>
+                <label><span>연결 상태</span><select value={form.mappingStatus} onChange={(event) => setForm({ ...form, mappingStatus: event.target.value as DashboardMappingStatus })}><option value="ACTIVE">ACTIVE</option><option value="PENDING">PENDING</option><option value="SUSPENDED">SUSPENDED</option></select></label>
+                <label className="wide"><span>상세 사양 JSON</span><textarea value={form.specificationsText} onChange={(event) => setForm({ ...form, specificationsText: event.target.value })} rows={5} spellCheck={false} placeholder={'{"camera":"thermal"}'} /></label>
+              </div>
+            )}
 
             <aside>
               <strong>
@@ -905,19 +704,6 @@ export default function AssetRegistryModal({
                 asset_type_id와 업체 장비번호만
                 전달하며 UUID를 직접 만들지
                 않습니다.
-              </span>
-            </aside>
-
-            <aside>
-              <strong>
-                업체 계약 확인
-              </strong>
-              <span>
-                deviceType은 Vendor /register의
-                검증 대상입니다. 현재 구현은
-                추천값을 제공하되 직접 입력도
-                허용하고, 최종 MAPPED 응답을
-                사용 가능 기준으로 사용합니다.
               </span>
             </aside>
 
@@ -948,7 +734,7 @@ export default function AssetRegistryModal({
               >
                 {saving
                   ? "등록 및 연결 확인 중…"
-                  : "등록 및 업체 연결"}
+                  : "장비 등록하고 assetId 발급"}
               </button>
             </footer>
           </form>

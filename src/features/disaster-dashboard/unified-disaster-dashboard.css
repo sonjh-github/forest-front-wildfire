@@ -2157,7 +2157,7 @@
 /* Component layout: reserve space for each panel instead of overlaying the map. */
 .unified-disaster-board {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   height: 100dvh;
   min-height: 620px;
@@ -3129,6 +3129,17 @@
   min-width: 0; height: 36px; padding: 0 10px; border: 1px solid #c6d3ce; border-radius: 5px;
   outline: 0; background: #fff; color: #203c34; font: inherit; font-size: 10px;
 }
+.asset-catalog-filter button {
+  height: 36px;
+  border: 1px solid #b9ccc5;
+  border-radius: 5px;
+  background: #fff;
+  color: #35675a;
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.asset-catalog-filter button:disabled { opacity: .6; cursor: wait; }
 .asset-catalog-filter input:focus,
 .asset-catalog-filter select:focus,
 .asset-registration-form input:focus,
@@ -3145,6 +3156,7 @@
 .asset-catalog-row dl div { min-width: 0; padding-top: 6px; border-top: 1px solid #e5ebe8; }
 .asset-catalog-row dt { margin-bottom: 2px; color: #83918c; font-size: 8px; }
 .asset-catalog-row dd { margin: 0; overflow: hidden; color: #40574f; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.asset-device-row > small { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .asset-catalog-empty { margin: 30px 12px; color: #768881; font-size: 11px; text-align: center; }
 
 .asset-registration-form { display: flex; flex-direction: column; overflow-y: auto; }
@@ -3155,8 +3167,73 @@
 .asset-form-grid label.wide { grid-column: 1 / -1; }
 .asset-form-grid label > span,
 .asset-registration-form legend { color: #425b53; font-size: 9px; font-weight: 800; }
+.asset-form-grid label > small { color: #71847d; font-size: 8px; line-height: 1.45; }
 .asset-form-grid label b,
 .asset-registration-form legend b { color: #b24b26; font-size: 8px; }
+.asset-required-guide {
+  margin: 12px 14px 0;
+  padding: 11px 12px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid #bcd8cf;
+  border-radius: 7px;
+  background: #f0f8f5;
+}
+.asset-required-guide strong { color: #145c49; font-size: 11px; }
+.asset-required-guide span { color: #527068; font-size: 9px; line-height: 1.55; }
+.asset-inline-action {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #176b57;
+  font-size: 8px;
+  font-weight: 850;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.asset-id-result {
+  margin: 12px 14px 0;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 2px solid #278267;
+  border-radius: 8px;
+  background: #ebf8f3;
+  box-shadow: 0 6px 18px rgba(27, 105, 82, .1);
+}
+.asset-id-result > div { min-width: 0; display: grid; gap: 4px; }
+.asset-id-result small { color: #29705d; font-size: 8px; font-weight: 850; }
+.asset-id-result strong { overflow-wrap: anywhere; color: #113e32; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 15px; }
+.asset-id-result span { color: #58736b; font-size: 8px; }
+.asset-id-result button {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid #176b57;
+  border-radius: 5px;
+  background: #176b57;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.asset-optional-toggle {
+  margin: 8px 14px 0;
+  padding: 9px 10px;
+  border: 1px dashed #b8c9c3;
+  border-radius: 6px;
+  background: #f8faf9;
+  color: #526d64;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.asset-optional-toggle:hover { border-color: #6d9f90; background: #f1f7f5; }
+.asset-optional-grid { padding-top: 10px; }
+.asset-optional-grid textarea { width: 100%; padding: 9px 10px; resize: vertical; border: 1px solid #c6d3ce; border-radius: 5px; color: #203c34; font: 9px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .asset-registration-form fieldset { margin: 10px 14px 0; padding: 10px; border: 1px solid #d2ddd8; border-radius: 6px; }
 .asset-registration-form legend { padding: 0 5px; }
 .asset-capability-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
@@ -3206,5 +3283,7 @@
   .asset-form-grid label.wide { grid-column: auto; }
   .asset-capability-grid { grid-template-columns: repeat(3, 1fr); }
   .asset-catalog-row dl { grid-template-columns: 1fr; }
+  .asset-id-result { align-items: stretch; flex-direction: column; }
+  .asset-id-result button { align-self: flex-start; }
   .readiness-actions .readiness-connection { display: none; }
 }
