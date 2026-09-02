@@ -1,4 +1,4 @@
-import { dashboardApi } from "./client";
+import { dashboardApi, HttpApiError } from "./client";
 
 export interface ExternalListMeta {
   pageNo?: number;
@@ -11,6 +11,58 @@ export interface ExternalListMeta {
 export interface ExternalListResponse<T> {
   data: T[];
   meta: ExternalListMeta;
+}
+
+export function externalIntegrationErrorMessage(
+  error: unknown,
+): string {
+  if (error instanceof HttpApiError) {
+    const message = error.message;
+
+    if (
+      /UNREGISTERED IP|등록되지 않은 IP/i.test(message)
+    ) {
+      return "외부기관 서버 접근 허용(IP 등록) 확인 필요";
+    }
+
+    if (
+      error.status === 401 ||
+      error.status === 403 ||
+      /HTTP 401|HTTP 403|UNAUTHORIZED|FORBIDDEN|SERVICE[_ ]?KEY/i.test(message)
+    ) {
+      return "외부기관 API 인증·권한 확인 필요";
+    }
+
+    if (error.status >= 500) {
+      return "외부기관 응답 오류";
+    }
+
+    return "외부기관 API 요청 실패";
+  }
+
+  if (
+    error instanceof TypeError ||
+    (
+      error instanceof Error &&
+      /FAILED TO FETCH|NETWORK/i.test(error.message)
+    )
+  ) {
+    return "외부기관 응답 없음 또는 네트워크 연결 확인 필요";
+  }
+
+  return "외부기관 연계 상태 확인 필요";
+}
+
+async function externalRequest<T>(
+  request: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    throw new Error(
+      externalIntegrationErrorMessage(error),
+    );
+  }
 }
 
 export interface FirmsHotspot {
@@ -98,27 +150,37 @@ export interface LandslideRegionalRisk {
 
 export const externalDisasterApi = {
   wildfireFirms: () =>
-    dashboardApi<ExternalListResponse<FirmsHotspot>>(
-      "/api/v1/external/wildfire/firms"
+    externalRequest(() =>
+      dashboardApi<ExternalListResponse<FirmsHotspot>>(
+        "/api/v1/external/wildfire/firms"
+      )
     ),
 
   wildfireRisk: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<WildfireRisk>>(
-      `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
+    externalRequest(() =>
+      dashboardApi<ExternalListResponse<WildfireRisk>>(
+        `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
+      )
     ),
 
   landslideForecast: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<LandslideForecast>>(
-      `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`
+    externalRequest(() =>
+      dashboardApi<ExternalListResponse<LandslideForecast>>(
+        `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`
+      )
     ),
 
   landslideHistory: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<LandslideHistory>>(
-      `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`
+    externalRequest(() =>
+      dashboardApi<ExternalListResponse<LandslideHistory>>(
+        `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`
+      )
     ),
 
   landslideRegionalRisk: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<LandslideRegionalRisk>>(
-      `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
+    externalRequest(() =>
+      dashboardApi<ExternalListResponse<LandslideRegionalRisk>>(
+        `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
+      )
     ),
 };
