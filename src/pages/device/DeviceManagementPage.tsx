@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AssetRegistryModal from "../../features/disaster-dashboard/AssetRegistryModal";
 import DeviceLogList from "./DeviceLogList";
 import "./device-management-page.css";
@@ -6,6 +6,11 @@ import "./device-management-page.css";
 export default function DeviceManagementPage() {
   const [registryOpen, setRegistryOpen] = useState(false);
   const [lastRegisteredAt, setLastRegisteredAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    document.body.classList.add("device-page-scroll");
+    return () => document.body.classList.remove("device-page-scroll");
+  }, []);
 
   return (
     <main className="device-management-page">
@@ -29,31 +34,6 @@ export default function DeviceManagementPage() {
           </button>
         </div>
       </header>
-
-      <section className="device-management-summary">
-        <article>
-          <small>DEVICE REGISTRY</small>
-          <strong>물리 장비 등록</strong>
-          <span>
-            Core asset 생성과 vendor mapping 저장을 한 번에 처리합니다.
-          </span>
-          <button
-            type="button"
-            onClick={() => setRegistryOpen(true)}
-          >
-            등록 화면 열기
-          </button>
-        </article>
-
-        <article>
-          <small>DEVICE LOG</small>
-          <strong>장비 로그</strong>
-          <span>
-            Core에 저장된 장비 연동 메시지를 assetId 기준으로 조회합니다.
-          </span>
-          <em>assetId 조회</em>
-        </article>
-      </section>
 
       <DeviceLogList lastRegisteredAt={lastRegisteredAt} />
 

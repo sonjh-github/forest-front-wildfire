@@ -1,5 +1,19 @@
+.device-page-scroll {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.device-page-scroll #root {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
 .device-management-page {
   min-height: 100vh;
+  box-sizing: border-box;
   padding: 32px;
   background: #f3f7f5;
   color: #18332b;
@@ -19,7 +33,6 @@
 }
 
 .device-management-header small,
-.device-management-summary small,
 .device-log-panel small {
   display: block;
   margin-bottom: 7px;
@@ -44,8 +57,7 @@
   gap: 10px;
 }
 
-.device-management-actions button,
-.device-management-summary button {
+.device-management-actions button {
   min-height: 42px;
   padding: 0 18px;
   border-radius: 9px;
@@ -54,8 +66,7 @@
   cursor: pointer;
 }
 
-.device-management-actions .primary,
-.device-management-summary button {
+.device-management-actions .primary {
   border-color: #176b55;
   background: #176b55;
   color: white;
@@ -64,47 +75,6 @@
 .device-management-actions .secondary {
   background: white;
   color: #21473c;
-}
-
-.device-management-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  max-width: 1480px;
-  margin: 0 auto 24px;
-}
-
-.device-management-summary article {
-  position: relative;
-  padding: 24px;
-  background: white;
-  border: 1px solid #d8e5df;
-  border-radius: 16px;
-}
-
-.device-management-summary strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 20px;
-}
-
-.device-management-summary span {
-  display: block;
-  margin-bottom: 20px;
-  color: #65776f;
-}
-
-.device-management-summary em {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: #eef3f1;
-  color: #687a72;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
 }
 
 .device-log-panel {
@@ -191,9 +161,6 @@
     flex-direction: column;
   }
 
-  .device-management-summary {
-    grid-template-columns: 1fr;
-  }
 }
 .device-log-filter {
   display: grid;
