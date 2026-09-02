@@ -1300,6 +1300,9 @@ export default function UnifiedDisasterDashboard() {
                 activeTab={operationsTab}
                 onActiveTabChange={setOperationsTab}
                 externalIntegrationStatus={externalIntegrationStatus}
+                onRefreshExternalIntegrations={() => {
+                  void refreshExternalIntegrations();
+                }}
               />
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>

@@ -33,6 +33,7 @@ interface OperationsPanelProps {
   activeTab: PanelTab;
   onActiveTabChange: (tab: PanelTab) => void;
   externalIntegrationStatus: ExternalIntegrationStatus;
+  onRefreshExternalIntegrations: () => void;
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -117,8 +118,12 @@ export function OperationsPanel({
   activeTab,
   onActiveTabChange,
   externalIntegrationStatus,
+  onRefreshExternalIntegrations,
 }: OperationsPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const externalIntegrationLoading = Object.values(
+    externalIntegrationStatus,
+  ).some((state) => state.status === "loading");
   const activeAlerts = useMemo(() => {
     const rank: Record<string, number> = { CRITICAL: 0, SEVERE: 1, WARNING: 2, CAUTION: 3, NORMAL: 4 };
     return overview.alerts
@@ -264,6 +269,16 @@ export function OperationsPanel({
         <header>
           <div><strong>{tabs.find((tab) => tab.id === activeTab)?.label}</strong><small>{overview.event.disasterType === "LANDSLIDE" ? "산사태 구조·통신 통합" : "산불 대응·통신 통합"}</small></div>
           {activeTab === "layers" && <button type="button" className="layer-reset" onClick={resetLayers}>기본값</button>}
+          {activeTab === "integrations" && (
+            <button
+              type="button"
+              className="layer-reset"
+              onClick={onRefreshExternalIntegrations}
+              disabled={externalIntegrationLoading}
+            >
+              {externalIntegrationLoading ? "갱신 중" : "새로고침"}
+            </button>
+          )}
         </header>
         <div className="operations-panel-body">
           {activeTab === "layers" && <section className="layer-control-list" aria-label="지도 레이어">
