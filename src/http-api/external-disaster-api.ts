@@ -1,4 +1,4 @@
-import { httpApi } from "./client";
+import { dashboardApi } from "./client";
 
 export interface ExternalListMeta {
   pageNo?: number;
@@ -98,27 +98,27 @@ export interface LandslideRegionalRisk {
 
 export const externalDisasterApi = {
   wildfireFirms: () =>
-    httpApi<ExternalListResponse<FirmsHotspot>>(
+    dashboardApi<ExternalListResponse<FirmsHotspot>>(
       "/api/v1/external/wildfire/firms"
     ),
 
   wildfireRisk: (pageNo = 1, numOfRows = 100) =>
-    httpApi<ExternalListResponse<WildfireRisk>>(
+    dashboardApi<ExternalListResponse<WildfireRisk>>(
       `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
     ),
 
   landslideForecast: (pageNo = 1, numOfRows = 100) =>
-    httpApi<ExternalListResponse<LandslideForecast>>(
+    dashboardApi<ExternalListResponse<LandslideForecast>>(
       `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`
     ),
 
   landslideHistory: (pageNo = 1, numOfRows = 100) =>
-    httpApi<ExternalListResponse<LandslideHistory>>(
+    dashboardApi<ExternalListResponse<LandslideHistory>>(
       `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`
     ),
 
   landslideRegionalRisk: (pageNo = 1, numOfRows = 100) =>
-    httpApi<ExternalListResponse<LandslideRegionalRisk>>(
+    dashboardApi<ExternalListResponse<LandslideRegionalRisk>>(
       `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
     ),
 };
