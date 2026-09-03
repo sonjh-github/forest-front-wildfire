@@ -107,6 +107,17 @@ const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color
     color: "#7651a8",
     opacity: 0.8,
   },
+  "external-wildfire-risk": { type: "fill", color: "#f05c2f", opacity: 0.2 },
+  "external-landslide-forecast": { type: "fill", color: "#d39a28", opacity: 0.18 },
+  "external-landslide-regional-risk": { type: "fill", color: "#8550b6", opacity: 0.2 },
+  "wildfire-risk-zones": { type: "fill", color: "#ef5b35", opacity: 0.12 },
+  "evacuation-routes": { type: "line", color: "#16a36d", opacity: 0.95 },
+  "suppression-resources": { type: "circle", color: "#1678c8", opacity: 0.9 },
+  "water-sources": { type: "circle", color: "#13a9d6", opacity: 0.9 },
+  "nearby-response-resources": { type: "circle", color: "#7057d9", opacity: 0.9 },
+  viewsheds: { type: "fill", color: "#e8c33f", opacity: 0.12 },
+  "communication-shadows": { type: "fill", color: "#394a5a", opacity: 0.26 },
+  "slope-gradients": { type: "fill", color: "#a85c36", opacity: 0.18 },
 };
 
 const DEFAULT_EXPECTED_TELEMETRY_INTERVAL_MS = 30_000;
@@ -258,6 +269,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mutedBasemap, setMutedBasemap] = useState(false);
+  const [terrain3d, setTerrain3d] = useState(false);
   const [tileDegraded, setTileDegraded] = useState(false);
   const selectedEventRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
@@ -298,6 +310,21 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     if (map.isStyleLoaded()) apply(); else map.once("load", apply);
     return () => { map.off("load", apply); };
   }, [mutedBasemap]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getSource("terrain-dem")) map.addSource("terrain-dem", {
+        type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        tileSize: 256, encoding: "terrarium",
+      });
+      map.setTerrain(terrain3d ? { source: "terrain-dem", exaggeration: 1.35 } : null);
+      map.easeTo({ pitch: terrain3d ? 58 : 0, bearing: terrain3d ? -18 : 0, duration: 650 });
+    };
+    if (map.isStyleLoaded()) apply(); else map.once("load", apply);
+    return () => { map.off("load", apply); };
+  }, [terrain3d]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -627,7 +654,9 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       <div className="basemap-switch" aria-label="배경지도 전환">
         <button type="button" className={!mutedBasemap ? "active" : ""} aria-pressed={!mutedBasemap} onClick={() => setMutedBasemap(false)}>일반지도</button>
         <button type="button" className={mutedBasemap ? "active" : ""} aria-pressed={mutedBasemap} onClick={() => setMutedBasemap(true)}>정보강조</button>
+        <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => setTerrain3d((value) => !value)}>3D 지형</button>
       </div>
+      {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>10m 격자 · 고도 음영</span><small>경사·Viewshed·통신 음영 레이어 사용 가능</small></section>}
       <section className="map-meaning-legend" aria-label="지도 범례">
         <strong>범례</strong>
         <span><i className="personnel" />현장 인원</span>

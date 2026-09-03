@@ -9,11 +9,13 @@ import {
 } from "./OperationsPanel";
 
 import DroneVideoModal from "./DroneVideoModal";
+import { createDemoOverview, DEMO_EVENT } from "./demoOverview";
 import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_CHANGE_HIGHLIGHT_MS = POLL_INTERVAL_MS * 0.3;
 const DEFAULT_EVENT_ID = "10000000-0000-4000-8000-000000000001";
+const FORCE_DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
 
 function text(value: unknown, fallback = "-") { return value == null || value === "" ? fallback : String(value); }
 const koreanLabels: Record<string, string> = {
@@ -138,6 +140,12 @@ export type LiveLocation = {
   rtcmStatus: string | null;
   networkMode: string | null;
   expectedTelemetryIntervalSec: number | null;
+  flightMode: string | null;
+  armed: boolean | null;
+  missionSequence: number | null;
+  emergencyStatus: string | null;
+  groundSpeedMps: number | null;
+  headingDeg: number | null;
   registeredToEvent: boolean;
 };
 
@@ -192,6 +200,12 @@ function locationFrom(item: Record<string, unknown>, kind: LiveLocation["kind"])
     expectedTelemetryIntervalSec: Number.isFinite(expectedTelemetryIntervalSec) && expectedTelemetryIntervalSec > 0
       ? expectedTelemetryIntervalSec
       : null,
+    flightMode: attributes.flightMode == null ? null : String(attributes.flightMode),
+    armed: typeof attributes.armed === "boolean" ? attributes.armed : null,
+    missionSequence: Number.isFinite(Number(attributes.missionSequence)) ? Number(attributes.missionSequence) : null,
+    emergencyStatus: attributes.emergencyStatus == null ? null : String(attributes.emergencyStatus),
+    groundSpeedMps: Number.isFinite(Number(attributes.groundSpeedMps)) ? Number(attributes.groundSpeedMps) : null,
+    headingDeg: Number.isFinite(Number(attributes.headingDeg)) ? Number(attributes.headingDeg) : null,
     registeredToEvent: kind === "personnel" || item.eventRegistrationStatus !== "UNREGISTERED",
   };
 }
@@ -558,6 +572,32 @@ function webMercatorToLngLat(x: number, y: number): [number, number] | null {
   return [longitude, latitude];
 }
 
+const districtCenters: Record<string, [number, number]> = {
+  "평창": [128.390, 37.370], "평창군": [128.390, 37.370], "강릉": [128.876, 37.752], "강릉시": [128.876, 37.752],
+  "홍천": [127.888, 37.697], "홍천군": [127.888, 37.697], "정선": [128.661, 37.380], "정선군": [128.661, 37.380],
+  "원주": [127.920, 37.342], "원주시": [127.920, 37.342], "춘천": [127.730, 37.881], "춘천시": [127.730, 37.881],
+  "인제": [128.170, 38.070], "인제군": [128.170, 38.070], "양양": [128.619, 38.075], "양양군": [128.619, 38.075],
+  "울진": [129.400, 36.993], "울진군": [129.400, 36.993], "봉화": [128.733, 36.893], "봉화군": [128.733, 36.893],
+  "밀양": [128.746, 35.503], "밀양시": [128.746, 35.503], "합천": [128.166, 35.566], "합천군": [128.166, 35.566],
+};
+function pointBuffer([longitude, latitude]: [number, number], radius: number) {
+  const ring = Array.from({ length: 25 }, (_, index) => {
+    const angle = (index / 24) * Math.PI * 2;
+    return [longitude + Math.cos(angle) * radius, latitude + Math.sin(angle) * radius] as [number, number];
+  });
+  return { type: "Polygon", coordinates: [ring] };
+}
+function districtCenter(...names: unknown[]): [number, number] | null {
+  for (const value of names) {
+    const raw = String(value ?? "").trim();
+    const direct = districtCenters[raw];
+    if (direct) return direct;
+    const match = Object.entries(districtCenters).find(([name]) => raw.includes(name));
+    if (match) return match[1];
+  }
+  return null;
+}
+
 export default function UnifiedDisasterDashboard() {
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -565,6 +605,7 @@ export default function UnifiedDisasterDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [demoMode, setDemoMode] = useState(FORCE_DEMO_MODE);
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -588,12 +629,19 @@ export default function UnifiedDisasterDashboard() {
     "debris-flow-paths", "debris-flow-areas", "victim-candidates", "rssi-detections",
     "ai-ran-coverages", "relay-placement-candidates", "ignition-detections",
     "vehicle-detections", "road-segmentations", "change-detections", "vital-signal-detections",
+    "external-firms", "external-landslide-history", "wildfire-risk-zones", "evacuation-routes",
+    "suppression-resources", "water-sources",
+    "nearby-response-resources", "slope-gradients", "viewsheds", "communication-shadows",
+    "external-wildfire-risk", "external-landslide-forecast", "external-landslide-regional-risk",
   ]));
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   const [externalFirmsRows, setExternalFirmsRows] = useState<ApiRecord[]>([]);
   const [externalLandslideHistoryRows, setExternalLandslideHistoryRows] =
     useState<ApiRecord[]>([]);
+  const [externalWildfireRiskRows, setExternalWildfireRiskRows] = useState<ApiRecord[]>([]);
+  const [externalLandslideForecastRows, setExternalLandslideForecastRows] = useState<ApiRecord[]>([]);
+  const [externalLandslideRegionalRows, setExternalLandslideRegionalRows] = useState<ApiRecord[]>([]);
 
   const [externalIntegrationStatus, setExternalIntegrationStatus] =
     useState<ExternalIntegrationStatus>({
@@ -626,6 +674,21 @@ export default function UnifiedDisasterDashboard() {
   }, []);
 
   const refreshExternalIntegrations = useCallback(async () => {
+    if (demoMode) {
+      const demo = createDemoOverview();
+      const checkedAt = new Date().toISOString();
+      setExternalFirmsRows(demo.domainLayers["external-firms"] ?? []);
+      setExternalLandslideHistoryRows(demo.domainLayers["external-landslide-history"] ?? []);
+      setExternalWildfireRiskRows(demo.domainLayers["wildfire-risk-zones"] ?? []);
+      setExternalLandslideForecastRows(demo.domainLayers["slope-assessments"] ?? []);
+      setExternalLandslideRegionalRows(demo.domainLayers["slope-gradients"] ?? []);
+      setExternalIntegrationStatus({
+        firms: { status: "ok", count: 1, checkedAt }, wildfireRisk: { status: "ok", count: 1, checkedAt },
+        landslideForecast: { status: "ok", count: 1, checkedAt }, landslideHistory: { status: "ok", count: 1, checkedAt },
+        landslideRegionalRisk: { status: "ok", count: 1, checkedAt },
+      });
+      return;
+    }
     setExternalIntegrationStatus((current) => ({
       firms: { ...current.firms, status: "loading", message: undefined },
       wildfireRisk: { ...current.wildfireRisk, status: "loading", message: undefined },
@@ -718,6 +781,19 @@ export default function UnifiedDisasterDashboard() {
       setExternalLandslideHistoryRows([]);
     }
 
+    setExternalWildfireRiskRows(wildfireRisk.status === "fulfilled" ? wildfireRisk.value.data.flatMap((item, index) => {
+      const coordinates = districtCenter(item.district, item.area, item.province);
+      return coordinates ? [{ id: `kfs-risk-${item.regionCode || index}`, observedAt: item.analyzedAt || checkedAt, provider: "산림청", riskScore: item.mean ?? item.max, district: item.district, resultGeometry: pointBuffer(coordinates, 0.035) }] : [];
+    }) : []);
+    setExternalLandslideForecastRows(landslideForecast.status === "fulfilled" ? landslideForecast.value.data.flatMap((item, index) => {
+      const coordinates = districtCenter(item.district);
+      return coordinates ? [{ id: `slide-forecast-${index}`, observedAt: item.predictedAt || checkedAt, provider: "재난안전데이터", forecast: item.forecast, resultGeometry: pointBuffer(coordinates, 0.028) }] : [];
+    }) : []);
+    setExternalLandslideRegionalRows(landslideRegionalRisk.status === "fulfilled" ? landslideRegionalRisk.value.data.flatMap((item, index) => {
+      const coordinates = districtCenter(item.districtName, item.detailAddress);
+      return coordinates ? [{ id: `slide-regional-${item.managementNumber || index}`, observedAt: item.lastModifiedAt || checkedAt, provider: "재난안전데이터", riskGrade: item.riskGradeCode, expectedPeople: item.expectedPeople, resultGeometry: pointBuffer(coordinates, 0.022) }] : [];
+    }) : []);
+
     setExternalIntegrationStatus({
       firms: firms.status === "fulfilled"
         ? {
@@ -784,7 +860,7 @@ export default function UnifiedDisasterDashboard() {
             message: errorMessage(landslideRegionalRisk.reason),
           },
     });
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     void refreshExternalIntegrations();
@@ -801,6 +877,17 @@ export default function UnifiedDisasterDashboard() {
     if (!selected) return;
     const result = await loadEventOverview(selected);
     const locations = overviewLocations(result);
+    const hasOperationalMapData = locations.length > 0
+      || Object.values(result.domainLayers).some((rows) => rows.length > 0);
+    if (!hasOperationalMapData) {
+      const demo = createDemoOverview();
+      setEvents([DEMO_EVENT]);
+      setSelectedId(DEMO_EVENT.eventId);
+      setOverview(demo);
+      setDemoMode(true);
+      setLastUpdatedAt(new Date());
+      return;
+    }
     const current = new Map(locations.map((item) => [locationKey(item), locationFingerprint(item)]));
     const previous = previousLocationsRef.current;
     const currentOverviewUpdateTime = overviewLatestUpdateTime(result);
@@ -871,8 +958,36 @@ export default function UnifiedDisasterDashboard() {
 
   useEffect(() => {
     let active = true;
+    if (FORCE_DEMO_MODE) {
+      const demo = createDemoOverview();
+      setEvents([DEMO_EVENT]);
+      setSelectedId(DEMO_EVENT.eventId);
+      setOverview(demo);
+      setLastUpdatedAt(new Date());
+      setEventsLoaded(true);
+      return () => { active = false; };
+    }
     refreshEvents()
-      .catch((caught: unknown) => active && setError(caught instanceof Error ? caught.message : "사건 목록 조회 실패"))
+      .catch(() => {
+        if (!active) return;
+        setEvents([DEMO_EVENT]);
+        setSelectedId(DEMO_EVENT.eventId);
+        setOverview(createDemoOverview());
+        setLastUpdatedAt(new Date());
+        setDemoMode(true);
+        setError(null);
+        setExternalFirmsRows(createDemoOverview().domainLayers["external-firms"] ?? []);
+        setExternalLandslideHistoryRows(createDemoOverview().domainLayers["external-landslide-history"] ?? []);
+        setExternalWildfireRiskRows(createDemoOverview().domainLayers["wildfire-risk-zones"] ?? []);
+        setExternalLandslideForecastRows(createDemoOverview().domainLayers["slope-assessments"] ?? []);
+        setExternalLandslideRegionalRows(createDemoOverview().domainLayers["slope-gradients"] ?? []);
+        const checkedAt = new Date().toISOString();
+        setExternalIntegrationStatus({
+          firms: { status: "ok", count: 1, checkedAt }, wildfireRisk: { status: "ok", count: 1, checkedAt },
+          landslideForecast: { status: "ok", count: 1, checkedAt }, landslideHistory: { status: "ok", count: 1, checkedAt },
+          landslideRegionalRisk: { status: "ok", count: 1, checkedAt },
+        });
+      })
       .finally(() => active && setEventsLoaded(true));
     return () => { active = false; };
   }, [refreshEvents]);
@@ -887,13 +1002,15 @@ export default function UnifiedDisasterDashboard() {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    const refresh = () => refreshOverview()
+    const refresh = () => demoMode
+      ? Promise.resolve(setOverview(createDemoOverview()))
+      : refreshOverview()
       .then(() => active && setError(null))
       .catch((caught: unknown) => active && setError(caught instanceof Error ? caught.message : "현황 조회 실패"));
     void refresh();
     const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
     return () => { active = false; window.clearInterval(timer); };
-  }, [refreshOverview, selectedId]);
+  }, [demoMode, refreshOverview, selectedId]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -921,11 +1038,17 @@ export default function UnifiedDisasterDashboard() {
       ...overview?.domainLayers,
       "external-firms": externalFirmsRows,
       "external-landslide-history": externalLandslideHistoryRows,
+      "external-wildfire-risk": externalWildfireRiskRows,
+      "external-landslide-forecast": externalLandslideForecastRows,
+      "external-landslide-regional-risk": externalLandslideRegionalRows,
     }),
     [
       overview?.domainLayers,
       externalFirmsRows,
       externalLandslideHistoryRows,
+      externalWildfireRiskRows,
+      externalLandslideForecastRows,
+      externalLandslideRegionalRows,
     ],
   );
 
@@ -1104,6 +1227,7 @@ export default function UnifiedDisasterDashboard() {
             <span>{korean(overview.event.severityCode)}</span>
             <small>{text(overview.event.locationName)}</small>
           </div>
+          {demoMode && <div className="demo-mode-badge" title="실제 API 연결 전 화면 검증용 데이터입니다"><b>DEMO</b><span>모의 관제 데이터</span></div>}
           <nav className="header-summary" aria-label="운영 현황">
             <button
   type="button"
@@ -1190,13 +1314,20 @@ export default function UnifiedDisasterDashboard() {
                 <div><dt>지연·손실</dt><dd>{selectedLocation.latencyMs == null ? "측정값 없음" : `${selectedLocation.latencyMs.toFixed(0)} ms · ${selectedLocation.packetLossPct?.toFixed(1) ?? "-"}%`}</dd></div>
                 <div><dt>데이터 발생 장비</dt><dd>{selectedLocation.sourceAssetId || selectedLocation.id}</dd></div>
                 <div><dt>API 전달 주체</dt><dd>{selectedLocation.reportedByAssetId ? `${korean(selectedLocation.reportingRole || "GATEWAY")} · ${selectedLocation.reportedByAssetId}` : "직접 보고 또는 정보 미수신"}</dd></div>
-                {isPositioningLocation(selectedLocation) && <>
+              {isPositioningLocation(selectedLocation) && <>
                   <div><dt>측위 상태</dt><dd>{selectedLocation.positioningMethod ? korean(selectedLocation.positioningMethod) : "측위정보 수신 전"}</dd></div>
                   <div><dt>예상 오차</dt><dd>{selectedLocation.horizontalAccuracyM == null ? "측정값 없음" : `±${selectedLocation.horizontalAccuracyM.toFixed(2)}m`}</dd></div>
                   <div><dt>기준국 보정</dt><dd>{correctionStatus(selectedLocation)}</dd></div>
                   <div><dt>현장 전송망</dt><dd>{selectedLocation.networkMode ? korean(selectedLocation.networkMode) : "망 정보 수신 전"}</dd></div>
                 </>}
+                {resourceGroupOf(selectedLocation) === "UAV" && <>
+                  <div><dt>비행 모드</dt><dd>{selectedLocation.flightMode ?? "수신 전"}</dd></div>
+                  <div><dt>시동·임무</dt><dd>{selectedLocation.armed == null ? "수신 전" : `${selectedLocation.armed ? "ARMED" : "DISARMED"} · WP ${selectedLocation.missionSequence ?? "-"}`}</dd></div>
+                  <div><dt>속도·방향</dt><dd>{selectedLocation.groundSpeedMps == null ? "수신 전" : `${selectedLocation.groundSpeedMps.toFixed(1)}m/s · ${selectedLocation.headingDeg?.toFixed(0) ?? "-"}°`}</dd></div>
+                  <div><dt>비상 상태</dt><dd>{selectedLocation.emergencyStatus ?? "정상"}</dd></div>
+                </>}
               </dl>
+              {selectedLocation.kind === "asset" && <button type="button" className="asset-log-link" onClick={() => { window.location.href = `/device?assetId=${encodeURIComponent(selectedLocation.id)}`; }}>assetId 로그·이력 조회</button>}
               {isPositioningLocation(selectedLocation) && <p className="positioning-dialog-note">
                 <strong>{selectedLocation.category === "RTK_BASE_LPWA_GATEWAY" ? "기준국 역할" : "위치 산출 흐름"}</strong>
                 <span>{positioningDescription(selectedLocation)}</span>
