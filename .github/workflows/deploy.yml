@@ -73,7 +73,12 @@ jobs:
 
             for attempt in $(seq 1 20); do
               status=$(docker inspect --format='{{.State.Health.Status}}' forest-front-wildfire)
-              test "$status" = healthy && exit 0
+              if test "$status" = healthy; then
+                curl --fail --silent --show-error http://127.0.0.1:18030/health
+                curl --fail --silent --show-error http://127.0.0.1:18030/demo-health | grep 'forest-service-demo'
+                curl --fail --silent --show-error 'http://127.0.0.1:18030/?demo=1' | grep '<div id="root"></div>'
+                exit 0
+              fi
               test "$status" = unhealthy && docker logs --tail 100 forest-front-wildfire && exit 1
               sleep 3
             done
