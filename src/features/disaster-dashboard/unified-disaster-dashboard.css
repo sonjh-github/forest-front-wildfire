@@ -1793,6 +1793,15 @@
 }
 
 /* 요구사항 추적 보강: 조작 가능한 KPI, 자산 정렬, 상세 품질값 */
+.demo-mode-badge { display:flex; align-items:center; gap:7px; padding:6px 10px; border:1px solid #efb85a; border-radius:7px; background:#fff8e8; color:#7c5415; white-space:nowrap; }
+.demo-mode-badge b { font-size:10px; letter-spacing:.08em; padding:3px 5px; border-radius:4px; background:#e29419; color:white; }
+.demo-mode-badge span { font-size:11px; font-weight:800; }
+.asset-log-link { position:static !important; width:100%; margin-top:10px; padding:10px 12px; border:1px solid #2e715e !important; border-radius:7px; background:#edf7f3; color:#1e5a49; font-weight:800; }
+.terrain-analysis-status { position:absolute; right:14px; top:58px; z-index:3; display:grid; gap:2px; padding:9px 11px; border:1px solid rgba(255,255,255,.7); border-radius:8px; background:rgba(24,48,42,.88); color:#fff; box-shadow:0 4px 16px rgba(0,0,0,.18); }
+.terrain-analysis-status b { color:#f1d368; font-size:11px; letter-spacing:.08em; }
+.terrain-analysis-status span { font-size:11px; font-weight:800; }
+.terrain-analysis-status small { color:#d4e5df; font-size:9px; }
+.kpi-evidence-download { width:100%; padding:10px; border:1px solid #347967; border-radius:7px; background:#eaf6f1; color:#205d4d; font-weight:800; cursor:pointer; }
 .event-metric-floor > button {
   min-width: 78px;
   height: 42px;

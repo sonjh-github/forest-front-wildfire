@@ -147,6 +147,14 @@ export function OperationsPanel({
       { id: "ignition-detections", label: "발화지점 탐지", description: "영상 AI 발화 후보" },
       { id: "vehicle-detections", label: "차량 탐지", description: "현장 차량 인식 결과" },
       { id: "road-segmentations", label: "도로 분할", description: "진입 가능 도로 분석" },
+      { id: "wildfire-risk-zones", label: "산불 위험지역", description: "산림청 위험예보 기반 위험면" },
+      { id: "evacuation-routes", label: "안전 대피로", description: "현장 지휘 승인 대피경로" },
+      { id: "suppression-resources", label: "진화자원", description: "진화차·방어선 배치 지점" },
+      { id: "water-sources", label: "소화용수", description: "취수 가능 지점" },
+      { id: "nearby-response-resources", label: "주변 대응자원", description: "대응센터·헬기·지원자원" },
+      { id: "slope-gradients", label: "DEM 경사도", description: "고경사 위험 구역" },
+      { id: "viewsheds", label: "Viewshed 가시권", description: "관측·중계 지점 가시영역" },
+      { id: "communication-shadows", label: "통신 음영", description: "지형 차폐 예상구역" },
     ];
   const externalMapLayers = [
     {
@@ -154,19 +162,20 @@ export function OperationsPanel({
       label: "NASA FIRMS 위성 화점",
       description: "위성에서 탐지된 산불 열원·화점",
       count:
-        externalIntegrationStatus.firms.status === "ok"
-          ? externalIntegrationStatus.firms.count
-          : 0,
+        overview.domainLayers["external-firms"]?.length
+          ?? (externalIntegrationStatus.firms.status === "ok" ? externalIntegrationStatus.firms.count : 0),
     },
     {
       id: "external-landslide-history",
       label: "산사태 발생이력",
       description: "재난안전데이터 산사태 발생 지점",
       count:
-        externalIntegrationStatus.landslideHistory.status === "ok"
-          ? externalIntegrationStatus.landslideHistory.count
-          : 0,
+        overview.domainLayers["external-landslide-history"]?.length
+          ?? (externalIntegrationStatus.landslideHistory.status === "ok" ? externalIntegrationStatus.landslideHistory.count : 0),
     },
+    { id: "external-wildfire-risk", label: "산림청 산불위험예보", description: "시군구 대표영역 위험도", count: overview.domainLayers["external-wildfire-risk"]?.length ?? externalIntegrationStatus.wildfireRisk.count },
+    { id: "external-landslide-forecast", label: "산사태 예측정보", description: "시군구 대표영역 예측등급", count: overview.domainLayers["external-landslide-forecast"]?.length ?? externalIntegrationStatus.landslideForecast.count },
+    { id: "external-landslide-regional-risk", label: "산사태 지역위험", description: "지역 위험등급·예상피해", count: overview.domainLayers["external-landslide-regional-risk"]?.length ?? externalIntegrationStatus.landslideRegionalRisk.count },
   ];
 
   const allLayerIds = [
@@ -229,6 +238,15 @@ export function OperationsPanel({
     for (const group of assetGroups) {
       if (visibleResourceGroups.has(group.id) === allAssetsVisible) onResourceGroupToggle(group.id);
     }
+  };
+  const downloadKpiEvidence = () => {
+    const payload = { exportedAt: new Date().toISOString(), event: overview.event, measurements: overview.kpis };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${overview.event.eventCode ?? overview.event.eventId}-kpi-evidence.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -334,8 +352,7 @@ export function OperationsPanel({
               })}
 
               <p className="operation-readonly-note">
-                산불위험예보·산사태 예측·지역위험정보는 현재 응답 계약에서
-                지도 좌표가 확정되지 않아 상태·건수만 표시합니다.
+                좌표가 없는 기관 행정구역 자료는 시군구 대표영역으로 공간화해 표시하며, 상세 경계 데이터가 제공되면 동일 레이어에서 교체됩니다.
               </p>
             </section>
 
@@ -383,6 +400,7 @@ export function OperationsPanel({
             <p className="operation-readonly-note">미디어 원본은 권한이 확인된 경우에만 별도 화면에서 재생·다운로드합니다.</p>
           </section>}
           {activeTab === "kpis" && <section className="operations-records" aria-label="실증 KPI">
+            <button type="button" className="kpi-evidence-download" onClick={downloadKpiEvidence} disabled={overview.kpis.length === 0}>시험 증적 JSON 내보내기</button>
             {overview.kpis.length === 0 && <p className="operation-empty-state"><b>수집된 실증 KPI 없음</b><span>모사값은 공식 실증값으로 표시하지 않습니다.</span></p>}
             {overview.kpis.map((kpi) => <article key={value(kpi, ["kpiMeasurementId", "metricCode"])} data-status={kpi.passed === true ? "ACTIVE" : kpi.passed === false ? "FAILED" : "INACTIVE"}>
               <div><strong>{value(kpi, ["metricName", "metricCode"], "실증 지표")}</strong><span>{kpi.passed === true ? "충족" : kpi.passed === false ? "미충족" : "판정 전"}</span></div>
