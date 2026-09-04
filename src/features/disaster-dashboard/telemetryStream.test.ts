@@ -20,6 +20,15 @@ describe("Gateway telemetry stream", () => {
     expect(merged.assets.find((asset) => asset.assetId === "DRONE-01")?.sourceSystem).toBe("GATEWAY_STREAM");
   });
 
+  it("대원 RTK 스트림을 personExternalId 기준으로 갱신한다", () => {
+    const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
+    const message = parseTelemetryMessage({ entityType: "PERSONNEL", assetId: "CREW-12", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", latitude: 37.617, longitude: 128.374, positioningMethod: "RTK_FIXED", horizontalAccuracyM: 0.05 })!;
+    const merged = mergeTelemetryIntoOverview(overview, message);
+    const person = merged.personnel.find((row) => row.personExternalId === "CREW-12")!;
+    expect((person.geometry as { coordinates: number[] }).coordinates.slice(0, 2)).toEqual([128.374, 37.617]);
+    expect(person.positioningMethod).toBe("RTK_FIXED");
+  });
+
   it("MAVLink heartbeat·GPS·위치 프레임을 하나의 드론 상태로 합친다", () => {
     const mavlink = new MavlinkTelemetryAccumulator();
     expect(mavlink.push({ protocol: "MAVLINK", assetId: "DRONE-01", observedAt: "2026-09-04T01:00:00Z", message: { type: "HEARTBEAT", base_mode: 128, flightMode: "AUTO" } })).toBeNull();

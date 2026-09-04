@@ -9,6 +9,7 @@ export function isTelemetryStreamStale(lastMessageAt: number | null, now: number
 
 export type LiveTelemetryMessage = {
   assetId: string;
+  entityType?: "ASSET" | "PERSONNEL";
   eventId?: string;
   observedAt: string;
   receivedAt?: string;
@@ -49,7 +50,7 @@ export function parseTelemetryMessage(raw: unknown): LiveTelemetryMessage | null
   const observedAt = String(row.observedAt ?? row.timestamp ?? "").trim();
   if (!assetId || longitude == null || latitude == null || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90 || !Number.isFinite(Date.parse(observedAt))) return null;
   return {
-    assetId, eventId: row.eventId ? String(row.eventId) : undefined, observedAt,
+    assetId, entityType: String(row.entityType ?? row.kind ?? "").toUpperCase() === "PERSONNEL" ? "PERSONNEL" : "ASSET", eventId: row.eventId ? String(row.eventId) : undefined, observedAt,
     receivedAt: row.receivedAt ? String(row.receivedAt) : new Date().toISOString(),
     sequence: finite(row.sequence), longitude, latitude, altitude: finite(row.altitude ?? coordinates?.[2]),
     assetType: row.assetType ? String(row.assetType) : undefined,
@@ -116,24 +117,29 @@ export class MavlinkTelemetryAccumulator {
 
 export function mergeTelemetryIntoOverview(overview: EventOverview, message: LiveTelemetryMessage): EventOverview {
   if (message.eventId && message.eventId !== overview.event.eventId) return overview;
-  const existingIndex = overview.assets.findIndex((asset) => String(asset.assetId) === message.assetId);
-  const previous = existingIndex >= 0 ? overview.assets[existingIndex] : {};
+  const personnel = message.entityType === "PERSONNEL";
+  const collection = personnel ? overview.personnel : overview.assets;
+  const identityKey = personnel ? "personExternalId" : "assetId";
+  const existingIndex = collection.findIndex((row) => String(row[identityKey]) === message.assetId);
+  const previous = existingIndex >= 0 ? collection[existingIndex] : {};
   if (previous.observedAt && Date.parse(String(previous.observedAt)) > Date.parse(message.observedAt)) return overview;
-  const asset: ApiRecord = {
+  const entity: ApiRecord = {
     ...previous, ...message,
-    assetId: message.assetId,
-    assetName: previous.assetName ?? message.assetId,
-    assetType: message.assetType ?? previous.assetType ?? "ASSET",
-    operationalStatus: message.operationalStatus ?? previous.operationalStatus ?? "ACTIVE",
+    [identityKey]: message.assetId,
+    ...(personnel ? { activityStatus: message.operationalStatus ?? previous.activityStatus ?? "ACTIVE", safetyStatus: previous.safetyStatus ?? "SAFE" } : {
+      assetName: previous.assetName ?? message.assetId,
+      assetType: message.assetType ?? previous.assetType ?? "ASSET",
+      operationalStatus: message.operationalStatus ?? previous.operationalStatus ?? "ACTIVE",
+    }),
     geometry: { type: "Point", coordinates: [message.longitude, message.latitude, message.altitude ?? null] },
     sourceSystem: "GATEWAY_STREAM",
     sourceAssetId: message.assetId,
     reportingRole: "GATEWAY",
     attributes: { ...(previous.attributes as Record<string, unknown> | undefined), ...message.attributes },
   };
-  const assets = [...overview.assets];
-  if (existingIndex >= 0) assets[existingIndex] = asset; else assets.push(asset);
-  return { ...overview, assets };
+  const next = [...collection];
+  if (existingIndex >= 0) next[existingIndex] = entity; else next.push(entity);
+  return personnel ? { ...overview, personnel: next } : { ...overview, assets: next };
 }
 
 function riskPolygons(overview: EventOverview): [number, number][][] {
