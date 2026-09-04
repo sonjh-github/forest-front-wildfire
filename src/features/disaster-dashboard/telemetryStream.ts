@@ -1,0 +1,136 @@
+import type { ApiRecord, EventOverview } from "../../http-api";
+
+export type TelemetryStreamStatus = "DISABLED" | "CONNECTING" | "CONNECTED" | "RECONNECTING" | "ERROR";
+
+export type LiveTelemetryMessage = {
+  assetId: string;
+  eventId?: string;
+  observedAt: string;
+  receivedAt?: string;
+  sequence?: number;
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+  assetType?: string;
+  operationalStatus?: string;
+  positioningMethod?: string;
+  horizontalAccuracyM?: number;
+  batteryPct?: number;
+  signalStrengthDbm?: number;
+  latencyMs?: number;
+  packetLossPct?: number;
+  reportedByAssetId?: string;
+  activeLink?: string;
+  attributes?: Record<string, unknown>;
+};
+
+function finite(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+export function parseTelemetryMessage(raw: unknown): LiveTelemetryMessage | null {
+  let value = raw;
+  if (typeof raw === "string") {
+    try { value = JSON.parse(raw); } catch { return null; }
+  }
+  if (!value || typeof value !== "object") return null;
+  const envelope = value as Record<string, unknown>;
+  const row = (envelope.data && typeof envelope.data === "object" ? envelope.data : envelope) as Record<string, unknown>;
+  const coordinates = (row.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
+  const longitude = finite(row.longitude ?? row.lng ?? coordinates?.[0]);
+  const latitude = finite(row.latitude ?? row.lat ?? coordinates?.[1]);
+  const assetId = String(row.assetId ?? row.sourceAssetId ?? "").trim();
+  const observedAt = String(row.observedAt ?? row.timestamp ?? "").trim();
+  if (!assetId || longitude == null || latitude == null || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90 || !Number.isFinite(Date.parse(observedAt))) return null;
+  return {
+    assetId, eventId: row.eventId ? String(row.eventId) : undefined, observedAt,
+    receivedAt: row.receivedAt ? String(row.receivedAt) : new Date().toISOString(),
+    sequence: finite(row.sequence), longitude, latitude, altitude: finite(row.altitude ?? coordinates?.[2]),
+    assetType: row.assetType ? String(row.assetType) : undefined,
+    operationalStatus: row.operationalStatus ? String(row.operationalStatus) : undefined,
+    positioningMethod: row.positioningMethod ? String(row.positioningMethod) : undefined,
+    horizontalAccuracyM: finite(row.horizontalAccuracyM), batteryPct: finite(row.batteryPct),
+    signalStrengthDbm: finite(row.signalStrengthDbm), latencyMs: finite(row.latencyMs),
+    packetLossPct: finite(row.packetLossPct), reportedByAssetId: row.reportedByAssetId ? String(row.reportedByAssetId) : undefined,
+    activeLink: row.activeLink ? String(row.activeLink) : undefined,
+    attributes: row.attributes && typeof row.attributes === "object" ? row.attributes as Record<string, unknown> : undefined,
+  };
+}
+
+export function mergeTelemetryIntoOverview(overview: EventOverview, message: LiveTelemetryMessage): EventOverview {
+  if (message.eventId && message.eventId !== overview.event.eventId) return overview;
+  const existingIndex = overview.assets.findIndex((asset) => String(asset.assetId) === message.assetId);
+  const previous = existingIndex >= 0 ? overview.assets[existingIndex] : {};
+  if (previous.observedAt && Date.parse(String(previous.observedAt)) > Date.parse(message.observedAt)) return overview;
+  const asset: ApiRecord = {
+    ...previous, ...message,
+    assetId: message.assetId,
+    assetName: previous.assetName ?? message.assetId,
+    assetType: message.assetType ?? previous.assetType ?? "ASSET",
+    operationalStatus: message.operationalStatus ?? previous.operationalStatus ?? "ACTIVE",
+    geometry: { type: "Point", coordinates: [message.longitude, message.latitude, message.altitude ?? null] },
+    sourceSystem: "GATEWAY_STREAM",
+    sourceAssetId: message.assetId,
+    reportingRole: "GATEWAY",
+    attributes: { ...(previous.attributes as Record<string, unknown> | undefined), ...message.attributes },
+  };
+  const assets = [...overview.assets];
+  if (existingIndex >= 0) assets[existingIndex] = asset; else assets.push(asset);
+  return { ...overview, assets };
+}
+
+type SocketLike = Pick<WebSocket, "close" | "send" | "readyState" | "onopen" | "onclose" | "onerror" | "onmessage">;
+
+export class TelemetryStreamClient {
+  private socket: SocketLike | null = null;
+  private reconnectTimer: number | null = null;
+  private attempts = 0;
+  private stopped = false;
+  private lastSequence = new Map<string, number>();
+
+  constructor(private options: {
+    url: string;
+    eventId: string;
+    onMessage: (message: LiveTelemetryMessage) => void;
+    onStatus: (status: TelemetryStreamStatus) => void;
+    createSocket?: (url: string) => SocketLike;
+  }) {}
+
+  connect() {
+    this.stopped = false;
+    this.options.onStatus(this.attempts ? "RECONNECTING" : "CONNECTING");
+    const createSocket = this.options.createSocket ?? ((url: string) => new WebSocket(url));
+    try { this.socket = createSocket(this.options.url); } catch { this.scheduleReconnect(); return; }
+    this.socket.onopen = () => {
+      this.attempts = 0;
+      this.options.onStatus("CONNECTED");
+      this.socket?.send(JSON.stringify({ type: "SUBSCRIBE", eventId: this.options.eventId }));
+    };
+    this.socket.onmessage = (event) => {
+      const message = parseTelemetryMessage(event.data);
+      if (!message || (message.eventId && message.eventId !== this.options.eventId)) return;
+      const previous = this.lastSequence.get(message.assetId);
+      if (message.sequence != null && previous != null && message.sequence <= previous) return;
+      if (message.sequence != null) this.lastSequence.set(message.assetId, message.sequence);
+      this.options.onMessage(message);
+    };
+    this.socket.onerror = () => this.options.onStatus("ERROR");
+    this.socket.onclose = () => { if (!this.stopped) this.scheduleReconnect(); };
+  }
+
+  private scheduleReconnect() {
+    if (this.stopped) return;
+    this.attempts += 1;
+    this.options.onStatus("RECONNECTING");
+    const delay = Math.min(30_000, 1_000 * 2 ** Math.min(this.attempts - 1, 5));
+    this.reconnectTimer = window.setTimeout(() => this.connect(), delay);
+  }
+
+  stop() {
+    this.stopped = true;
+    if (this.reconnectTimer != null) window.clearTimeout(this.reconnectTimer);
+    this.socket?.close();
+    this.socket = null;
+  }
+}

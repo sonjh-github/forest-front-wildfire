@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
 import { buildOperationalEvidence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import type { TelemetryStreamStatus } from "./telemetryStream";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
@@ -37,6 +38,7 @@ interface OperationsPanelProps {
   onActiveTabChange: (tab: PanelTab) => void;
   externalIntegrationStatus: ExternalIntegrationStatus;
   onRefreshExternalIntegrations: () => void;
+  telemetryStreamStatus: TelemetryStreamStatus;
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -122,6 +124,7 @@ export function OperationsPanel({
   onActiveTabChange,
   externalIntegrationStatus,
   onRefreshExternalIntegrations,
+  telemetryStreamStatus,
 }: OperationsPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const externalIntegrationLoading = Object.values(
@@ -445,6 +448,11 @@ export function OperationsPanel({
               <div><strong>장비 수신 상태 자동판정</strong><span>{linkHealthSummary.disconnected > 0 ? "두절 발생" : linkHealthSummary.delayed > 0 ? "일부 지연" : "정상"}</span></div>
               <p>연결 {linkHealthSummary.connected} · 지연 {linkHealthSummary.delayed} · 두절 {linkHealthSummary.disconnected}</p>
               <small>마지막 정상 수신 {linkHealthSummary.lastReceivedAt ? relativeTime(linkHealthSummary.lastReceivedAt) : "수신 없음"} · 장비별 목표 주기의 1.5배/3배 기준 자동판정</small>
+            </article>
+            <article data-status={telemetryStreamStatus === "CONNECTED" ? "ACTIVE" : telemetryStreamStatus === "ERROR" ? "FAILED" : "INACTIVE"} className="network-detail-card">
+              <div><strong>Gateway 실시간 스트림</strong><span>{telemetryStreamStatus === "CONNECTED" ? "연결" : telemetryStreamStatus === "CONNECTING" ? "연결 중" : telemetryStreamStatus === "RECONNECTING" ? "재연결 중" : telemetryStreamStatus === "ERROR" ? "오류" : "미설정"}</span></div>
+              <p>WebSocket 위치·GNSS/RTK·MAVLink 변환 텔레메트리 수신</p>
+              <small>운영 주소는 VITE_TELEMETRY_WS_URL로 주입하며 브라우저에 장비 인증키를 저장하지 않습니다.</small>
             </article>
             {overview.networks.length === 0 && <p className="operation-empty-state"><b>연계된 통신망 없음</b><span>측정값 0이 아닌 미연계 상태입니다.</span></p>}
             {overview.networks.map((network) => {

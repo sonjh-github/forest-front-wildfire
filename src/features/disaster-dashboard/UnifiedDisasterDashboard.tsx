@@ -11,6 +11,7 @@ import {
 import DroneVideoModal from "./DroneVideoModal";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
+import { mergeTelemetryIntoOverview, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
 import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
@@ -609,6 +610,7 @@ export default function UnifiedDisasterDashboard() {
   const [retrying, setRetrying] = useState(false);
   const [demoMode, setDemoMode] = useState(FORCE_DEMO_MODE);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -1027,6 +1029,25 @@ export default function UnifiedDisasterDashboard() {
   }, [demoMode, refreshOverview, selectedId]);
 
   useEffect(() => {
+    const url = import.meta.env.VITE_TELEMETRY_WS_URL?.trim();
+    if (demoMode || !url || !selectedId) {
+      setTelemetryStreamStatus("DISABLED");
+      return;
+    }
+    const client = new TelemetryStreamClient({
+      url,
+      eventId: selectedId,
+      onStatus: setTelemetryStreamStatus,
+      onMessage: (message) => {
+        setOverview((current) => current ? mergeTelemetryIntoOverview(current, message) : current);
+        setLastUpdatedAt(new Date());
+      },
+    });
+    client.connect();
+    return () => client.stop();
+  }, [demoMode, selectedId]);
+
+  useEffect(() => {
     if (!selectedId) return;
     let active = true;
     const refreshTimeline = async () => {
@@ -1320,6 +1341,7 @@ export default function UnifiedDisasterDashboard() {
                 onRefreshExternalIntegrations={() => {
                   void refreshExternalIntegrations();
                 }}
+                telemetryStreamStatus={telemetryStreamStatus}
               />
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
