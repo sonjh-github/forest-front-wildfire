@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HttpApiError } from "./client";
-import { externalIntegrationErrorMessage } from "./external-disaster-api";
+import { externalIntegrationErrorMessage, validateExternalListResponse } from "./external-disaster-api";
 
 describe("externalIntegrationErrorMessage", () => {
   it("등록되지 않은 서버 IP 오류를 운영자용 문구로 변환한다", () => {
@@ -52,5 +52,15 @@ describe("externalIntegrationErrorMessage", () => {
     expect(
       externalIntegrationErrorMessage(error),
     ).toBe("외부기관 응답 오류");
+  });
+});
+
+describe("validateExternalListResponse", () => {
+  it("meta가 생략돼도 공급자와 실제 건수를 보완한다", () => {
+    expect(validateExternalListResponse({ data: [{ id: 1 }] }, "기관 API").meta).toEqual({ count: 1, provider: "기관 API" });
+  });
+
+  it("목록이 아닌 비정상 응답을 화면 데이터로 사용하지 않는다", () => {
+    expect(() => validateExternalListResponse({ data: null }, "기관 API")).toThrow("목록 데이터 형식 확인 필요");
   });
 });

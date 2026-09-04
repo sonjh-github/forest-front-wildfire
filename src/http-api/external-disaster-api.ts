@@ -13,6 +13,16 @@ export interface ExternalListResponse<T> {
   meta: ExternalListMeta;
 }
 
+export function validateExternalListResponse<T>(value: unknown, provider: string): ExternalListResponse<T> {
+  if (!value || typeof value !== "object") throw new Error(`${provider} 응답 형식 확인 필요`);
+  const candidate = value as { data?: unknown; meta?: Partial<ExternalListMeta> };
+  if (!Array.isArray(candidate.data)) throw new Error(`${provider} 목록 데이터 형식 확인 필요`);
+  const meta = candidate.meta ?? {};
+  const count = Number(meta.count ?? candidate.data.length);
+  if (!Number.isFinite(count) || count < 0) throw new Error(`${provider} 응답 건수 확인 필요`);
+  return { data: candidate.data as T[], meta: { ...meta, count, provider: String(meta.provider ?? provider) } };
+}
+
 export function externalIntegrationErrorMessage(
   error: unknown,
 ): string {
@@ -63,6 +73,10 @@ async function externalRequest<T>(
       externalIntegrationErrorMessage(error),
     );
   }
+}
+
+async function externalListRequest<T>(provider: string, path: string) {
+  return validateExternalListResponse<T>(await externalRequest(() => dashboardApi<unknown>(path)), provider);
 }
 
 export interface FirmsHotspot {
@@ -150,37 +164,17 @@ export interface LandslideRegionalRisk {
 
 export const externalDisasterApi = {
   wildfireFirms: () =>
-    externalRequest(() =>
-      dashboardApi<ExternalListResponse<FirmsHotspot>>(
-        "/api/v1/external/wildfire/firms"
-      )
-    ),
+    externalListRequest<FirmsHotspot>("NASA FIRMS", "/api/v1/external/wildfire/firms"),
 
   wildfireRisk: (pageNo = 1, numOfRows = 100) =>
-    externalRequest(() =>
-      dashboardApi<ExternalListResponse<WildfireRisk>>(
-        `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
-      )
-    ),
+    externalListRequest<WildfireRisk>("산림청 산불위험예보", `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 
   landslideForecast: (pageNo = 1, numOfRows = 100) =>
-    externalRequest(() =>
-      dashboardApi<ExternalListResponse<LandslideForecast>>(
-        `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`
-      )
-    ),
+    externalListRequest<LandslideForecast>("산사태 예측정보", `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 
   landslideHistory: (pageNo = 1, numOfRows = 100) =>
-    externalRequest(() =>
-      dashboardApi<ExternalListResponse<LandslideHistory>>(
-        `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`
-      )
-    ),
+    externalListRequest<LandslideHistory>("산사태 발생이력", `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 
   landslideRegionalRisk: (pageNo = 1, numOfRows = 100) =>
-    externalRequest(() =>
-      dashboardApi<ExternalListResponse<LandslideRegionalRisk>>(
-        `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
-      )
-    ),
+    externalListRequest<LandslideRegionalRisk>("산사태 지역위험", `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 };

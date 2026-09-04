@@ -753,8 +753,6 @@ export default function UnifiedDisasterDashboard() {
           } as ApiRecord];
         }),
       );
-    } else {
-      setExternalFirmsRows([]);
     }
 
     if (landslideHistory.status === "fulfilled") {
@@ -780,34 +778,35 @@ export default function UnifiedDisasterDashboard() {
           } as ApiRecord];
         }),
       );
-    } else {
-      setExternalLandslideHistoryRows([]);
     }
 
-    setExternalWildfireRiskRows(wildfireRisk.status === "fulfilled" ? wildfireRisk.value.data.flatMap((item, index) => {
+    if (wildfireRisk.status === "fulfilled") setExternalWildfireRiskRows(wildfireRisk.value.data.flatMap((item, index) => {
       const coordinates = districtCenter(item.district, item.area, item.province);
       return coordinates ? [{ id: `kfs-risk-${item.regionCode || index}`, observedAt: item.analyzedAt || checkedAt, provider: "산림청", riskScore: item.mean ?? item.max, district: item.district, resultGeometry: pointBuffer(coordinates, 0.035) }] : [];
-    }) : []);
-    setExternalLandslideForecastRows(landslideForecast.status === "fulfilled" ? landslideForecast.value.data.flatMap((item, index) => {
+    }));
+    if (landslideForecast.status === "fulfilled") setExternalLandslideForecastRows(landslideForecast.value.data.flatMap((item, index) => {
       const coordinates = districtCenter(item.district);
       return coordinates ? [{ id: `slide-forecast-${index}`, observedAt: item.predictedAt || checkedAt, provider: "재난안전데이터", forecast: item.forecast, resultGeometry: pointBuffer(coordinates, 0.028) }] : [];
-    }) : []);
-    setExternalLandslideRegionalRows(landslideRegionalRisk.status === "fulfilled" ? landslideRegionalRisk.value.data.flatMap((item, index) => {
+    }));
+    if (landslideRegionalRisk.status === "fulfilled") setExternalLandslideRegionalRows(landslideRegionalRisk.value.data.flatMap((item, index) => {
       const coordinates = districtCenter(item.districtName, item.detailAddress);
       return coordinates ? [{ id: `slide-regional-${item.managementNumber || index}`, observedAt: item.lastModifiedAt || checkedAt, provider: "재난안전데이터", riskGrade: item.riskGradeCode, expectedPeople: item.expectedPeople, resultGeometry: pointBuffer(coordinates, 0.022) }] : [];
-    }) : []);
+    }));
 
-    setExternalIntegrationStatus({
+    setExternalIntegrationStatus((current) => ({
       firms: firms.status === "fulfilled"
         ? {
             status: "ok",
             count: firms.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.firms.count,
             checkedAt,
+            lastSuccessAt: current.firms.lastSuccessAt,
+            servingStale: current.firms.count > 0,
             message: errorMessage(firms.reason),
           },
 
@@ -816,11 +815,14 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: wildfireRisk.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.wildfireRisk.count,
             checkedAt,
+            lastSuccessAt: current.wildfireRisk.lastSuccessAt,
+            servingStale: current.wildfireRisk.count > 0,
             message: errorMessage(wildfireRisk.reason),
           },
 
@@ -829,11 +831,14 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: landslideForecast.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.landslideForecast.count,
             checkedAt,
+            lastSuccessAt: current.landslideForecast.lastSuccessAt,
+            servingStale: current.landslideForecast.count > 0,
             message: errorMessage(landslideForecast.reason),
           },
 
@@ -842,11 +847,14 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: landslideHistory.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.landslideHistory.count,
             checkedAt,
+            lastSuccessAt: current.landslideHistory.lastSuccessAt,
+            servingStale: current.landslideHistory.count > 0,
             message: errorMessage(landslideHistory.reason),
           },
 
@@ -855,14 +863,17 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: landslideRegionalRisk.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.landslideRegionalRisk.count,
             checkedAt,
+            lastSuccessAt: current.landslideRegionalRisk.lastSuccessAt,
+            servingStale: current.landslideRegionalRisk.count > 0,
             message: errorMessage(landslideRegionalRisk.reason),
           },
-    });
+    }));
   }, [demoMode]);
 
   useEffect(() => {

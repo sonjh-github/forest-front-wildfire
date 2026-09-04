@@ -17,6 +17,8 @@ export type ExternalSourceState = {
   count: number;
   checkedAt: string | null;
   message?: string;
+  lastSuccessAt?: string | null;
+  servingStale?: boolean;
 };
 
 export type ExternalIntegrationStatus = Record<ExternalSourceId, ExternalSourceState>;
@@ -548,12 +550,13 @@ export function OperationsPanel({
                   <span>{statusLabel}</span>
                 </div>
 
-                <p>{source.impact} · 수신 {state.count}건</p>
+                <p>{source.impact} · 수신 {state.count}건{state.servingStale ? " · 마지막 정상 데이터 유지 중" : ""}</p>
 
                 <small>
                   {state.checkedAt
                     ? `마지막 확인 ${relativeTime(state.checkedAt)}`
                     : "아직 확인하지 않음"}
+                  {state.lastSuccessAt ? ` · 최종 정상 ${relativeTime(state.lastSuccessAt)}` : ""}
                   {state.message ? ` · ${state.message}` : ""}
                 </small>
               </article>;
