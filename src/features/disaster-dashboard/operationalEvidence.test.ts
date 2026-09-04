@@ -36,5 +36,9 @@ describe("operational evidence", () => {
     const zone: [number, number][] = [[128.35, 37.60], [128.38, 37.60], [128.38, 37.63], [128.35, 37.63]];
     expect(evaluateRiskZone([128.37, 37.61], zone).inside).toBe(true);
     expect(evaluateRiskZone([128.40, 37.65], zone).shouldAlert).toBe(false);
+    const nearEdge = evaluateRiskZone([128.3805, 37.615], zone, 100);
+    expect(nearEdge.inside).toBe(false);
+    expect(nearEdge.shouldAlert).toBe(true);
+    expect(nearEdge.boundaryDistanceM).toBeLessThan(100);
   });
 });

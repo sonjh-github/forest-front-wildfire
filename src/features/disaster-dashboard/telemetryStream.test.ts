@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDemoOverview } from "./demoOverview";
-import { MavlinkTelemetryAccumulator, mergeTelemetryIntoOverview, parseTelemetryMessage } from "./telemetryStream";
+import { MavlinkTelemetryAccumulator, applyTelemetrySafetyRules, mergeTelemetryIntoOverview, parseTelemetryMessage } from "./telemetryStream";
 
 describe("Gateway telemetry stream", () => {
   it("Gateway 좌표 메시지를 표준 텔레메트리로 검증한다", () => {
@@ -27,5 +27,11 @@ describe("Gateway telemetry stream", () => {
     const result = mavlink.push({ protocol: "MAVLINK", assetId: "DRONE-01", eventId: "WF-1", observedAt: "2026-09-04T01:00:02Z", sequence: 3, message: { type: "GLOBAL_POSITION_INT", lat: 376200000, lon: 1283700000, relative_alt: 312000, hdg: 9450, vx: 300, vy: 400 } });
     expect(result).toMatchObject({ assetId: "DRONE-01", latitude: 37.62, longitude: 128.37, altitude: 312, positioningMethod: "RTK_FIXED", operationalStatus: "FLYING" });
     expect(result?.attributes).toMatchObject({ armed: true, flightMode: "AUTO", headingDeg: 94.5, groundSpeedMps: 5, satellitesVisible: 18 });
+  });
+
+  it("실시간 위치가 위험면에 진입하면 관제 경보를 자동 발령한다", () => {
+    const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
+    const updated = applyTelemetrySafetyRules(overview, { assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", receivedAt: "2026-09-04T00:00:03Z", latitude: 37.615, longitude: 128.37 });
+    expect(updated.alerts.find((alert) => alert.alertId === "ALT-GEOFENCE-DRONE-01")).toMatchObject({ status: "ACTIVE", severity: "CRITICAL", issuerOrgCode: "공간판정 엔진" });
   });
 });

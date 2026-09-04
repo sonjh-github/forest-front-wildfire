@@ -1,4 +1,5 @@
 import type { ApiRecord, EventOverview } from "../../http-api";
+import { evaluateRiskZone } from "./operationalEvidence";
 
 export type TelemetryStreamStatus = "DISABLED" | "CONNECTING" | "CONNECTED" | "RECONNECTING" | "ERROR";
 
@@ -129,6 +130,42 @@ export function mergeTelemetryIntoOverview(overview: EventOverview, message: Liv
   const assets = [...overview.assets];
   if (existingIndex >= 0) assets[existingIndex] = asset; else assets.push(asset);
   return { ...overview, assets };
+}
+
+function riskPolygons(overview: EventOverview): [number, number][][] {
+  return ["wildfire-risk-zones", "spread-predictions", "slope-assessments"].flatMap((layerId) =>
+    (overview.domainLayers[layerId] ?? []).flatMap((row) => {
+      const candidate = (row.resultGeometry ?? row.predictedArea ?? row.geometry) as { type?: string; coordinates?: unknown } | undefined;
+      if (candidate?.type !== "Polygon" || !Array.isArray(candidate.coordinates)) return [];
+      const ring = candidate.coordinates[0];
+      if (!Array.isArray(ring)) return [];
+      const polygon = ring.flatMap((coordinate) => Array.isArray(coordinate) && Number.isFinite(Number(coordinate[0])) && Number.isFinite(Number(coordinate[1])) ? [[Number(coordinate[0]), Number(coordinate[1])] as [number, number]] : []);
+      return polygon.length >= 3 ? [polygon] : [];
+    }),
+  );
+}
+
+export function applyTelemetrySafetyRules(overview: EventOverview, message: LiveTelemetryMessage, warningDistanceM = 100): EventOverview {
+  const merged = mergeTelemetryIntoOverview(overview, message);
+  if (merged === overview || riskPolygons(merged).length === 0) return merged;
+  const evaluations = riskPolygons(merged).map((polygon) => evaluateRiskZone([message.longitude, message.latitude], polygon, warningDistanceM));
+  const nearest = evaluations.find((evaluation) => evaluation.inside)
+    ?? evaluations.sort((a, b) => a.boundaryDistanceM - b.boundaryDistanceM)[0];
+  const alertId = `ALT-GEOFENCE-${message.assetId}`;
+  const previousIndex = merged.alerts.findIndex((alert) => alert.alertId === alertId);
+  const alerts = [...merged.alerts];
+  if (nearest.shouldAlert) {
+    const alert: ApiRecord = {
+      alertId, severity: nearest.inside ? "CRITICAL" : "WARNING", status: "ACTIVE",
+      title: nearest.inside ? "현장 자산 위험구역 진입" : "현장 자산 위험구역 접근",
+      message: `${message.assetId}가 위험구역 ${nearest.inside ? "내부에 진입" : `경계 ${nearest.boundaryDistanceM}m 이내에 접근`}했습니다. 지정 대피로와 현장 안전을 확인하세요.`,
+      issuedAt: message.receivedAt ?? new Date().toISOString(), issuerOrgCode: "공간판정 엔진", sourceAssetId: message.assetId,
+    };
+    if (previousIndex >= 0) alerts[previousIndex] = alert; else alerts.unshift(alert);
+  } else if (previousIndex >= 0 && alerts[previousIndex].status !== "RESOLVED") {
+    alerts[previousIndex] = { ...alerts[previousIndex], status: "RESOLVED", resolvedAt: message.receivedAt ?? new Date().toISOString(), message: `${message.assetId}가 위험구역 경계를 벗어났습니다.` };
+  }
+  return { ...merged, alerts };
 }
 
 type SocketLike = Pick<WebSocket, "close" | "send" | "readyState" | "onopen" | "onclose" | "onerror" | "onmessage">;

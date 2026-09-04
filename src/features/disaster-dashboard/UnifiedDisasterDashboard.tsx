@@ -11,7 +11,7 @@ import {
 import DroneVideoModal from "./DroneVideoModal";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
-import { mergeTelemetryIntoOverview, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
+import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
 import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
@@ -1039,7 +1039,7 @@ export default function UnifiedDisasterDashboard() {
       eventId: selectedId,
       onStatus: setTelemetryStreamStatus,
       onMessage: (message) => {
-        setOverview((current) => current ? mergeTelemetryIntoOverview(current, message) : current);
+        setOverview((current) => current ? applyTelemetrySafetyRules(current, message) : current);
         setLastUpdatedAt(new Date());
       },
     });

@@ -31,9 +31,23 @@ export function distanceMeters(a: [number, number], b: [number, number]) {
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
+function distanceToSegmentMeters(point: [number, number], start: [number, number], end: [number, number]) {
+  const latitudeScale = 111_320;
+  const longitudeScale = latitudeScale * Math.cos(point[1] * Math.PI / 180);
+  const ax = (start[0] - point[0]) * longitudeScale;
+  const ay = (start[1] - point[1]) * latitudeScale;
+  const bx = (end[0] - point[0]) * longitudeScale;
+  const by = (end[1] - point[1]) * latitudeScale;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const denominator = dx * dx + dy * dy;
+  const ratio = denominator === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / denominator));
+  return Math.hypot(ax + ratio * dx, ay + ratio * dy);
+}
+
 export function evaluateRiskZone(point: [number, number], polygon: [number, number][], warningDistanceM = 100) {
   const inside = isPointInPolygon(point, polygon);
-  const boundaryDistanceM = polygon.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...polygon.map((vertex) => distanceMeters(point, vertex)));
+  const boundaryDistanceM = polygon.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...polygon.map((vertex, index) => distanceToSegmentMeters(point, vertex, polygon[(index + 1) % polygon.length])));
   return { inside, boundaryDistanceM: Math.round(boundaryDistanceM), shouldAlert: inside || boundaryDistanceM <= warningDistanceM };
 }
 
