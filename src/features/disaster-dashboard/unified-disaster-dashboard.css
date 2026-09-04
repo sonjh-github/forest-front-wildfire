@@ -1822,6 +1822,13 @@
 .event-metric-floor > button strong { color: #173d33; font-size: 16px; line-height: 1; }
 .event-metric-floor > button small { align-self: end; color: #83938e; font-size: 7px; }
 .event-metric-floor > button[data-tone="alert"] strong { color: #c73531; }
+.demo-alert-actions { display:flex; gap:6px; margin-top:8px; }
+.demo-alert-actions button { flex:1; min-height:28px; border:1px solid #b8cbc4; border-radius:5px; background:#fff; color:#28594b; font-size:9px; font-weight:850; cursor:pointer; }
+.demo-alert-actions button:last-child { border-color:#b76051; color:#9a3528; }
+.demo-alert-actions button:disabled { opacity:.45; cursor:default; }
+.demo-alert-audit { display:grid; gap:4px; padding:9px; border:1px solid #d4e3dd; border-radius:6px; background:#f5faf8; }
+.demo-alert-audit strong { color:#28584a; font-size:10px; }
+.demo-alert-audit small { color:#637a72; font-size:8px; }
 .event-metric-floor > button:not(:disabled):hover,
 .event-metric-floor > button.is-active { border-color: #2680bb; background: #eef8ff; box-shadow: inset 0 -2px #2680bb, 0 5px 15px rgba(25, 91, 136, .14); }
 .event-metric-floor > button:disabled { cursor: default; opacity: 1; }

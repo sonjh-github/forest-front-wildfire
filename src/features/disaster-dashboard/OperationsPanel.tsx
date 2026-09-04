@@ -3,6 +3,7 @@ import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
 import { buildOperationalEvidence, calculateTelemetryMetrics, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import type { TelemetryStreamStatus } from "./telemetryStream";
+import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
@@ -129,18 +130,27 @@ export function OperationsPanel({
   telemetrySamples,
 }: OperationsPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [alertOverrides, setAlertOverrides] = useState<Record<string, AlertWorkflowStatus>>({});
+  const [alertAudit, setAlertAudit] = useState<Array<ReturnType<typeof createAlertAudit>>>([]);
   const externalIntegrationLoading = Object.values(
     externalIntegrationStatus,
   ).some((state) => state.status === "loading");
   const activeAlerts = useMemo(() => {
     const rank: Record<string, number> = { CRITICAL: 0, SEVERE: 1, WARNING: 2, CAUTION: 3, NORMAL: 4 };
-    return overview.alerts
+    return overview.alerts.map((alert) => ({ ...alert, status: alertOverrides[value(alert, ["alertId", "id"], "")] ?? alert.status }))
       .filter((alert) => !["RESOLVED", "EXPIRED", "CANCELLED"].includes(value(alert, ["status"])))
       .sort((a, b) =>
         (rank[value(a, ["severity", "severityCode"])] ?? 5) - (rank[value(b, ["severity", "severityCode"])] ?? 5)
         || Date.parse(value(b, ["issuedAt", "createdAt"], "0")) - Date.parse(value(a, ["issuedAt", "createdAt"], "0")),
       );
-  }, [overview.alerts]);
+  }, [overview.alerts, alertOverrides]);
+  const demoAlertWorkflow = overview.domainDetail?.mode === "SIMULATION";
+  const handleAlertAction = (alertId: string, currentStatus: string, action: AlertWorkflowAction) => {
+    const normalized: AlertWorkflowStatus = ["ACKNOWLEDGED", "RESOLVED"].includes(currentStatus) ? currentStatus as AlertWorkflowStatus : "ACTIVE";
+    const next = transitionAlert(normalized, action);
+    setAlertOverrides((current) => ({ ...current, [alertId]: next }));
+    setAlertAudit((current) => [createAlertAudit(alertId, action, "DEMO 관제자"), ...current].slice(0, 20));
+  };
   const linkHealthSummary = useMemo(() => {
     const now = new Date();
     const rows = locations.map((location) => ({
@@ -441,9 +451,14 @@ export function OperationsPanel({
                 <div><strong>{value(alert, ["title", "alertType", "type"], "현장 경보")}</strong><span>{label(severity)}</span></div>
                 <p>{value(alert, ["message", "description"], "상세 내용이 없습니다.")}</p>
                 <small>{label(value(alert, ["status"], "OPEN"))} · {occurredAt(alert, ["issuedAt", "createdAt"])} · 발령 {value(alert, ["issuerOrgCode"], "기관 미상")}</small>
+                {demoAlertWorkflow && <div className="demo-alert-actions">
+                  <button type="button" disabled={value(alert, ["status"]) === "ACKNOWLEDGED"} onClick={() => handleAlertAction(alertKey, value(alert, ["status"], "ACTIVE"), "ACKNOWLEDGE")}>경보 확인</button>
+                  <button type="button" onClick={() => handleAlertAction(alertKey, value(alert, ["status"], "ACTIVE"), "RESOLVE")}>조치 후 해제</button>
+                </div>}
               </article>;
             })}
-            <p className="operation-readonly-note">경보 발령·확인·해제는 명령센터 권한 및 이력 API 연계 후 사용할 수 있습니다.</p>
+            {demoAlertWorkflow && alertAudit.length > 0 && <section className="demo-alert-audit" aria-label="경보 조치 이력"><strong>DEMO 조치 이력</strong>{alertAudit.slice(0, 5).map((audit) => <small key={audit.auditId}>{audit.alertId} · {audit.action === "ACKNOWLEDGE" ? "확인" : "해제"} · {new Date(audit.occurredAt).toLocaleTimeString("ko-KR")}</small>)}</section>}
+            <p className="operation-readonly-note">DEMO 조치는 브라우저 세션에서만 유지됩니다. 운영 저장은 명령센터 권한 및 감사 이력 API 연계 후 사용합니다.</p>
           </section>}
           {activeTab === "networks" && <section className="operations-records" aria-label="통신망 상태">
             <article data-status={linkHealthSummary.disconnected > 0 ? "FAILED" : linkHealthSummary.delayed > 0 ? "DEGRADED" : "ACTIVE"} className="network-detail-card">
