@@ -1,4 +1,5 @@
 import { REQUIREMENTS_READINESS, requirementSummary, type RequirementValidation } from "./requirementsReadiness";
+import { runDemoAcceptance } from "./demoAcceptance";
 
 const validationLabel: Record<RequirementValidation, string> = {
   OPERATING: "운영 확인",
@@ -9,9 +10,10 @@ const validationLabel: Record<RequirementValidation, string> = {
 
 export default function RequirementsReadinessModal({ onClose }: { onClose: () => void }) {
   const summary = requirementSummary();
+  const acceptance = runDemoAcceptance();
   const categories = [...new Set(REQUIREMENTS_READINESS.map((item) => item.category))];
   const download = () => {
-    const payload = JSON.stringify({ generatedAt: new Date().toISOString(), summary, requirements: REQUIREMENTS_READINESS }, null, 2);
+    const payload = JSON.stringify({ generatedAt: new Date().toISOString(), summary, demoAcceptance: acceptance, requirements: REQUIREMENTS_READINESS }, null, 2);
     const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -30,6 +32,11 @@ export default function RequirementsReadinessModal({ onClose }: { onClose: () =>
         <strong><b>{summary.softwareComplete}</b><span>/ {summary.total} SW 구현</span></strong>
         <span>운영 확인 {summary.operating}</span><span>DEMO 검증 {summary.demoVerified}</span>
         <span>기관 대기 {summary.externalPending}</span><span>현장 대기 {summary.fieldPending}</span>
+      </div>
+      <div className="demo-acceptance-summary" data-passed={acceptance.failed === 0}>
+        <div><small>AUTOMATED DEMO ACCEPTANCE</small><strong>{acceptance.passed} / {acceptance.total} 자동검증 통과</strong></div>
+        <span>산불</span><span>산사태</span><span>통신장애</span><span>드론비상</span>
+        <em>{acceptance.failed === 0 ? "검증 성공" : `${acceptance.failed}개 확인 필요`}</em>
       </div>
       <div className="requirements-groups">
         {categories.map((category) => <section key={category}>

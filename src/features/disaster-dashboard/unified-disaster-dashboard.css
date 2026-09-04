@@ -3371,6 +3371,13 @@
 .requirements-summary strong b { color: #08745a; font-size: 30px; }
 .requirements-summary strong span { font-size: 14px; }
 .requirements-summary > span { border-radius: 999px; background: #edf4f1; padding: 7px 10px; font-size: 12px; font-weight: 800; }
+.demo-acceptance-summary { display:flex; align-items:center; gap:8px; padding:10px 26px; border-bottom:1px solid #d9e4df; background:#fff8e9; }
+.demo-acceptance-summary > div { display:grid; gap:2px; margin-right:auto; }
+.demo-acceptance-summary small { color:#8a6a25; font-size:9px; font-weight:900; letter-spacing:.06em; }
+.demo-acceptance-summary strong { color:#714c08; font-size:14px; }
+.demo-acceptance-summary > span { padding:5px 8px; border-radius:999px; background:#fff; color:#6c5a31; font-size:10px; font-weight:800; }
+.demo-acceptance-summary > em { padding:6px 9px; border-radius:6px; background:#dce9e3; color:#275d4c; font-size:10px; font-style:normal; font-weight:900; }
+.demo-acceptance-summary[data-passed="true"] > em { background:#d8f4e8; color:#087053; }
 
 .requirements-groups { overflow: auto; padding: 18px 26px 28px; }
 .requirements-groups section { margin-bottom: 18px; }
