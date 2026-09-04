@@ -57,7 +57,7 @@ export function createDemoOverview(now = new Date()): EventOverview {
       { kpiMeasurementId: "KPI-LOC", metricCode: "LOCATION_LATENCY", metricName: "위치정보 갱신시간", measuredValue: 2.1, unit: "초", targetOperator: "≤", targetValue: 3, passed: true, measuredTo: observedAt, sourceSystem: "Gateway 원시로그", evidence: ["run-20260903-01"] },
       { kpiMeasurementId: "KPI-AVL", metricCode: "NETWORK_AVAILABILITY", metricName: "네트워크 가용률", measuredValue: 99.2, unit: "%", targetOperator: "≥", targetValue: 98, passed: true, measuredTo: observedAt, sourceSystem: "NMS", evidence: ["run-20260903-01"] },
       { kpiMeasurementId: "KPI-SHARE", metricCode: "SHARING_SUCCESS", metricName: "정보공유 성공률", measuredValue: 98.8, unit: "%", targetOperator: "≥", targetValue: 98, passed: true, measuredTo: observedAt, sourceSystem: "Message Gateway", evidence: ["run-20260903-01"] },
-      { kpiMeasurementId: "KPI-DEPLOY", metricCode: "NETWORK_DEPLOYMENT_TIME", metricName: "통신망 구축시간", measuredValue: 18.6, unit: "분", targetOperator: "≤", targetValue: 20, passed: true, measuredTo: observedAt, sourceSystem: "현장시험 타임라인", evidence: ["run-20260903-01"] },
+      { kpiMeasurementId: "KPI-DEPLOY", metricCode: "NETWORK_DEPLOYMENT_TIME", metricName: "통신망 구축시간", measuredValue: 6.4, unit: "분", targetOperator: "≤", targetValue: 7, passed: true, measuredTo: observedAt, sourceSystem: "DEMO 현장시험 타임라인", evidence: ["demo-run-20260903-01"] },
     ],
     integrations: [],
     domainDetail: { mode: "SIMULATION", terrain: "DEM 10m", windDirection: "서남서", windSpeedMps: 4.2 },

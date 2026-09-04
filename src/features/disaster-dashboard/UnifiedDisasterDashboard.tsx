@@ -9,6 +9,7 @@ import {
 } from "./OperationsPanel";
 
 import DroneVideoModal from "./DroneVideoModal";
+import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT } from "./demoOverview";
 import "./unified-disaster-dashboard.css";
 
@@ -606,6 +607,7 @@ export default function UnifiedDisasterDashboard() {
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [demoMode, setDemoMode] = useState(FORCE_DEMO_MODE);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -1192,6 +1194,7 @@ export default function UnifiedDisasterDashboard() {
           <header>
             <div className="readiness-brand"><span>산림청</span><strong>산림재난 통합상황판</strong><small>FOREST DISASTER COMMON OPERATIONAL PICTURE</small></div>
             <div className="readiness-actions">
+              <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>47개 개발 증빙</button>
               <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
               <div className={`readiness-connection ${error ? "is-error" : eventsLoaded ? "is-ready" : "is-loading"}`}><i />{error ? "연결 점검 필요" : eventsLoaded ? "연결 정상" : "데이터 연결 중"}</div>
             </div>
@@ -1244,6 +1247,7 @@ export default function UnifiedDisasterDashboard() {
             <button type="button" data-alert={activeAlertCount > 0} onClick={() => setOperationsTab("alerts")}><span>경보</span><b>{activeAlertCount}</b></button>
           </nav>
           <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
+          <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>47개 개발 증빙</button>
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
@@ -1480,6 +1484,7 @@ export default function UnifiedDisasterDashboard() {
         </section>
         </>
       )}
+      {requirementsOpen && <RequirementsReadinessModal onClose={() => setRequirementsOpen(false)} />}
 
       {videoDrone && <DroneVideoModal drone={videoDrone} onClose={() => setVideoDrone(null)} />}
     </main>
