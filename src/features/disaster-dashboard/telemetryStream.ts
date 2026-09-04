@@ -58,6 +58,57 @@ export function parseTelemetryMessage(raw: unknown): LiveTelemetryMessage | null
   };
 }
 
+export class MavlinkTelemetryAccumulator {
+  private states = new Map<string, Partial<LiveTelemetryMessage>>();
+
+  push(raw: unknown): LiveTelemetryMessage | null {
+    let value = raw;
+    if (typeof raw === "string") {
+      try { value = JSON.parse(raw); } catch { return null; }
+    }
+    if (!value || typeof value !== "object") return null;
+    const envelope = value as Record<string, unknown>;
+    if (String(envelope.protocol ?? "").toUpperCase() !== "MAVLINK") return null;
+    const message = (envelope.message && typeof envelope.message === "object" ? envelope.message : envelope) as Record<string, unknown>;
+    const assetId = String(envelope.assetId ?? message.assetId ?? "").trim();
+    if (!assetId) return null;
+    const current = this.states.get(assetId) ?? { assetId, assetType: "UAV" };
+    const type = String(message.type ?? message.messageType ?? "").toUpperCase();
+    const observedAt = String(envelope.observedAt ?? envelope.receivedAt ?? new Date().toISOString());
+    const next: Partial<LiveTelemetryMessage> = { ...current, assetId, eventId: envelope.eventId ? String(envelope.eventId) : current.eventId, observedAt, receivedAt: envelope.receivedAt ? String(envelope.receivedAt) : new Date().toISOString(), sequence: finite(envelope.sequence) ?? current.sequence };
+    if (type === "GLOBAL_POSITION_INT") {
+      const latitude = finite(message.lat);
+      const longitude = finite(message.lon);
+      if (latitude != null) next.latitude = latitude / 10_000_000;
+      if (longitude != null) next.longitude = longitude / 10_000_000;
+      const altitudeMm = finite(message.relative_alt ?? message.alt);
+      if (altitudeMm != null) next.altitude = altitudeMm / 1_000;
+      const heading = finite(message.hdg);
+      const vx = finite(message.vx);
+      const vy = finite(message.vy);
+      next.attributes = { ...next.attributes, headingDeg: heading == null || heading === 65535 ? undefined : heading / 100, groundSpeedMps: vx == null || vy == null ? undefined : Math.hypot(vx, vy) / 100 };
+    } else if (type === "HEARTBEAT") {
+      const baseMode = finite(message.base_mode) ?? 0;
+      next.operationalStatus = (baseMode & 128) !== 0 ? "FLYING" : "READY";
+      next.attributes = { ...next.attributes, armed: (baseMode & 128) !== 0, flightMode: String(message.flightMode ?? message.custom_mode ?? "UNKNOWN") };
+    } else if (type === "SYS_STATUS") {
+      next.batteryPct = finite(message.battery_remaining);
+      next.attributes = { ...next.attributes, voltageBatteryMv: finite(message.voltage_battery) };
+    } else if (type === "GPS_RAW_INT") {
+      const fixType = finite(message.fix_type) ?? 0;
+      next.positioningMethod = fixType >= 6 ? "RTK_FIXED" : fixType === 5 ? "RTK_FLOAT" : fixType >= 3 ? "GNSS" : "NO_FIX";
+      const eph = finite(message.eph);
+      if (eph != null && eph !== 65535) next.horizontalAccuracyM = eph / 100;
+      next.attributes = { ...next.attributes, satellitesVisible: finite(message.satellites_visible) };
+    } else if (type === "MISSION_CURRENT") {
+      next.attributes = { ...next.attributes, missionSequence: finite(message.seq) };
+    } else return null;
+    this.states.set(assetId, next);
+    if (next.latitude == null || next.longitude == null) return null;
+    return parseTelemetryMessage(next);
+  }
+}
+
 export function mergeTelemetryIntoOverview(overview: EventOverview, message: LiveTelemetryMessage): EventOverview {
   if (message.eventId && message.eventId !== overview.event.eventId) return overview;
   const existingIndex = overview.assets.findIndex((asset) => String(asset.assetId) === message.assetId);
@@ -88,6 +139,7 @@ export class TelemetryStreamClient {
   private attempts = 0;
   private stopped = false;
   private lastSequence = new Map<string, number>();
+  private mavlink = new MavlinkTelemetryAccumulator();
 
   constructor(private options: {
     url: string;
@@ -108,7 +160,7 @@ export class TelemetryStreamClient {
       this.socket?.send(JSON.stringify({ type: "SUBSCRIBE", eventId: this.options.eventId }));
     };
     this.socket.onmessage = (event) => {
-      const message = parseTelemetryMessage(event.data);
+      const message = this.mavlink.push(event.data) ?? parseTelemetryMessage(event.data);
       if (!message || (message.eventId && message.eventId !== this.options.eventId)) return;
       const previous = this.lastSequence.get(message.assetId);
       if (message.sequence != null && previous != null && message.sequence <= previous) return;
