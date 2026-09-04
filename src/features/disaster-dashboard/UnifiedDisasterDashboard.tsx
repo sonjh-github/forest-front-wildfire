@@ -1170,6 +1170,19 @@ export default function UnifiedDisasterDashboard() {
       : [],
   );
   const selectedLocation = mapLocations.find((location) => locationKey(location) === selectedLocationKey) ?? null;
+  const selectedTelemetryHistory = selectedLocation
+    ? telemetrySamples.filter((sample) => sample.assetId === selectedLocation.id).slice(-20).reverse()
+    : [];
+  const downloadSelectedTelemetry = () => {
+    if (!selectedLocation || selectedTelemetryHistory.length === 0) return;
+    const payload = { exportedAt: new Date().toISOString(), eventId: overview?.event.eventId, assetId: selectedLocation.id, samples: [...selectedTelemetryHistory].reverse() };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${selectedLocation.id}-telemetry-history.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
   const selectedCommunicationPath = selectedLocation ? communicationPath(selectedLocation) : null;
   const selectedPositioningWarning = selectedLocation && isPositioningLocation(selectedLocation)
     ? positioningWarning(selectedLocation)
@@ -1378,6 +1391,10 @@ export default function UnifiedDisasterDashboard() {
                   <div><dt>비상 상태</dt><dd>{selectedLocation.emergencyStatus ?? "정상"}</dd></div>
                 </>}
               </dl>
+              {selectedTelemetryHistory.length > 0 && <section className="asset-live-history" aria-label={`${selectedLocation.id} 실시간 수신 이력`}>
+                <header><div><small>GATEWAY RAW HISTORY</small><strong>최근 위치 수신 {selectedTelemetryHistory.length}건</strong></div><button type="button" onClick={downloadSelectedTelemetry}>JSON 증적</button></header>
+                <ol>{selectedTelemetryHistory.slice(0, 6).map((sample, index) => <li key={`${sample.observedAt}-${sample.sequence ?? index}`}><time>{new Date(sample.observedAt).toLocaleTimeString("ko-KR")}</time><span>{sample.latitude?.toFixed(6) ?? "-"}, {sample.longitude?.toFixed(6) ?? "-"}</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}</ol>
+              </section>}
               {selectedLocation.kind === "asset" && <button type="button" className="asset-log-link" onClick={() => { window.location.href = `/device?assetId=${encodeURIComponent(selectedLocation.id)}`; }}>assetId 로그·이력 조회</button>}
               {isPositioningLocation(selectedLocation) && <p className="positioning-dialog-note">
                 <strong>{selectedLocation.category === "RTK_BASE_LPWA_GATEWAY" ? "기준국 역할" : "위치 산출 흐름"}</strong>
