@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
+import { resolveTerrainConfig } from "./terrainConfig";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ApiRecord, NetworkTopology } from "../../http-api";
 import type { LiveLocation } from "./UnifiedDisasterDashboard";
@@ -289,6 +290,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mutedBasemap, setMutedBasemap] = useState(false);
   const [terrain3d, setTerrain3d] = useState(false);
+  const [terrainElevationM, setTerrainElevationM] = useState<number | null>(null);
+  const terrainConfig = resolveTerrainConfig(import.meta.env);
   const [tileDegraded, setTileDegraded] = useState(false);
   const selectedEventRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
@@ -335,14 +338,26 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     if (!map) return;
     const apply = () => {
       if (!map.getSource("terrain-dem")) map.addSource("terrain-dem", {
-        type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
-        tileSize: 256, encoding: "terrarium",
+        type: "raster-dem", tiles: terrainConfig.tiles,
+        tileSize: terrainConfig.tileSize, encoding: terrainConfig.encoding, maxzoom: terrainConfig.maxzoom,
+        attribution: terrainConfig.attribution,
       });
       map.setTerrain(terrain3d ? { source: "terrain-dem", exaggeration: 1.35 } : null);
       map.easeTo({ pitch: terrain3d ? 58 : 0, bearing: terrain3d ? -18 : 0, duration: 650 });
     };
     if (map.isStyleLoaded()) apply(); else map.once("load", apply);
     return () => { map.off("load", apply); };
+  }, [terrain3d]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !terrain3d) { setTerrainElevationM(null); return; }
+    const handleMove = (event: maplibregl.MapMouseEvent) => {
+      const elevation = map.queryTerrainElevation(event.lngLat);
+      setTerrainElevationM(Number.isFinite(elevation) ? Number(elevation) : null);
+    };
+    map.on("mousemove", handleMove);
+    return () => { map.off("mousemove", handleMove); };
   }, [terrain3d]);
 
   useEffect(() => {
@@ -763,7 +778,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         <button type="button" className={mutedBasemap ? "active" : ""} aria-pressed={mutedBasemap} onClick={() => setMutedBasemap(true)}>정보강조</button>
         <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => setTerrain3d((value) => !value)}>3D 지형</button>
       </div>
-      {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>10m 격자 · 고도 음영</span><small>경사·Viewshed·통신 음영 레이어 사용 가능</small></section>}
+      {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
       <section className="map-meaning-legend" aria-label="지도 범례">
         <strong>범례</strong>
         <span><i className="personnel" />현장 인원</span>
