@@ -1,4 +1,4 @@
-import { dashboardApi } from "./client";
+import { dashboardApi, HttpApiError } from "./client";
 
 export interface ExternalListMeta {
   pageNo?: number;
@@ -11,6 +11,72 @@ export interface ExternalListMeta {
 export interface ExternalListResponse<T> {
   data: T[];
   meta: ExternalListMeta;
+}
+
+export function validateExternalListResponse<T>(value: unknown, provider: string): ExternalListResponse<T> {
+  if (!value || typeof value !== "object") throw new Error(`${provider} 응답 형식 확인 필요`);
+  const candidate = value as { data?: unknown; meta?: Partial<ExternalListMeta> };
+  if (!Array.isArray(candidate.data)) throw new Error(`${provider} 목록 데이터 형식 확인 필요`);
+  const meta = candidate.meta ?? {};
+  const count = Number(meta.count ?? candidate.data.length);
+  if (!Number.isFinite(count) || count < 0) throw new Error(`${provider} 응답 건수 확인 필요`);
+  return { data: candidate.data as T[], meta: { ...meta, count, provider: String(meta.provider ?? provider) } };
+}
+
+export function externalIntegrationErrorMessage(
+  error: unknown,
+): string {
+  if (error instanceof HttpApiError) {
+    const message = error.message;
+
+    if (
+      /UNREGISTERED IP|등록되지 않은 IP/i.test(message)
+    ) {
+      return "외부기관 서버 접근 허용(IP 등록) 확인 필요";
+    }
+
+    if (
+      error.status === 401 ||
+      error.status === 403 ||
+      /HTTP 401|HTTP 403|UNAUTHORIZED|FORBIDDEN|SERVICE[_ ]?KEY/i.test(message)
+    ) {
+      return "외부기관 API 인증·권한 확인 필요";
+    }
+
+    if (error.status >= 500) {
+      return "외부기관 응답 오류";
+    }
+
+    return "외부기관 API 요청 실패";
+  }
+
+  if (
+    error instanceof TypeError ||
+    (
+      error instanceof Error &&
+      /FAILED TO FETCH|NETWORK/i.test(error.message)
+    )
+  ) {
+    return "외부기관 응답 없음 또는 네트워크 연결 확인 필요";
+  }
+
+  return "외부기관 연계 상태 확인 필요";
+}
+
+async function externalRequest<T>(
+  request: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    throw new Error(
+      externalIntegrationErrorMessage(error),
+    );
+  }
+}
+
+async function externalListRequest<T>(provider: string, path: string) {
+  return validateExternalListResponse<T>(await externalRequest(() => dashboardApi<unknown>(path)), provider);
 }
 
 export interface FirmsHotspot {
@@ -98,27 +164,17 @@ export interface LandslideRegionalRisk {
 
 export const externalDisasterApi = {
   wildfireFirms: () =>
-    dashboardApi<ExternalListResponse<FirmsHotspot>>(
-      "/api/v1/external/wildfire/firms"
-    ),
+    externalListRequest<FirmsHotspot>("NASA FIRMS", "/api/v1/external/wildfire/firms"),
 
   wildfireRisk: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<WildfireRisk>>(
-      `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
-    ),
+    externalListRequest<WildfireRisk>("산림청 산불위험예보", `/api/v1/external/wildfire/risk?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 
   landslideForecast: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<LandslideForecast>>(
-      `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`
-    ),
+    externalListRequest<LandslideForecast>("산사태 예측정보", `/api/v1/external/landslide/forecast?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 
   landslideHistory: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<LandslideHistory>>(
-      `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`
-    ),
+    externalListRequest<LandslideHistory>("산사태 발생이력", `/api/v1/external/landslide/history?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 
   landslideRegionalRisk: (pageNo = 1, numOfRows = 100) =>
-    dashboardApi<ExternalListResponse<LandslideRegionalRisk>>(
-      `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`
-    ),
+    externalListRequest<LandslideRegionalRisk>("산사태 지역위험", `/api/v1/external/landslide/regional-risk?pageNo=${pageNo}&numOfRows=${numOfRows}`),
 };

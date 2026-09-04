@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
+import { buildOperationalEvidence, calculateTelemetryMetrics, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import type { TelemetryStreamStatus } from "./telemetryStream";
+import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
@@ -16,6 +19,8 @@ export type ExternalSourceState = {
   count: number;
   checkedAt: string | null;
   message?: string;
+  lastSuccessAt?: string | null;
+  servingStale?: boolean;
 };
 
 export type ExternalIntegrationStatus = Record<ExternalSourceId, ExternalSourceState>;
@@ -33,6 +38,9 @@ interface OperationsPanelProps {
   activeTab: PanelTab;
   onActiveTabChange: (tab: PanelTab) => void;
   externalIntegrationStatus: ExternalIntegrationStatus;
+  onRefreshExternalIntegrations: () => void;
+  telemetryStreamStatus: TelemetryStreamStatus;
+  telemetrySamples: TelemetrySample[];
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -117,17 +125,47 @@ export function OperationsPanel({
   activeTab,
   onActiveTabChange,
   externalIntegrationStatus,
+  onRefreshExternalIntegrations,
+  telemetryStreamStatus,
+  telemetrySamples,
 }: OperationsPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [alertOverrides, setAlertOverrides] = useState<Record<string, AlertWorkflowStatus>>({});
+  const [alertAudit, setAlertAudit] = useState<Array<ReturnType<typeof createAlertAudit>>>([]);
+  const externalIntegrationLoading = Object.values(
+    externalIntegrationStatus,
+  ).some((state) => state.status === "loading");
   const activeAlerts = useMemo(() => {
     const rank: Record<string, number> = { CRITICAL: 0, SEVERE: 1, WARNING: 2, CAUTION: 3, NORMAL: 4 };
-    return overview.alerts
+    return overview.alerts.map((alert) => ({ ...alert, status: alertOverrides[value(alert, ["alertId", "id"], "")] ?? alert.status }))
       .filter((alert) => !["RESOLVED", "EXPIRED", "CANCELLED"].includes(value(alert, ["status"])))
       .sort((a, b) =>
         (rank[value(a, ["severity", "severityCode"])] ?? 5) - (rank[value(b, ["severity", "severityCode"])] ?? 5)
         || Date.parse(value(b, ["issuedAt", "createdAt"], "0")) - Date.parse(value(a, ["issuedAt", "createdAt"], "0")),
       );
-  }, [overview.alerts]);
+  }, [overview.alerts, alertOverrides]);
+  const demoAlertWorkflow = overview.domainDetail?.mode === "SIMULATION";
+  const handleAlertAction = (alertId: string, currentStatus: string, action: AlertWorkflowAction) => {
+    const normalized: AlertWorkflowStatus = ["ACKNOWLEDGED", "RESOLVED"].includes(currentStatus) ? currentStatus as AlertWorkflowStatus : "ACTIVE";
+    const next = transitionAlert(normalized, action);
+    setAlertOverrides((current) => ({ ...current, [alertId]: next }));
+    setAlertAudit((current) => [createAlertAudit(alertId, action, "DEMO 관제자"), ...current].slice(0, 20));
+  };
+  const linkHealthSummary = useMemo(() => {
+    const now = new Date();
+    const rows = locations.map((location) => ({
+      ...location,
+      linkHealth: classifyLinkHealth(location.observedAt, now, location.expectedTelemetryIntervalSec ?? 3),
+    }));
+    return {
+      rows,
+      connected: rows.filter((row) => row.linkHealth === "CONNECTED").length,
+      delayed: rows.filter((row) => row.linkHealth === "DELAYED").length,
+      disconnected: rows.filter((row) => row.linkHealth === "DISCONNECTED").length,
+      lastReceivedAt: rows.map((row) => row.observedAt).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null,
+    };
+  }, [locations, lastUpdatedAt]);
+  const liveTelemetryMetrics = useMemo(() => telemetrySamples.length ? calculateTelemetryMetrics(telemetrySamples, 3) : null, [telemetrySamples]);
   const domainLayers = overview.event.disasterType === "LANDSLIDE"
     ? [
       { id: "slope-assessments", label: "산사태 위험면", description: "사면 위험·분석 결과" },
@@ -232,6 +270,31 @@ export function OperationsPanel({
       impact: "지역별 산사태 위험정보",
     },
   ];
+  const externalStates = Object.values(externalIntegrationStatus);
+
+  const externalHealthyCount = externalStates.filter(
+    (state) => state.status === "ok",
+  ).length;
+
+  const externalFailedCount = externalStates.filter(
+    (state) => state.status === "error",
+  ).length;
+
+  const externalCheckingCount = externalStates.filter(
+    (state) => state.status === "loading",
+  ).length;
+
+  const externalUncheckedCount =
+    externalStates.length
+    - externalHealthyCount
+    - externalFailedCount
+    - externalCheckingCount;
+
+  const latestExternalCheckedAt = externalStates
+    .map((state) => state.checkedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+
   const assetGroups = resourceGroups.filter((group) => group.id !== "PERSONNEL");
   const allAssetsVisible = assetGroups.every((group) => visibleResourceGroups.has(group.id));
   const toggleAllAssets = () => {
@@ -240,7 +303,20 @@ export function OperationsPanel({
     }
   };
   const downloadKpiEvidence = () => {
-    const payload = { exportedAt: new Date().toISOString(), event: overview.event, measurements: overview.kpis };
+    const now = new Date();
+    const snapshotSamples: TelemetrySample[] = locations.map((location, index) => ({
+      assetId: location.id,
+      sequence: index + 1,
+      observedAt: location.observedAt,
+      receivedAt: now.toISOString(),
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }));
+    const runId = `run-${now.toISOString().replaceAll(/[-:.TZ]/g, "").slice(0, 14)}`;
+    const samples = telemetrySamples.length ? telemetrySamples : snapshotSamples;
+    const evidence = buildOperationalEvidence({ eventId: String(overview.event.eventId), runId, samples,
+      ...(telemetrySamples.length ? {} : { startedAt: new Date(now.getTime() - 6.4 * 60_000).toISOString(), networkReadyAt: now.toISOString() }) });
+    const payload = { ...evidence, mode: overview.domainDetail?.mode ?? "UNKNOWN", event: overview.event, measurements: overview.kpis };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -264,6 +340,16 @@ export function OperationsPanel({
         <header>
           <div><strong>{tabs.find((tab) => tab.id === activeTab)?.label}</strong><small>{overview.event.disasterType === "LANDSLIDE" ? "산사태 구조·통신 통합" : "산불 대응·통신 통합"}</small></div>
           {activeTab === "layers" && <button type="button" className="layer-reset" onClick={resetLayers}>기본값</button>}
+          {activeTab === "integrations" && (
+            <button
+              type="button"
+              className="layer-reset"
+              onClick={onRefreshExternalIntegrations}
+              disabled={externalIntegrationLoading}
+            >
+              {externalIntegrationLoading ? "갱신 중" : "새로고침"}
+            </button>
+          )}
         </header>
         <div className="operations-panel-body">
           {activeTab === "layers" && <section className="layer-control-list" aria-label="지도 레이어">
@@ -365,11 +451,26 @@ export function OperationsPanel({
                 <div><strong>{value(alert, ["title", "alertType", "type"], "현장 경보")}</strong><span>{label(severity)}</span></div>
                 <p>{value(alert, ["message", "description"], "상세 내용이 없습니다.")}</p>
                 <small>{label(value(alert, ["status"], "OPEN"))} · {occurredAt(alert, ["issuedAt", "createdAt"])} · 발령 {value(alert, ["issuerOrgCode"], "기관 미상")}</small>
+                {demoAlertWorkflow && <div className="demo-alert-actions">
+                  <button type="button" disabled={value(alert, ["status"]) === "ACKNOWLEDGED"} onClick={() => handleAlertAction(alertKey, value(alert, ["status"], "ACTIVE"), "ACKNOWLEDGE")}>경보 확인</button>
+                  <button type="button" onClick={() => handleAlertAction(alertKey, value(alert, ["status"], "ACTIVE"), "RESOLVE")}>조치 후 해제</button>
+                </div>}
               </article>;
             })}
-            <p className="operation-readonly-note">경보 발령·확인·해제는 명령센터 권한 및 이력 API 연계 후 사용할 수 있습니다.</p>
+            {demoAlertWorkflow && alertAudit.length > 0 && <section className="demo-alert-audit" aria-label="경보 조치 이력"><strong>DEMO 조치 이력</strong>{alertAudit.slice(0, 5).map((audit) => <small key={audit.auditId}>{audit.alertId} · {audit.action === "ACKNOWLEDGE" ? "확인" : "해제"} · {new Date(audit.occurredAt).toLocaleTimeString("ko-KR")}</small>)}</section>}
+            <p className="operation-readonly-note">DEMO 조치는 브라우저 세션에서만 유지됩니다. 운영 저장은 명령센터 권한 및 감사 이력 API 연계 후 사용합니다.</p>
           </section>}
           {activeTab === "networks" && <section className="operations-records" aria-label="통신망 상태">
+            <article data-status={linkHealthSummary.disconnected > 0 ? "FAILED" : linkHealthSummary.delayed > 0 ? "DEGRADED" : "ACTIVE"} className="network-detail-card">
+              <div><strong>장비 수신 상태 자동판정</strong><span>{linkHealthSummary.disconnected > 0 ? "두절 발생" : linkHealthSummary.delayed > 0 ? "일부 지연" : "정상"}</span></div>
+              <p>연결 {linkHealthSummary.connected} · 지연 {linkHealthSummary.delayed} · 두절 {linkHealthSummary.disconnected}</p>
+              <small>마지막 정상 수신 {linkHealthSummary.lastReceivedAt ? relativeTime(linkHealthSummary.lastReceivedAt) : "수신 없음"} · 장비별 목표 주기의 1.5배/3배 기준 자동판정</small>
+            </article>
+            <article data-status={telemetryStreamStatus === "CONNECTED" ? "ACTIVE" : telemetryStreamStatus === "ERROR" ? "FAILED" : "INACTIVE"} className="network-detail-card">
+              <div><strong>Gateway 실시간 스트림</strong><span>{telemetryStreamStatus === "CONNECTED" ? "연결" : telemetryStreamStatus === "CONNECTING" ? "연결 중" : telemetryStreamStatus === "RECONNECTING" ? "재연결 중" : telemetryStreamStatus === "ERROR" ? "오류" : "미설정"}</span></div>
+              <p>WebSocket 위치·GNSS/RTK·MAVLink 변환 텔레메트리 수신</p>
+              <small>운영 주소는 VITE_TELEMETRY_WS_URL로 주입하며 브라우저에 장비 인증키를 저장하지 않습니다.</small>
+            </article>
             {overview.networks.length === 0 && <p className="operation-empty-state"><b>연계된 통신망 없음</b><span>측정값 0이 아닌 미연계 상태입니다.</span></p>}
             {overview.networks.map((network) => {
               const status = value(network, ["status"], "UNKNOWN");
@@ -401,6 +502,11 @@ export function OperationsPanel({
           </section>}
           {activeTab === "kpis" && <section className="operations-records" aria-label="실증 KPI">
             <button type="button" className="kpi-evidence-download" onClick={downloadKpiEvidence} disabled={overview.kpis.length === 0}>시험 증적 JSON 내보내기</button>
+            {liveTelemetryMetrics && <article data-status={liveTelemetryMetrics.averageLatencySec <= 3 && liveTelemetryMetrics.availabilityPct >= 98 ? "ACTIVE" : "FAILED"}>
+              <div><strong>Gateway 실시간 측정</strong><span>{liveTelemetryMetrics.received}개 표본</span></div>
+              <p>평균 지연 {liveTelemetryMetrics.averageLatencySec}초 · 최대 공백 {liveTelemetryMetrics.maxGapSec}초</p>
+              <small>가용률 {liveTelemetryMetrics.availabilityPct}% · 정보공유 {liveTelemetryMetrics.sharingSuccessPct}% · 메모리 내 원시표본 기준</small>
+            </article>}
             {overview.kpis.length === 0 && <p className="operation-empty-state"><b>수집된 실증 KPI 없음</b><span>모사값은 공식 실증값으로 표시하지 않습니다.</span></p>}
             {overview.kpis.map((kpi) => <article key={value(kpi, ["kpiMeasurementId", "metricCode"])} data-status={kpi.passed === true ? "ACTIVE" : kpi.passed === false ? "FAILED" : "INACTIVE"}>
               <div><strong>{value(kpi, ["metricName", "metricCode"], "실증 지표")}</strong><span>{kpi.passed === true ? "충족" : kpi.passed === false ? "미충족" : "판정 전"}</span></div>
@@ -411,6 +517,43 @@ export function OperationsPanel({
           </section>}
           {activeTab === "integrations" && <section className="operations-records" aria-label="외부기관 데이터 연계 상태">
             <p className="operation-section-title"><strong>외부기관 실시간 연계</strong></p>
+
+            <article
+              data-status={
+                externalFailedCount > 0
+                  ? "FAILED"
+                  : externalCheckingCount > 0 || externalUncheckedCount > 0
+                    ? "INACTIVE"
+                    : "ACTIVE"
+              }
+            >
+              <div>
+                <strong>외부기관 연계 요약</strong>
+                <span>
+                  {externalCheckingCount > 0
+                    ? "갱신 중"
+                    : externalFailedCount > 0
+                      ? "일부 장애"
+                      : externalHealthyCount === externalStates.length
+                        ? "정상"
+                        : "확인 필요"}
+                </span>
+              </div>
+
+              <p>
+                정상 {externalHealthyCount} · 장애 {externalFailedCount}
+                {" · "}확인 중 {externalCheckingCount}
+                {" · "}미확인 {externalUncheckedCount}
+              </p>
+
+              <small>
+                30초 자동 갱신 · {
+                  latestExternalCheckedAt
+                    ? `마지막 확인 ${relativeTime(latestExternalCheckedAt)}`
+                    : "아직 확인하지 않음"
+                }
+              </small>
+            </article>
 
             {externalSourceRows.map((source) => {
               const state = externalIntegrationStatus[source.id];
@@ -437,12 +580,13 @@ export function OperationsPanel({
                   <span>{statusLabel}</span>
                 </div>
 
-                <p>{source.impact} · 수신 {state.count}건</p>
+                <p>{source.impact} · 수신 {state.count}건{state.servingStale ? " · 마지막 정상 데이터 유지 중" : ""}</p>
 
                 <small>
                   {state.checkedAt
                     ? `마지막 확인 ${relativeTime(state.checkedAt)}`
                     : "아직 확인하지 않음"}
+                  {state.lastSuccessAt ? ` · 최종 정상 ${relativeTime(state.lastSuccessAt)}` : ""}
                   {state.message ? ` · ${state.message}` : ""}
                 </small>
               </article>;

@@ -37,7 +37,7 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-기본 주소는 `http://127.0.0.1:15173`이다. API 주소는 `VITE_API_BASE_URL`로 주입하며 프론트 환경에 Supabase 서버 키를 넣지 않는다.
+기본 주소는 `http://127.0.0.1:15173`이다. API 주소는 `VITE_API_BASE_URL`, Gateway 실시간 스트림은 `VITE_TELEMETRY_WS_URL`로 주입하며 프론트 환경에 Supabase 서버 키나 장비 인증키를 넣지 않는다. 스트림 메시지는 `assetId`, `observedAt`, 위·경도와 선택적인 GNSS/RTK·MAVLink 변환 상태를 받으며 사건 ID와 sequence를 검증한 뒤 최신 좌표만 반영한다.
 
 산림청 UI/UX 시연에서는 `http://127.0.0.1:15173/?demo=1`로 접속한다. 이 경로는 외부 API나 현장망 장애와 무관하게 산불·산사태 공간 레이어, 실시간 드론 궤적, 운영 경보, 통신 상태와 KPI 증적을 고정 시나리오로 재현한다. 화면 상단의 `DEMO · 모의 관제 데이터` 표시는 공식 실측값과 혼동되지 않도록 유지한다.
 
@@ -57,6 +57,6 @@ npm.cmd run build
 - 마커 100~1000개 부하와 지도 FPS
 - 3D 지형·고도·화선 렌더링
 - 역할별 화면과 모바일 저대역 모드
-- WebSocket/SSE push와 오프라인 캐시
+- 실제 Gateway WebSocket 인증·부하 시험과 오프라인 캐시
 
 `src/entities`, `src/pages`, 일부 `src/features`와 `src/shared`의 README는 향후 모듈 분리 경계를 설명한다. 해당 디렉터리에 README만 있는 경우 구현 완료 기능을 의미하지 않는다.

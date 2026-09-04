@@ -9,7 +9,10 @@ import {
 } from "./OperationsPanel";
 
 import DroneVideoModal from "./DroneVideoModal";
-import { createDemoOverview, DEMO_EVENT } from "./demoOverview";
+import RequirementsReadinessModal from "./RequirementsReadinessModal";
+import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
+import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
+import type { TelemetrySample } from "./operationalEvidence";
 import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
@@ -599,6 +602,7 @@ function districtCenter(...names: unknown[]): [number, number] | null {
 }
 
 export default function UnifiedDisasterDashboard() {
+  const demoScenario = demoScenarioFromLocation();
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [overview, setOverview] = useState<EventOverview | null>(null);
@@ -606,6 +610,9 @@ export default function UnifiedDisasterDashboard() {
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [demoMode, setDemoMode] = useState(FORCE_DEMO_MODE);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
+  const [telemetrySamples, setTelemetrySamples] = useState<TelemetrySample[]>([]);
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -750,8 +757,6 @@ export default function UnifiedDisasterDashboard() {
           } as ApiRecord];
         }),
       );
-    } else {
-      setExternalFirmsRows([]);
     }
 
     if (landslideHistory.status === "fulfilled") {
@@ -777,34 +782,35 @@ export default function UnifiedDisasterDashboard() {
           } as ApiRecord];
         }),
       );
-    } else {
-      setExternalLandslideHistoryRows([]);
     }
 
-    setExternalWildfireRiskRows(wildfireRisk.status === "fulfilled" ? wildfireRisk.value.data.flatMap((item, index) => {
+    if (wildfireRisk.status === "fulfilled") setExternalWildfireRiskRows(wildfireRisk.value.data.flatMap((item, index) => {
       const coordinates = districtCenter(item.district, item.area, item.province);
       return coordinates ? [{ id: `kfs-risk-${item.regionCode || index}`, observedAt: item.analyzedAt || checkedAt, provider: "산림청", riskScore: item.mean ?? item.max, district: item.district, resultGeometry: pointBuffer(coordinates, 0.035) }] : [];
-    }) : []);
-    setExternalLandslideForecastRows(landslideForecast.status === "fulfilled" ? landslideForecast.value.data.flatMap((item, index) => {
+    }));
+    if (landslideForecast.status === "fulfilled") setExternalLandslideForecastRows(landslideForecast.value.data.flatMap((item, index) => {
       const coordinates = districtCenter(item.district);
       return coordinates ? [{ id: `slide-forecast-${index}`, observedAt: item.predictedAt || checkedAt, provider: "재난안전데이터", forecast: item.forecast, resultGeometry: pointBuffer(coordinates, 0.028) }] : [];
-    }) : []);
-    setExternalLandslideRegionalRows(landslideRegionalRisk.status === "fulfilled" ? landslideRegionalRisk.value.data.flatMap((item, index) => {
+    }));
+    if (landslideRegionalRisk.status === "fulfilled") setExternalLandslideRegionalRows(landslideRegionalRisk.value.data.flatMap((item, index) => {
       const coordinates = districtCenter(item.districtName, item.detailAddress);
       return coordinates ? [{ id: `slide-regional-${item.managementNumber || index}`, observedAt: item.lastModifiedAt || checkedAt, provider: "재난안전데이터", riskGrade: item.riskGradeCode, expectedPeople: item.expectedPeople, resultGeometry: pointBuffer(coordinates, 0.022) }] : [];
-    }) : []);
+    }));
 
-    setExternalIntegrationStatus({
+    setExternalIntegrationStatus((current) => ({
       firms: firms.status === "fulfilled"
         ? {
             status: "ok",
             count: firms.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.firms.count,
             checkedAt,
+            lastSuccessAt: current.firms.lastSuccessAt,
+            servingStale: current.firms.count > 0,
             message: errorMessage(firms.reason),
           },
 
@@ -813,11 +819,14 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: wildfireRisk.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.wildfireRisk.count,
             checkedAt,
+            lastSuccessAt: current.wildfireRisk.lastSuccessAt,
+            servingStale: current.wildfireRisk.count > 0,
             message: errorMessage(wildfireRisk.reason),
           },
 
@@ -826,11 +835,14 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: landslideForecast.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.landslideForecast.count,
             checkedAt,
+            lastSuccessAt: current.landslideForecast.lastSuccessAt,
+            servingStale: current.landslideForecast.count > 0,
             message: errorMessage(landslideForecast.reason),
           },
 
@@ -839,11 +851,14 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: landslideHistory.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.landslideHistory.count,
             checkedAt,
+            lastSuccessAt: current.landslideHistory.lastSuccessAt,
+            servingStale: current.landslideHistory.count > 0,
             message: errorMessage(landslideHistory.reason),
           },
 
@@ -852,14 +867,17 @@ export default function UnifiedDisasterDashboard() {
             status: "ok",
             count: landslideRegionalRisk.value.meta.count,
             checkedAt,
+            lastSuccessAt: checkedAt,
           }
         : {
             status: "error",
-            count: 0,
+            count: current.landslideRegionalRisk.count,
             checkedAt,
+            lastSuccessAt: current.landslideRegionalRisk.lastSuccessAt,
+            servingStale: current.landslideRegionalRisk.count > 0,
             message: errorMessage(landslideRegionalRisk.reason),
           },
-    });
+    }));
   }, [demoMode]);
 
   useEffect(() => {
@@ -939,6 +957,7 @@ export default function UnifiedDisasterDashboard() {
     setTimeline(null);
     setTimelineIndex(null);
     setTimelinePlaying(false);
+    setTelemetrySamples([]);
   }, [selectedId]);
 
   useEffect(() => {
@@ -960,8 +979,8 @@ export default function UnifiedDisasterDashboard() {
     let active = true;
     if (FORCE_DEMO_MODE) {
       const demo = createDemoOverview();
-      setEvents([DEMO_EVENT]);
-      setSelectedId(DEMO_EVENT.eventId);
+      setEvents([demo.event]);
+      setSelectedId(demo.event.eventId);
       setOverview(demo);
       setLastUpdatedAt(new Date());
       setEventsLoaded(true);
@@ -1003,7 +1022,20 @@ export default function UnifiedDisasterDashboard() {
     if (!selectedId) return;
     let active = true;
     const refresh = () => demoMode
-      ? Promise.resolve(setOverview(createDemoOverview()))
+      ? (() => {
+          const next = createDemoOverview();
+          setOverview(next);
+          const sequenceBase = Math.floor(Date.now() / 1_000) * 100;
+          setTelemetrySamples((current) => [...current, ...next.assets.map((asset, index) => {
+            const coordinates = (asset.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
+            return {
+              assetId: String(asset.assetId), observedAt: String(asset.observedAt), receivedAt: new Date().toISOString(),
+              sequence: sequenceBase + index, latitude: Number(coordinates?.[1]), longitude: Number(coordinates?.[0]),
+            } satisfies TelemetrySample;
+          })].slice(-3_600));
+          setLastUpdatedAt(new Date());
+          return Promise.resolve();
+        })()
       : refreshOverview()
       .then(() => active && setError(null))
       .catch((caught: unknown) => active && setError(caught instanceof Error ? caught.message : "현황 조회 실패"));
@@ -1011,6 +1043,30 @@ export default function UnifiedDisasterDashboard() {
     const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
     return () => { active = false; window.clearInterval(timer); };
   }, [demoMode, refreshOverview, selectedId]);
+
+  useEffect(() => {
+    const url = import.meta.env.VITE_TELEMETRY_WS_URL?.trim();
+    if (demoMode || !url || !selectedId) {
+      setTelemetryStreamStatus("DISABLED");
+      return;
+    }
+    const client = new TelemetryStreamClient({
+      url,
+      eventId: selectedId,
+      onStatus: setTelemetryStreamStatus,
+      onMessage: (message) => {
+        setOverview((current) => current ? applyTelemetrySafetyRules(current, message) : current);
+        setTelemetrySamples((current) => [...current, {
+          assetId: message.assetId, observedAt: message.observedAt,
+          receivedAt: message.receivedAt ?? new Date().toISOString(), sequence: message.sequence,
+          latitude: message.latitude, longitude: message.longitude,
+        }].slice(-3_600));
+        setLastUpdatedAt(new Date());
+      },
+    });
+    client.connect();
+    return () => client.stop();
+  }, [demoMode, selectedId]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1127,6 +1183,19 @@ export default function UnifiedDisasterDashboard() {
       : [],
   );
   const selectedLocation = mapLocations.find((location) => locationKey(location) === selectedLocationKey) ?? null;
+  const selectedTelemetryHistory = selectedLocation
+    ? telemetrySamples.filter((sample) => sample.assetId === selectedLocation.id).slice(-20).reverse()
+    : [];
+  const downloadSelectedTelemetry = () => {
+    if (!selectedLocation || selectedTelemetryHistory.length === 0) return;
+    const payload = { exportedAt: new Date().toISOString(), eventId: overview?.event.eventId, assetId: selectedLocation.id, samples: [...selectedTelemetryHistory].reverse() };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${selectedLocation.id}-telemetry-history.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
   const selectedCommunicationPath = selectedLocation ? communicationPath(selectedLocation) : null;
   const selectedPositioningWarning = selectedLocation && isPositioningLocation(selectedLocation)
     ? positioningWarning(selectedLocation)
@@ -1192,6 +1261,7 @@ export default function UnifiedDisasterDashboard() {
           <header>
             <div className="readiness-brand"><span>산림청</span><strong>산림재난 통합상황판</strong><small>FOREST DISASTER COMMON OPERATIONAL PICTURE</small></div>
             <div className="readiness-actions">
+              <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>47개 개발 증빙</button>
               <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
               <div className={`readiness-connection ${error ? "is-error" : eventsLoaded ? "is-ready" : "is-loading"}`}><i />{error ? "연결 점검 필요" : eventsLoaded ? "연결 정상" : "데이터 연결 중"}</div>
             </div>
@@ -1228,6 +1298,7 @@ export default function UnifiedDisasterDashboard() {
             <small>{text(overview.event.locationName)}</small>
           </div>
           {demoMode && <div className="demo-mode-badge" title="실제 API 연결 전 화면 검증용 데이터입니다"><b>DEMO</b><span>모의 관제 데이터</span></div>}
+          {demoMode && <label className="demo-scenario-selector"><span>검증 시나리오</span><select aria-label="DEMO 검증 시나리오" value={demoScenario} onChange={(event) => { const params = new URLSearchParams(window.location.search); params.set("demo", "1"); params.set("scenario", event.target.value); window.location.search = params.toString(); }}>{DEMO_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label>}
           <nav className="header-summary" aria-label="운영 현황">
             <button
   type="button"
@@ -1244,6 +1315,7 @@ export default function UnifiedDisasterDashboard() {
             <button type="button" data-alert={activeAlertCount > 0} onClick={() => setOperationsTab("alerts")}><span>경보</span><b>{activeAlertCount}</b></button>
           </nav>
           <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
+          <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>47개 개발 증빙</button>
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
@@ -1300,6 +1372,11 @@ export default function UnifiedDisasterDashboard() {
                 activeTab={operationsTab}
                 onActiveTabChange={setOperationsTab}
                 externalIntegrationStatus={externalIntegrationStatus}
+                onRefreshExternalIntegrations={() => {
+                  void refreshExternalIntegrations();
+                }}
+                telemetryStreamStatus={telemetryStreamStatus}
+                telemetrySamples={telemetrySamples}
               />
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
@@ -1327,6 +1404,10 @@ export default function UnifiedDisasterDashboard() {
                   <div><dt>비상 상태</dt><dd>{selectedLocation.emergencyStatus ?? "정상"}</dd></div>
                 </>}
               </dl>
+              {selectedTelemetryHistory.length > 0 && <section className="asset-live-history" aria-label={`${selectedLocation.id} 실시간 수신 이력`}>
+                <header><div><small>GATEWAY RAW HISTORY</small><strong>최근 위치 수신 {selectedTelemetryHistory.length}건</strong></div><button type="button" onClick={downloadSelectedTelemetry}>JSON 증적</button></header>
+                <ol>{selectedTelemetryHistory.slice(0, 6).map((sample, index) => <li key={`${sample.observedAt}-${sample.sequence ?? index}`}><time>{new Date(sample.observedAt).toLocaleTimeString("ko-KR")}</time><span>{sample.latitude?.toFixed(6) ?? "-"}, {sample.longitude?.toFixed(6) ?? "-"}</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}</ol>
+              </section>}
               {selectedLocation.kind === "asset" && <button type="button" className="asset-log-link" onClick={() => { window.location.href = `/device?assetId=${encodeURIComponent(selectedLocation.id)}`; }}>assetId 로그·이력 조회</button>}
               {isPositioningLocation(selectedLocation) && <p className="positioning-dialog-note">
                 <strong>{selectedLocation.category === "RTK_BASE_LPWA_GATEWAY" ? "기준국 역할" : "위치 산출 흐름"}</strong>
@@ -1477,6 +1558,7 @@ export default function UnifiedDisasterDashboard() {
         </section>
         </>
       )}
+      {requirementsOpen && <RequirementsReadinessModal onClose={() => setRequirementsOpen(false)} />}
 
       {videoDrone && <DroneVideoModal drone={videoDrone} onClose={() => setVideoDrone(null)} />}
     </main>
