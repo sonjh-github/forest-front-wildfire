@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDemoOverview } from "./demoOverview";
-import { MavlinkTelemetryAccumulator, applyTelemetrySafetyRules, mergeTelemetryIntoOverview, parseTelemetryMessage } from "./telemetryStream";
+import { MavlinkTelemetryAccumulator, applyTelemetrySafetyRules, isTelemetryStreamStale, mergeTelemetryIntoOverview, parseTelemetryMessage } from "./telemetryStream";
 
 describe("Gateway telemetry stream", () => {
   it("Gateway 좌표 메시지를 표준 텔레메트리로 검증한다", () => {
@@ -33,5 +33,10 @@ describe("Gateway telemetry stream", () => {
     const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
     const updated = applyTelemetrySafetyRules(overview, { assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", receivedAt: "2026-09-04T00:00:03Z", latitude: 37.615, longitude: 128.37 });
     expect(updated.alerts.find((alert) => alert.alertId === "ALT-GEOFENCE-DRONE-01")).toMatchObject({ status: "ACTIVE", severity: "CRITICAL", issuerOrgCode: "공간판정 엔진" });
+  });
+
+  it("소켓이 열려 있어도 10초 이상 메시지가 없으면 수신 중단으로 판정한다", () => {
+    expect(isTelemetryStreamStale(1_000, 10_500)).toBe(false);
+    expect(isTelemetryStreamStale(1_000, 11_001)).toBe(true);
   });
 });

@@ -3,6 +3,10 @@ import { evaluateRiskZone } from "./operationalEvidence";
 
 export type TelemetryStreamStatus = "DISABLED" | "CONNECTING" | "CONNECTED" | "RECONNECTING" | "ERROR";
 
+export function isTelemetryStreamStale(lastMessageAt: number | null, now: number, staleAfterMs = 10_000) {
+  return lastMessageAt != null && now - lastMessageAt > staleAfterMs;
+}
+
 export type LiveTelemetryMessage = {
   assetId: string;
   eventId?: string;
@@ -173,6 +177,8 @@ type SocketLike = Pick<WebSocket, "close" | "send" | "readyState" | "onopen" | "
 export class TelemetryStreamClient {
   private socket: SocketLike | null = null;
   private reconnectTimer: number | null = null;
+  private watchdogTimer: number | null = null;
+  private lastMessageAt: number | null = null;
   private attempts = 0;
   private stopped = false;
   private lastSequence = new Map<string, number>();
@@ -195,8 +201,16 @@ export class TelemetryStreamClient {
       this.attempts = 0;
       this.options.onStatus("CONNECTED");
       this.socket?.send(JSON.stringify({ type: "SUBSCRIBE", eventId: this.options.eventId }));
+      this.lastMessageAt = Date.now();
+      if (this.watchdogTimer != null) window.clearInterval(this.watchdogTimer);
+      this.watchdogTimer = window.setInterval(() => {
+        if (!isTelemetryStreamStale(this.lastMessageAt, Date.now())) return;
+        this.options.onStatus("ERROR");
+        this.socket?.close();
+      }, 1_000);
     };
     this.socket.onmessage = (event) => {
+      this.lastMessageAt = Date.now();
       const message = this.mavlink.push(event.data) ?? parseTelemetryMessage(event.data);
       if (!message || (message.eventId && message.eventId !== this.options.eventId)) return;
       const previous = this.lastSequence.get(message.assetId);
@@ -205,7 +219,11 @@ export class TelemetryStreamClient {
       this.options.onMessage(message);
     };
     this.socket.onerror = () => this.options.onStatus("ERROR");
-    this.socket.onclose = () => { if (!this.stopped) this.scheduleReconnect(); };
+    this.socket.onclose = () => {
+      if (this.watchdogTimer != null) window.clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+      if (!this.stopped) this.scheduleReconnect();
+    };
   }
 
   private scheduleReconnect() {
@@ -219,6 +237,7 @@ export class TelemetryStreamClient {
   stop() {
     this.stopped = true;
     if (this.reconnectTimer != null) window.clearTimeout(this.reconnectTimer);
+    if (this.watchdogTimer != null) window.clearInterval(this.watchdogTimer);
     this.socket?.close();
     this.socket = null;
   }
