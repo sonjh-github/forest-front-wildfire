@@ -3307,6 +3307,18 @@
   cursor: pointer;
 }
 
+.demo-scenario-selector {
+  display: grid;
+  gap: 2px;
+  min-width: 142px;
+  padding: 4px 8px;
+  border: 1px solid #e4bb73;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+.demo-scenario-selector span { color: #8c641f; font-size: 10px; font-weight: 800; }
+.demo-scenario-selector select { max-width: 150px; border: 0; outline: 0; background: transparent; color: #654207; font-weight: 800; }
+
 .requirements-backdrop {
   position: fixed;
   inset: 0;

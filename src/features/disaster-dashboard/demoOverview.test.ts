@@ -19,4 +19,20 @@ describe("통합 관제 실증 데이터", () => {
     expect((second.attributes as Record<string, unknown>).armed).toBe(true);
     expect((second.attributes as Record<string, unknown>).flightMode).toBe("AUTO");
   });
+
+  it("산사태·통신장애·드론비상 시나리오를 실제 상태 변화로 재현한다", () => {
+    const at = new Date("2026-09-03T05:00:00Z");
+    const landslide = createDemoOverview(at, "LANDSLIDE");
+    expect(landslide.event.disasterType).toBe("LANDSLIDE");
+    expect(landslide.alerts[0]?.title).toContain("산사태");
+
+    const networkFailure = createDemoOverview(at, "COMMUNICATION_FAILURE");
+    expect(networkFailure.networks.some((network) => network.status === "FAILED")).toBe(true);
+    expect(networkFailure.assets.find((asset) => asset.assetId === "RELAY-02")?.operationalStatus).toBe("SIGNAL_LOST");
+
+    const droneEmergency = createDemoOverview(at, "DRONE_EMERGENCY");
+    const drone = droneEmergency.assets.find((asset) => asset.assetId === "DRONE-01")!;
+    expect(drone.operationalStatus).toBe("RETURNING");
+    expect((drone.attributes as Record<string, unknown>).flightMode).toBe("RTL");
+  });
 });

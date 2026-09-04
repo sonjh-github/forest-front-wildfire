@@ -15,7 +15,21 @@ export const DEMO_EVENT: ForestEvent = {
   geometry: point([128.365, 37.614]),
 };
 
-export function createDemoOverview(now = new Date()): EventOverview {
+export type DemoScenario = "WILDFIRE" | "LANDSLIDE" | "COMMUNICATION_FAILURE" | "DRONE_EMERGENCY";
+export const DEMO_SCENARIOS: Array<{ id: DemoScenario; label: string }> = [
+  { id: "WILDFIRE", label: "산불 통합대응" },
+  { id: "LANDSLIDE", label: "산사태 위험대응" },
+  { id: "COMMUNICATION_FAILURE", label: "통신 장애복구" },
+  { id: "DRONE_EMERGENCY", label: "드론 비상복귀" },
+];
+
+export function demoScenarioFromLocation(): DemoScenario {
+  if (typeof window === "undefined") return "WILDFIRE";
+  const scenario = new URLSearchParams(window.location.search).get("scenario") as DemoScenario | null;
+  return DEMO_SCENARIOS.some((item) => item.id === scenario) ? scenario! : "WILDFIRE";
+}
+
+export function createDemoOverview(now = new Date(), scenario: DemoScenario = demoScenarioFromLocation()): EventOverview {
   const observedAt = now.toISOString();
   const phase = (now.getTime() / 1000) % 120;
   const droneLng = 128.359 + Math.cos((phase / 120) * Math.PI * 2) * 0.006;
@@ -29,7 +43,7 @@ export function createDemoOverview(now = new Date()): EventOverview {
     eventRegistrationStatus: "REGISTERED", networkId: "NET-FIELD-01", ...extra,
   });
 
-  return {
+  const overview: EventOverview = {
     event: { ...DEMO_EVENT, updatedAt: observedAt },
     assets: [
       asset("DRONE-01", "정찰드론 1호", "UAV", [droneLng, droneLat, 312 + Math.sin(phase / 8) * 12], { operationalStatus: "FLYING", mission: "화선 정찰", batteryPct: 68, attributes: { flightMode: "AUTO", armed: true, missionSequence: Math.floor(phase / 15) + 1, emergencyStatus: "NORMAL", groundSpeedMps: 11.4, headingDeg: (phase * 3) % 360 } }),
@@ -77,4 +91,49 @@ export function createDemoOverview(now = new Date()): EventOverview {
       "external-landslide-history": [{ id: "slide-history-1", observedAt, provider: "재난안전데이터", resultGeometry: point([128.379,37.620]) }],
     },
   };
+
+  if (scenario === "LANDSLIDE") {
+    overview.event = {
+      ...overview.event,
+      eventId: "demo-landslide-pyeongchang",
+      eventCode: "LS-2026-0903-01",
+      disasterType: "LANDSLIDE",
+      eventName: "평창군 봉평면 산사태 위험대응",
+      severityCode: "CRITICAL",
+    };
+    overview.alerts = [{
+      alertId: "ALT-LAND-01", severity: "CRITICAL", status: "ACTIVE", title: "급경사지 산사태 위험 상승",
+      message: "시간강우량과 사면 위험도가 임계치를 초과했습니다. 동측 계곡 접근을 통제하고 지정 대피로를 사용하세요.",
+      issuedAt: observedAt, issuerOrgCode: "산사태 관제",
+    }];
+    overview.reports = [{ reportId: "RPT-LAND-01", title: "산사태 위험구역 통제", reportText: "동측 계곡 진입 통제와 주민 대피경로 확보를 완료했습니다.", urgency: "CRITICAL", status: "SUBMITTED", reportedAt: observedAt, reporterOrgCode: "현장지휘" }];
+  }
+
+  if (scenario === "COMMUNICATION_FAILURE") {
+    const relay = overview.assets.find((item) => item.assetId === "RELAY-02");
+    if (relay) Object.assign(relay, { operationalStatus: "SIGNAL_LOST", signalStrengthDbm: -113, latencyMs: 4200, packetLossPct: 38.2, observedAt: new Date(now.getTime() - 20_000).toISOString() });
+    overview.networks = overview.networks.map((network, index) => index === 0
+      ? { ...network, status: "FAILED", availabilityPct: 91.3, lastReceivedAt: new Date(now.getTime() - 20_000).toISOString(), attributes: { primary: "이음5G", activePath: "LTE 비상 백홀", switchReason: "산악 중계기 두절" } }
+      : network);
+    overview.alerts = [{
+      alertId: "ALT-NET-01", severity: "CRITICAL", status: "ACTIVE", title: "산악 중계기 통신 두절",
+      message: "RELAY-02가 20초 동안 수신되지 않았습니다. LTE 비상 백홀로 전환하고 예비 중계기를 배치하세요.",
+      issuedAt: observedAt, issuerOrgCode: "통신 관제",
+    }];
+  }
+
+  if (scenario === "DRONE_EMERGENCY") {
+    const drone = overview.assets.find((item) => item.assetId === "DRONE-01");
+    if (drone) {
+      Object.assign(drone, { operationalStatus: "RETURNING", batteryPct: 19 });
+      drone.attributes = { ...(drone.attributes as Record<string, unknown>), flightMode: "RTL", emergencyStatus: "LOW_BATTERY", groundSpeedMps: 14.8 };
+    }
+    overview.alerts = [{
+      alertId: "ALT-UAV-01", severity: "CRITICAL", status: "ACTIVE", title: "드론 저전압 비상복귀",
+      message: "DRONE-01 배터리가 19%로 감소해 RTL 모드로 전환했습니다. 복귀 경로와 착륙지 안전을 확인하세요.",
+      issuedAt: observedAt, issuerOrgCode: "드론 관제",
+    }];
+  }
+
+  return overview;
 }

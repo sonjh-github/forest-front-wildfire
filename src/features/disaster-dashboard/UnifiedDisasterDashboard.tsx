@@ -10,7 +10,7 @@ import {
 
 import DroneVideoModal from "./DroneVideoModal";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
-import { createDemoOverview, DEMO_EVENT } from "./demoOverview";
+import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
 import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
@@ -600,6 +600,7 @@ function districtCenter(...names: unknown[]): [number, number] | null {
 }
 
 export default function UnifiedDisasterDashboard() {
+  const demoScenario = demoScenarioFromLocation();
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [overview, setOverview] = useState<EventOverview | null>(null);
@@ -962,8 +963,8 @@ export default function UnifiedDisasterDashboard() {
     let active = true;
     if (FORCE_DEMO_MODE) {
       const demo = createDemoOverview();
-      setEvents([DEMO_EVENT]);
-      setSelectedId(DEMO_EVENT.eventId);
+      setEvents([demo.event]);
+      setSelectedId(demo.event.eventId);
       setOverview(demo);
       setLastUpdatedAt(new Date());
       setEventsLoaded(true);
@@ -1231,6 +1232,7 @@ export default function UnifiedDisasterDashboard() {
             <small>{text(overview.event.locationName)}</small>
           </div>
           {demoMode && <div className="demo-mode-badge" title="실제 API 연결 전 화면 검증용 데이터입니다"><b>DEMO</b><span>모의 관제 데이터</span></div>}
+          {demoMode && <label className="demo-scenario-selector"><span>검증 시나리오</span><select aria-label="DEMO 검증 시나리오" value={demoScenario} onChange={(event) => { const params = new URLSearchParams(window.location.search); params.set("demo", "1"); params.set("scenario", event.target.value); window.location.search = params.toString(); }}>{DEMO_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label>}
           <nav className="header-summary" aria-label="운영 현황">
             <button
   type="button"
