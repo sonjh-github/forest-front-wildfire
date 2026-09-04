@@ -1022,7 +1022,20 @@ export default function UnifiedDisasterDashboard() {
     if (!selectedId) return;
     let active = true;
     const refresh = () => demoMode
-      ? Promise.resolve(setOverview(createDemoOverview()))
+      ? (() => {
+          const next = createDemoOverview();
+          setOverview(next);
+          const sequenceBase = Math.floor(Date.now() / 1_000) * 100;
+          setTelemetrySamples((current) => [...current, ...next.assets.map((asset, index) => {
+            const coordinates = (asset.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
+            return {
+              assetId: String(asset.assetId), observedAt: String(asset.observedAt), receivedAt: new Date().toISOString(),
+              sequence: sequenceBase + index, latitude: Number(coordinates?.[1]), longitude: Number(coordinates?.[0]),
+            } satisfies TelemetrySample;
+          })].slice(-3_600));
+          setLastUpdatedAt(new Date());
+          return Promise.resolve();
+        })()
       : refreshOverview()
       .then(() => active && setError(null))
       .catch((caught: unknown) => active && setError(caught instanceof Error ? caught.message : "현황 조회 실패"));
