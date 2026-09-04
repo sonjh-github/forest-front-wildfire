@@ -1,4 +1,5 @@
 import type { EventOverview, ForestEvent } from "../../http-api";
+import { evaluateRiskZone } from "./operationalEvidence";
 
 const point = (coordinates: [number, number]) => ({ type: "Point", coordinates });
 const line = (coordinates: [number, number][]) => ({ type: "LineString", coordinates });
@@ -34,6 +35,9 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
   const phase = (now.getTime() / 1000) % 120;
   const droneLng = 128.359 + Math.cos((phase / 120) * Math.PI * 2) * 0.006;
   const droneLat = 37.619 + Math.sin((phase / 120) * Math.PI * 2) * 0.004;
+  const wildfireRiskBoundary: [number, number][] = [[128.355,37.608],[128.356,37.624],[128.378,37.625],[128.382,37.608]];
+  const crew12Position: [number, number] = [128.372, 37.615];
+  const crew12Risk = evaluateRiskZone(crew12Position, wildfireRiskBoundary, 100);
   const asset = (assetId: string, assetName: string, assetType: string, coordinates: [number, number, number], extra = {}) => ({
     assetId, assetName, assetCode: assetId, assetType, operationalStatus: "ACTIVE", observedAt,
     geometry: { type: "Point", coordinates }, batteryPct: 78, signalStrengthDbm: -67,
@@ -55,7 +59,7 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
     unregisteredAssets: [],
     personnel: [
       { personExternalId: "CREW-07", activityStatus: "APPROACHING", safetyStatus: "SAFE", observedAt, geometry: point([128.363, 37.611]), altitude: 238, batteryPct: 84, signalStrengthDbm: -71, latencyMs: 188, packetLossPct: 1.1, positioningMethod: "RTK_FIXED", horizontalAccuracyM: 0.06, sourceAssetId: "RTK-07", reportedByAssetId: "GW-RTK-01", reportingRole: "GATEWAY", activeLink: "LPWA", expectedTelemetryIntervalSec: 3 },
-      { personExternalId: "CREW-12", activityStatus: "HOLDING", safetyStatus: "CAUTION", observedAt, geometry: point([128.372, 37.615]), altitude: 286, batteryPct: 61, signalStrengthDbm: -86, latencyMs: 291, packetLossPct: 2.3, positioningMethod: "RTK_FLOAT", horizontalAccuracyM: 0.43, sourceAssetId: "RTK-12", reportedByAssetId: "GW-RTK-01", reportingRole: "GATEWAY", activeLink: "LPWA", expectedTelemetryIntervalSec: 3 },
+      { personExternalId: "CREW-12", activityStatus: "HOLDING", safetyStatus: crew12Risk.shouldAlert ? "CAUTION" : "SAFE", observedAt, geometry: point(crew12Position), altitude: 286, batteryPct: 61, signalStrengthDbm: -86, latencyMs: 291, packetLossPct: 2.3, positioningMethod: "RTK_FLOAT", horizontalAccuracyM: 0.43, sourceAssetId: "RTK-12", reportedByAssetId: "GW-RTK-01", reportingRole: "GATEWAY", activeLink: "LPWA", expectedTelemetryIntervalSec: 3 },
     ],
     networks: [
       { networkId: "NET-FIELD-01", networkName: "현장 이음5G·LPWA", networkType: "PRIVATE_5G_LPWA", status: "ACTIVE", availabilityPct: 99.2, lastReceivedAt: observedAt, attributes: { primary: "이음5G", activePath: "LTE 백홀" } },
@@ -63,7 +67,7 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
     ],
     topology: { networks: [], nodes: [], links: [] },
     alerts: [
-      { alertId: "ALT-01", severity: "CRITICAL", status: "ACTIVE", title: "대원 위험구역 접근", message: "CREW-12가 확산예측 경계 42m 이내에 진입했습니다. 북서 대피로로 이동을 지시하세요.", issuedAt: observedAt, issuerOrgCode: "통합상황판" },
+      { alertId: "ALT-01", severity: "CRITICAL", status: "ACTIVE", title: "대원 위험구역 진입", message: `CREW-12가 산불 위험구역 ${crew12Risk.inside ? "내부에 진입" : `${crew12Risk.boundaryDistanceM}m 이내에 접근`}했습니다. 북서 대피로로 이동을 지시하세요.`, issuedAt: observedAt, issuerOrgCode: "공간판정 엔진" },
       { alertId: "ALT-02", severity: "WARNING", status: "ACTIVE", title: "산악 중계기 신호 저하", message: "RELAY-02 수신신호가 -82dBm으로 낮습니다. 예비 중계기 배치를 검토하세요.", issuedAt: observedAt, issuerOrgCode: "통신 관제" },
     ],
     reports: [{ reportId: "RPT-01", title: "동측 화선 대응 보고", reportText: "진화차 3호 현장 진입, 소화용수 2개소 확보 완료", urgency: "WARNING", status: "SUBMITTED", reportedAt: observedAt, reporterOrgCode: "현장지휘" }],
@@ -78,7 +82,7 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
     domainLayers: {
       firelines: [{ id: "fireline-1", observedAt, fireline: line([[128.359,37.616],[128.364,37.618],[128.369,37.616],[128.372,37.613]]) }],
       "spread-predictions": [{ id: "spread-1", baseTime: observedAt, modelName: "ForestSpread AI", modelVersion: "2.4", confidence: 0.86, predictedArea: polygon([[128.357,37.611],[128.360,37.622],[128.373,37.624],[128.379,37.614],[128.369,37.606]]) }],
-      "wildfire-risk-zones": [{ id: "risk-1", observedAt, resultGeometry: polygon([[128.355,37.608],[128.356,37.624],[128.378,37.625],[128.382,37.608]]) }],
+      "wildfire-risk-zones": [{ id: "risk-1", observedAt, resultGeometry: polygon(wildfireRiskBoundary) }],
       "evacuation-routes": [{ id: "evac-1", observedAt, resultGeometry: line([[128.373,37.616],[128.365,37.610],[128.355,37.606],[128.346,37.603]]) }],
       "suppression-resources": [{ id: "sup-1", observedAt, resultGeometry: point([128.351,37.606]) }, { id: "sup-2", observedAt, resultGeometry: point([128.375,37.608]) }],
       "water-sources": [{ id: "water-1", observedAt, resultGeometry: point([128.343,37.609]) }, { id: "water-2", observedAt, resultGeometry: point([128.382,37.604]) }],
