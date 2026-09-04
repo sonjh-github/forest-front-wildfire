@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
-import { buildOperationalEvidence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import { buildOperationalEvidence, calculateTelemetryMetrics, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import type { TelemetryStreamStatus } from "./telemetryStream";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
@@ -39,6 +39,7 @@ interface OperationsPanelProps {
   externalIntegrationStatus: ExternalIntegrationStatus;
   onRefreshExternalIntegrations: () => void;
   telemetryStreamStatus: TelemetryStreamStatus;
+  telemetrySamples: TelemetrySample[];
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -125,6 +126,7 @@ export function OperationsPanel({
   externalIntegrationStatus,
   onRefreshExternalIntegrations,
   telemetryStreamStatus,
+  telemetrySamples,
 }: OperationsPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const externalIntegrationLoading = Object.values(
@@ -153,6 +155,7 @@ export function OperationsPanel({
       lastReceivedAt: rows.map((row) => row.observedAt).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null,
     };
   }, [locations, lastUpdatedAt]);
+  const liveTelemetryMetrics = useMemo(() => telemetrySamples.length ? calculateTelemetryMetrics(telemetrySamples, 3) : null, [telemetrySamples]);
   const domainLayers = overview.event.disasterType === "LANDSLIDE"
     ? [
       { id: "slope-assessments", label: "산사태 위험면", description: "사면 위험·분석 결과" },
@@ -291,7 +294,7 @@ export function OperationsPanel({
   };
   const downloadKpiEvidence = () => {
     const now = new Date();
-    const telemetrySamples: TelemetrySample[] = locations.map((location, index) => ({
+    const snapshotSamples: TelemetrySample[] = locations.map((location, index) => ({
       assetId: location.id,
       sequence: index + 1,
       observedAt: location.observedAt,
@@ -300,10 +303,9 @@ export function OperationsPanel({
       longitude: location.longitude,
     }));
     const runId = `run-${now.toISOString().replaceAll(/[-:.TZ]/g, "").slice(0, 14)}`;
-    const evidence = buildOperationalEvidence({
-      eventId: String(overview.event.eventId), runId, samples: telemetrySamples,
-      startedAt: new Date(now.getTime() - 6.4 * 60_000).toISOString(), networkReadyAt: now.toISOString(),
-    });
+    const samples = telemetrySamples.length ? telemetrySamples : snapshotSamples;
+    const evidence = buildOperationalEvidence({ eventId: String(overview.event.eventId), runId, samples,
+      ...(telemetrySamples.length ? {} : { startedAt: new Date(now.getTime() - 6.4 * 60_000).toISOString(), networkReadyAt: now.toISOString() }) });
     const payload = { ...evidence, mode: overview.domainDetail?.mode ?? "UNKNOWN", event: overview.event, measurements: overview.kpis };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
@@ -485,6 +487,11 @@ export function OperationsPanel({
           </section>}
           {activeTab === "kpis" && <section className="operations-records" aria-label="실증 KPI">
             <button type="button" className="kpi-evidence-download" onClick={downloadKpiEvidence} disabled={overview.kpis.length === 0}>시험 증적 JSON 내보내기</button>
+            {liveTelemetryMetrics && <article data-status={liveTelemetryMetrics.averageLatencySec <= 3 && liveTelemetryMetrics.availabilityPct >= 98 ? "ACTIVE" : "FAILED"}>
+              <div><strong>Gateway 실시간 측정</strong><span>{liveTelemetryMetrics.received}개 표본</span></div>
+              <p>평균 지연 {liveTelemetryMetrics.averageLatencySec}초 · 최대 공백 {liveTelemetryMetrics.maxGapSec}초</p>
+              <small>가용률 {liveTelemetryMetrics.availabilityPct}% · 정보공유 {liveTelemetryMetrics.sharingSuccessPct}% · 메모리 내 원시표본 기준</small>
+            </article>}
             {overview.kpis.length === 0 && <p className="operation-empty-state"><b>수집된 실증 KPI 없음</b><span>모사값은 공식 실증값으로 표시하지 않습니다.</span></p>}
             {overview.kpis.map((kpi) => <article key={value(kpi, ["kpiMeasurementId", "metricCode"])} data-status={kpi.passed === true ? "ACTIVE" : kpi.passed === false ? "FAILED" : "INACTIVE"}>
               <div><strong>{value(kpi, ["metricName", "metricCode"], "실증 지표")}</strong><span>{kpi.passed === true ? "충족" : kpi.passed === false ? "미충족" : "판정 전"}</span></div>

@@ -12,6 +12,7 @@ import DroneVideoModal from "./DroneVideoModal";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
 import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
+import type { TelemetrySample } from "./operationalEvidence";
 import "./unified-disaster-dashboard.css";
 
 const POLL_INTERVAL_MS = 1_000;
@@ -611,6 +612,7 @@ export default function UnifiedDisasterDashboard() {
   const [demoMode, setDemoMode] = useState(FORCE_DEMO_MODE);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
+  const [telemetrySamples, setTelemetrySamples] = useState<TelemetrySample[]>([]);
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -955,6 +957,7 @@ export default function UnifiedDisasterDashboard() {
     setTimeline(null);
     setTimelineIndex(null);
     setTimelinePlaying(false);
+    setTelemetrySamples([]);
   }, [selectedId]);
 
   useEffect(() => {
@@ -1040,6 +1043,11 @@ export default function UnifiedDisasterDashboard() {
       onStatus: setTelemetryStreamStatus,
       onMessage: (message) => {
         setOverview((current) => current ? applyTelemetrySafetyRules(current, message) : current);
+        setTelemetrySamples((current) => [...current, {
+          assetId: message.assetId, observedAt: message.observedAt,
+          receivedAt: message.receivedAt ?? new Date().toISOString(), sequence: message.sequence,
+          latitude: message.latitude, longitude: message.longitude,
+        }].slice(-3_600));
         setLastUpdatedAt(new Date());
       },
     });
@@ -1342,6 +1350,7 @@ export default function UnifiedDisasterDashboard() {
                   void refreshExternalIntegrations();
                 }}
                 telemetryStreamStatus={telemetryStreamStatus}
+                telemetrySamples={telemetrySamples}
               />
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>

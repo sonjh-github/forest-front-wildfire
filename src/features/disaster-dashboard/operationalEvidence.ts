@@ -91,12 +91,14 @@ export function buildOperationalEvidence(input: {
   runId: string;
   samples: TelemetrySample[];
   expectedIntervalSec?: number;
-  startedAt: string;
-  networkReadyAt: string;
+  startedAt?: string;
+  networkReadyAt?: string;
 }) {
   const expectedIntervalSec = input.expectedIntervalSec ?? 3;
   const metrics = calculateTelemetryMetrics(input.samples, expectedIntervalSec);
-  const networkDeploymentMinutes = Number(Math.max(0, (Date.parse(input.networkReadyAt) - Date.parse(input.startedAt)) / 60_000).toFixed(2));
+  const networkDeploymentMinutes = input.startedAt && input.networkReadyAt
+    ? Number(Math.max(0, (Date.parse(input.networkReadyAt) - Date.parse(input.startedAt)) / 60_000).toFixed(2))
+    : null;
   const raw = JSON.stringify(input.samples);
   return {
     schemaVersion: "forest-kpi-evidence/v1",

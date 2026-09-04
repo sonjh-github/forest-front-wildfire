@@ -54,7 +54,7 @@ export function runDemoAcceptance(now = new Date("2026-09-04T00:00:30Z")) {
     "RESP-03": [layer("suppression-resources"), "진화자원"], "RESP-04": [layer("water-sources"), "소화용수"],
     "RESP-05": [layer("nearby-response-resources"), "주변 대응자원·ETA"],
     "KPI-01": [evidence.metrics.averageLatencySec <= 3, "원시표본 평균 수신지연"],
-    "KPI-02": [evidence.metrics.networkDeploymentMinutes <= 7, "시작-망준비 6.4분"],
+    "KPI-02": [Number(evidence.metrics.networkDeploymentMinutes ?? Number.POSITIVE_INFINITY) <= 7, "시작-망준비 6.4분"],
     "KPI-03": [evidence.metrics.sharingSuccessPct >= 98, "sequence 수신 성공률"],
     "KPI-04": [evidence.metrics.availabilityPct >= 98, "목표주기 대비 가용률"],
     "KPI-05": [evidence.rawSamples.length > 0 && Boolean(evidence.integrity.checksum), "실행 ID·원시표본·체크섬"],
