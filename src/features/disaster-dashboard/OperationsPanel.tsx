@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
-import { buildOperationalEvidence, type TelemetrySample } from "./operationalEvidence";
+import { buildOperationalEvidence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
@@ -134,6 +134,20 @@ export function OperationsPanel({
         || Date.parse(value(b, ["issuedAt", "createdAt"], "0")) - Date.parse(value(a, ["issuedAt", "createdAt"], "0")),
       );
   }, [overview.alerts]);
+  const linkHealthSummary = useMemo(() => {
+    const now = new Date();
+    const rows = locations.map((location) => ({
+      ...location,
+      linkHealth: classifyLinkHealth(location.observedAt, now, location.expectedTelemetryIntervalSec ?? 3),
+    }));
+    return {
+      rows,
+      connected: rows.filter((row) => row.linkHealth === "CONNECTED").length,
+      delayed: rows.filter((row) => row.linkHealth === "DELAYED").length,
+      disconnected: rows.filter((row) => row.linkHealth === "DISCONNECTED").length,
+      lastReceivedAt: rows.map((row) => row.observedAt).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null,
+    };
+  }, [locations, lastUpdatedAt]);
   const domainLayers = overview.event.disasterType === "LANDSLIDE"
     ? [
       { id: "slope-assessments", label: "산사태 위험면", description: "사면 위험·분석 결과" },
@@ -425,6 +439,11 @@ export function OperationsPanel({
             <p className="operation-readonly-note">경보 발령·확인·해제는 명령센터 권한 및 이력 API 연계 후 사용할 수 있습니다.</p>
           </section>}
           {activeTab === "networks" && <section className="operations-records" aria-label="통신망 상태">
+            <article data-status={linkHealthSummary.disconnected > 0 ? "FAILED" : linkHealthSummary.delayed > 0 ? "DEGRADED" : "ACTIVE"} className="network-detail-card">
+              <div><strong>장비 수신 상태 자동판정</strong><span>{linkHealthSummary.disconnected > 0 ? "두절 발생" : linkHealthSummary.delayed > 0 ? "일부 지연" : "정상"}</span></div>
+              <p>연결 {linkHealthSummary.connected} · 지연 {linkHealthSummary.delayed} · 두절 {linkHealthSummary.disconnected}</p>
+              <small>마지막 정상 수신 {linkHealthSummary.lastReceivedAt ? relativeTime(linkHealthSummary.lastReceivedAt) : "수신 없음"} · 장비별 목표 주기의 1.5배/3배 기준 자동판정</small>
+            </article>
             {overview.networks.length === 0 && <p className="operation-empty-state"><b>연계된 통신망 없음</b><span>측정값 0이 아닌 미연계 상태입니다.</span></p>}
             {overview.networks.map((network) => {
               const status = value(network, ["status"], "UNKNOWN");
