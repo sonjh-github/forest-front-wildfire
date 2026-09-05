@@ -25,7 +25,7 @@ export default function RequirementsReadinessModal({ onClose }: { onClose: () =>
   return <div className="requirements-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="requirements-modal" role="dialog" aria-modal="true" aria-labelledby="requirements-title" onMouseDown={(event) => event.stopPropagation()}>
       <header>
-        <div><small>REQUIREMENTS TRACEABILITY</small><h2 id="requirements-title">47개 요구사항 개발 증빙</h2><p>소프트웨어 완료와 기관·현장 검증을 분리해 표시합니다.</p></div>
+        <div><small>REQUIREMENTS TRACEABILITY</small><h2 id="requirements-title">통합상황판 기능 검증 현황</h2><p>소프트웨어 완료와 기관·현장 검증을 분리해 표시합니다.</p></div>
         <div><button type="button" onClick={download}>증빙 JSON</button><button type="button" onClick={onClose} aria-label="요구사항 증빙 닫기">×</button></div>
       </header>
       <div className="requirements-summary">

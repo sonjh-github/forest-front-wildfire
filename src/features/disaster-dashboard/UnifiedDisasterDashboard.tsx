@@ -609,7 +609,7 @@ export default function UnifiedDisasterDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const [demoMode, setDemoMode] = useState(FORCE_DEMO_MODE);
+  const demoMode = FORCE_DEMO_MODE;
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
   const [telemetrySamples, setTelemetrySamples] = useState<TelemetrySample[]>([]);
@@ -632,14 +632,10 @@ export default function UnifiedDisasterDashboard() {
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [visibleLayerIds, setVisibleLayerIds] = useState(() => new Set([
-    "resources", "event", "topology", "firelines", "spread-predictions", "slope-assessments",
-    "debris-flow-paths", "debris-flow-areas", "victim-candidates", "rssi-detections",
-    "ai-ran-coverages", "relay-placement-candidates", "ignition-detections",
-    "vehicle-detections", "road-segmentations", "change-detections", "vital-signal-detections",
-    "external-firms", "external-landslide-history", "wildfire-risk-zones", "evacuation-routes",
-    "suppression-resources", "water-sources",
-    "nearby-response-resources", "slope-gradients", "viewsheds", "communication-shadows",
-    "external-wildfire-risk", "external-landslide-forecast", "external-landslide-regional-risk",
+    "resources",
+    "event",
+    "firelines",
+    "wildfire-risk-zones",
   ]));
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
@@ -678,6 +674,7 @@ export default function UnifiedDisasterDashboard() {
 
     setEvents([currentEvent]);
     setSelectedId((current) => current || currentEvent.eventId);
+    setError(null);
   }, []);
 
   const refreshExternalIntegrations = useCallback(async () => {
@@ -895,17 +892,6 @@ export default function UnifiedDisasterDashboard() {
     if (!selected) return;
     const result = await loadEventOverview(selected);
     const locations = overviewLocations(result);
-    const hasOperationalMapData = locations.length > 0
-      || Object.values(result.domainLayers).some((rows) => rows.length > 0);
-    if (!hasOperationalMapData) {
-      const demo = createDemoOverview();
-      setEvents([DEMO_EVENT]);
-      setSelectedId(DEMO_EVENT.eventId);
-      setOverview(demo);
-      setDemoMode(true);
-      setLastUpdatedAt(new Date());
-      return;
-    }
     const current = new Map(locations.map((item) => [locationKey(item), locationFingerprint(item)]));
     const previous = previousLocationsRef.current;
     const currentOverviewUpdateTime = overviewLatestUpdateTime(result);
@@ -987,25 +973,9 @@ export default function UnifiedDisasterDashboard() {
       return () => { active = false; };
     }
     refreshEvents()
-      .catch(() => {
+      .catch((caught: unknown) => {
         if (!active) return;
-        setEvents([DEMO_EVENT]);
-        setSelectedId(DEMO_EVENT.eventId);
-        setOverview(createDemoOverview());
-        setLastUpdatedAt(new Date());
-        setDemoMode(true);
-        setError(null);
-        setExternalFirmsRows(createDemoOverview().domainLayers["external-firms"] ?? []);
-        setExternalLandslideHistoryRows(createDemoOverview().domainLayers["external-landslide-history"] ?? []);
-        setExternalWildfireRiskRows(createDemoOverview().domainLayers["wildfire-risk-zones"] ?? []);
-        setExternalLandslideForecastRows(createDemoOverview().domainLayers["slope-assessments"] ?? []);
-        setExternalLandslideRegionalRows(createDemoOverview().domainLayers["slope-gradients"] ?? []);
-        const checkedAt = new Date().toISOString();
-        setExternalIntegrationStatus({
-          firms: { status: "ok", count: 1, checkedAt }, wildfireRisk: { status: "ok", count: 1, checkedAt },
-          landslideForecast: { status: "ok", count: 1, checkedAt }, landslideHistory: { status: "ok", count: 1, checkedAt },
-          landslideRegionalRisk: { status: "ok", count: 1, checkedAt },
-        });
+        setError(caught instanceof Error ? caught.message : "?? ?? ?? ??");
       })
       .finally(() => active && setEventsLoaded(true));
     return () => { active = false; };
@@ -1261,7 +1231,7 @@ export default function UnifiedDisasterDashboard() {
           <header>
             <div className="readiness-brand"><span>산림청</span><strong>산림재난 통합상황판</strong><small>FOREST DISASTER COMMON OPERATIONAL PICTURE</small></div>
             <div className="readiness-actions">
-              <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>47개 개발 증빙</button>
+              <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>
               <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
               <div className={`readiness-connection ${error ? "is-error" : eventsLoaded ? "is-ready" : "is-loading"}`}><i />{error ? "연결 점검 필요" : eventsLoaded ? "연결 정상" : "데이터 연결 중"}</div>
             </div>
@@ -1315,7 +1285,7 @@ export default function UnifiedDisasterDashboard() {
             <button type="button" data-alert={activeAlertCount > 0} onClick={() => setOperationsTab("alerts")}><span>경보</span><b>{activeAlertCount}</b></button>
           </nav>
           <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
-          <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>47개 개발 증빙</button>
+          <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
