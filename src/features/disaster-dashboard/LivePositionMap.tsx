@@ -426,7 +426,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         source: "terrain-dem",
         layout: { visibility: terrain3d ? "visible" : "none" },
         paint: {
-          "hillshade-exaggeration": wildfireDemo ? 0.78 : 0.45,
+          "hillshade-exaggeration": wildfireDemo ? 0.55 : 0.45,
           "hillshade-shadow-color": "#2f3d36",
           "hillshade-highlight-color": "#ffffff",
           "hillshade-accent-color": "#6f8178",
@@ -437,13 +437,13 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
       map.setTerrain(
         terrain3d
-          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 1.75 : 1.35 }
+          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 1.45 : 1.35 }
           : null,
       );
 
       map.easeTo({
-        pitch: terrain3d ? (wildfireDemo ? 70 : 58) : 0,
-        bearing: terrain3d ? (wildfireDemo ? -28 : -18) : 0,
+        pitch: terrain3d ? (wildfireDemo ? 64 : 58) : 0,
+        bearing: terrain3d ? (wildfireDemo ? -24 : -18) : 0,
         duration: 760,
       });
     };
@@ -959,8 +959,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     <div className={`live-map-shell${tileDegraded ? " is-tile-degraded" : ""}`}>
       <div ref={containerRef} className="live-basemap" aria-label="실시간 현장 지도" />
       <div className="basemap-switch" aria-label="지도 표현 전환">
-        <button type="button" className={!mutedBasemap ? "active" : ""} aria-pressed={!mutedBasemap} onClick={() => setMutedBasemap(false)}>2D 지도</button>
-        <button type="button" className={mutedBasemap ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap} onClick={() => setMutedBasemap(true)}>재난 강조</button>
+        <button type="button" className={!mutedBasemap && !terrain3d ? "active" : ""} aria-pressed={!mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(false); }}>2D 지도</button>
+        <button type="button" className={mutedBasemap && !terrain3d ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(true); }}>재난 강조</button>
         {wildfireDemo && <button type="button" className={riskHeatmap ? "active heatmap" : "heatmap"} aria-pressed={riskHeatmap} onClick={() => setRiskHeatmap((value) => !value)}>위험도</button>}
         <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(false); setTerrain3d((value) => !value); }}>3D 지형</button>
       </div>
