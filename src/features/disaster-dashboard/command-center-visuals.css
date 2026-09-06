@@ -1,0 +1,190 @@
+/* 2026-09-06 산림청 DEMO v4: 공공 GIS 관제형으로 단순화 */
+.live-map-shell {
+  position: relative;
+}
+
+.live-map-shell .basemap-switch {
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: 40 !important;
+  display: flex !important;
+  align-items: stretch;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgba(47, 67, 61, .42) !important;
+  border-radius: 3px !important;
+  background: #f6f8f7 !important;
+  box-shadow: 0 2px 6px rgba(16, 35, 30, .12) !important;
+  backdrop-filter: none !important;
+  overflow: hidden;
+}
+
+.live-map-shell .basemap-switch button {
+  min-height: 32px;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-right: 1px solid #c9d2cf !important;
+  border-radius: 0 !important;
+  background: #f7f9f8 !important;
+  color: #243c35 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.live-map-shell .basemap-switch button:last-child {
+  border-right: 0 !important;
+}
+
+.live-map-shell .basemap-switch button:hover {
+  background: #edf2f0 !important;
+}
+
+.live-map-shell .basemap-switch button.active {
+  background: #244f43 !important;
+  color: #fff !important;
+}
+
+.live-map-shell .basemap-switch button.heatmap.active {
+  background: #a63425 !important;
+  color: #fff !important;
+}
+
+.live-map-shell .basemap-switch button.terrain.active {
+  background: #315f78 !important;
+  color: #fff !important;
+}
+
+.live-map-shell .terrain-analysis-status {
+  position: absolute !important;
+  top: 54px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: 32 !important;
+  max-width: 290px;
+  padding: 9px 11px !important;
+  border: 1px solid rgba(48, 78, 91, .45) !important;
+  border-radius: 2px !important;
+  background: rgba(246, 249, 248, .96) !important;
+  box-shadow: 0 2px 6px rgba(18, 40, 35, .10) !important;
+}
+
+.live-map-shell .terrain-analysis-status b {
+  color: #24465a !important;
+}
+
+.live-map-shell .terrain-analysis-status span,
+.live-map-shell .terrain-analysis-status small {
+  color: #4f625c !important;
+}
+
+.live-map-shell .command-center-legend {
+  position: absolute !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  left: auto !important;
+  top: auto !important;
+  z-index: 25 !important;
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 11px !important;
+  max-width: min(680px, calc(100% - 76px));
+  padding: 6px 9px !important;
+  border: 1px solid rgba(55, 76, 70, .35) !important;
+  border-radius: 2px !important;
+  background: rgba(247, 249, 248, .96) !important;
+  box-shadow: 0 1px 4px rgba(17, 36, 31, .10) !important;
+}
+
+.command-center-legend strong {
+  color: #263f38 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  margin-right: 3px;
+}
+
+.command-center-legend span {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: #40534d !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+.command-center-legend i {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.command-center-legend i.fireline {
+  width: 20px;
+  height: 4px;
+  border-radius: 0;
+  background: #d9271c;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.92);
+}
+
+.command-center-legend i.spread {
+  width: 18px;
+  height: 9px;
+  border: 2px dashed #ed6d22;
+  border-radius: 0;
+  background: rgba(243, 107, 33, .24);
+}
+
+.command-center-legend i.risk {
+  width: 18px;
+  height: 9px;
+  border: 2px solid #c9231a;
+  border-radius: 0;
+  background: rgba(217, 45, 32, .20);
+}
+
+.command-center-legend i.evacuation {
+  width: 20px;
+  height: 4px;
+  border-radius: 0;
+  background: #169560;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.92);
+}
+
+.command-center-legend i.heat {
+  width: 20px;
+  height: 9px;
+  border-radius: 0;
+  background: linear-gradient(90deg, #f3cb20, #ed7722 52%, #b5261d);
+}
+
+@media (max-width: 1100px) {
+  .live-map-shell .basemap-switch {
+    top: 8px !important;
+    right: 8px !important;
+  }
+
+  .live-map-shell .basemap-switch button {
+    min-height: 29px;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+  }
+
+  .live-map-shell .terrain-analysis-status {
+    top: 45px !important;
+    right: 8px !important;
+    max-width: 245px;
+  }
+
+  .live-map-shell .command-center-legend {
+    right: 8px !important;
+    bottom: 8px !important;
+    max-width: calc(100% - 68px);
+  }
+}
