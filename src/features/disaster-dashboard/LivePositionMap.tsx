@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
 import { resolveTerrainConfig } from "./terrainConfig";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "./command-center-visuals.css";
 import type { ApiRecord, NetworkTopology } from "../../http-api";
 import type { LiveLocation } from "./UnifiedDisasterDashboard";
 
@@ -58,6 +59,46 @@ function compactLabel(location: LiveLocation) {
   return `${location.registeredToEvent ? type : "미등록"} · ${name}`;
 }
 
+function isWildfireDemoMode() {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get("demo") === "1" && (params.get("scenario") ?? "WILDFIRE") === "WILDFIRE";
+}
+
+function wildfireHeatFeatureCollection(
+  eventCenter: [number, number] | null,
+  domainLayers: Record<string, ApiRecord[]>,
+): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = [];
+
+  if (eventCenter) {
+    features.push({
+      type: "Feature",
+      id: "incident-center",
+      geometry: { type: "Point", coordinates: eventCenter },
+      properties: { weight: 1 },
+    });
+  }
+
+  for (const layerId of ["external-firms", "ignition-detections"]) {
+    for (const [index, row] of (domainLayers[layerId] ?? []).entries()) {
+      const geometry = geometryOf(layerId, row);
+      if (!geometry || geometry.type !== "Point") continue;
+      const frp = Number(row.frp);
+      features.push({
+        type: "Feature",
+        id: `heat-${layerId}-${index}`,
+        geometry,
+        properties: {
+          weight: Number.isFinite(frp) ? Math.min(1, 0.55 + frp / 80) : 0.72,
+        },
+      });
+    }
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
 function createLabelImage(text: string) {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
@@ -81,8 +122,8 @@ function createLabelImage(text: string) {
 }
 
 const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color: string; opacity?: number }> = {
-  firelines: { type: "line", color: "#e23f2f" },
-  "spread-predictions": { type: "fill", color: "#f06432", opacity: 0.05 },
+  firelines: { type: "line", color: "#d9271c" },
+  "spread-predictions": { type: "fill", color: "#f36b21", opacity: 0.27 },
   "communication-coverages": { type: "fill", color: "#158bcb", opacity: 0.14 },
   "slope-assessments": { type: "fill", color: "#8a52c7", opacity: 0.12 },
   "debris-flow-paths": { type: "line", color: "#70451f" },
@@ -111,8 +152,8 @@ const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color
   "external-wildfire-risk": { type: "fill", color: "#f05c2f", opacity: 0.2 },
   "external-landslide-forecast": { type: "fill", color: "#d39a28", opacity: 0.18 },
   "external-landslide-regional-risk": { type: "fill", color: "#8550b6", opacity: 0.2 },
-  "wildfire-risk-zones": { type: "fill", color: "#ef5b35", opacity: 0.12 },
-  "evacuation-routes": { type: "line", color: "#16a36d", opacity: 0.95 },
+  "wildfire-risk-zones": { type: "fill", color: "#d92d20", opacity: 0.22 },
+  "evacuation-routes": { type: "line", color: "#16a36d", opacity: 1 },
   "suppression-resources": { type: "circle", color: "#1678c8", opacity: 0.9 },
   "water-sources": { type: "circle", color: "#13a9d6", opacity: 0.9 },
   "nearby-response-resources": { type: "circle", color: "#7057d9", opacity: 0.9 },
@@ -288,10 +329,24 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
 export default function LivePositionMap({ locations, changedUntil, highlightDurationMs, eventCenter, focusCenter, eventId, showResources, showEvent, selectedKey, onLocationSelect, onLocationDoubleClick, onLocationTopology, topology, topologyFocusKey, showTopology, referenceTimeMs, domainLayers, visibleLayerIds }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const wildfireDemo = isWildfireDemoMode();
   const [mutedBasemap, setMutedBasemap] = useState(false);
   const [terrain3d, setTerrain3d] = useState(false);
+  const [riskHeatmap, setRiskHeatmap] = useState(wildfireDemo);
   const [terrainElevationM, setTerrainElevationM] = useState<number | null>(null);
-  const terrainConfig = resolveTerrainConfig(import.meta.env);
+  const fallbackTerrainConfig = resolveTerrainConfig(import.meta.env);
+  const terrainConfig = wildfireDemo
+    ? {
+      ...fallbackTerrainConfig,
+      tiles: ["/dem/37806/{z}/{x}/{y}.png"],
+      tileSize: 256 as const,
+      encoding: "terrarium" as const,
+      maxzoom: 13,
+      attribution: "국토지리정보원 공개DEM 37806 (2025)",
+      resolutionLabel: "90m 공개DEM",
+      sourceLabel: "평창 봉평 37806 실지형",
+    }
+    : fallbackTerrainConfig;
   const [tileDegraded, setTileDegraded] = useState(false);
   const selectedEventRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
@@ -304,6 +359,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       center: [128.7, 36.35],
       zoom: 12,
       attributionControl: false,
+      maxPitch: 80,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: "metric" }), "bottom-left");
@@ -327,7 +383,11 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     const map = mapRef.current;
     if (!map) return;
     const apply = () => {
-      if (map.getLayer("osm")) map.setPaintProperty("osm", "raster-opacity", mutedBasemap ? 0.2 : 1);
+      if (!map.getLayer("osm")) return;
+      map.setPaintProperty("osm", "raster-opacity", mutedBasemap ? 0.76 : 1);
+      map.setPaintProperty("osm", "raster-saturation", mutedBasemap ? -0.82 : 0);
+      map.setPaintProperty("osm", "raster-contrast", mutedBasemap ? 0.2 : 0);
+      map.setPaintProperty("osm", "raster-brightness-max", mutedBasemap ? 0.94 : 1);
     };
     if (map.isStyleLoaded()) apply(); else map.once("load", apply);
     return () => { map.off("load", apply); };
@@ -336,18 +396,65 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+
     const apply = () => {
-      if (!map.getSource("terrain-dem")) map.addSource("terrain-dem", {
-        type: "raster-dem", tiles: terrainConfig.tiles,
-        tileSize: terrainConfig.tileSize, encoding: terrainConfig.encoding, maxzoom: terrainConfig.maxzoom,
+      // DEM source가 이전 설정으로 만들어졌을 수 있어 시나리오/모드 전환 시 안전하게 재생성합니다.
+      map.setTerrain(null);
+
+      if (map.getLayer("terrain-hillshade")) {
+        map.removeLayer("terrain-hillshade");
+      }
+      if (map.getSource("terrain-dem")) {
+        map.removeSource("terrain-dem");
+      }
+
+      map.addSource("terrain-dem", {
+        type: "raster-dem",
+        tiles: terrainConfig.tiles,
+        tileSize: terrainConfig.tileSize,
+        encoding: terrainConfig.encoding,
+        maxzoom: terrainConfig.maxzoom,
         attribution: terrainConfig.attribution,
+        ...(wildfireDemo
+          ? { bounds: [128.2461776, 37.4926055, 128.5082070, 37.7508433] as [number, number, number, number] }
+          : {}),
       });
-      map.setTerrain(terrain3d ? { source: "terrain-dem", exaggeration: 1.35 } : null);
-      map.easeTo({ pitch: terrain3d ? 58 : 0, bearing: terrain3d ? -18 : 0, duration: 650 });
+
+      map.addLayer({
+        id: "terrain-hillshade",
+        type: "hillshade",
+        source: "terrain-dem",
+        layout: { visibility: terrain3d ? "visible" : "none" },
+        paint: {
+          "hillshade-exaggeration": wildfireDemo ? 0.78 : 0.45,
+          "hillshade-shadow-color": "#2f3d36",
+          "hillshade-highlight-color": "#ffffff",
+          "hillshade-accent-color": "#6f8178",
+          "hillshade-illumination-anchor": "map",
+          "hillshade-illumination-direction": 315,
+        },
+      });
+
+      map.setTerrain(
+        terrain3d
+          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 1.75 : 1.35 }
+          : null,
+      );
+
+      map.easeTo({
+        pitch: terrain3d ? (wildfireDemo ? 70 : 58) : 0,
+        bearing: terrain3d ? (wildfireDemo ? -28 : -18) : 0,
+        duration: 760,
+      });
     };
-    if (map.isStyleLoaded()) apply(); else map.once("load", apply);
-    return () => { map.off("load", apply); };
-  }, [terrain3d]);
+
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+
+    return () => {
+      map.off("load", apply);
+    };
+  }, [terrain3d, wildfireDemo]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -366,6 +473,10 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     if (selectedEventRef.current === eventId) return;
     selectedEventRef.current = eventId;
     const targetCenter = focusCenter ?? eventCenter;
+    if (wildfireDemo && !focusCenter) {
+      map.easeTo({ center: eventCenter, zoom: 13.8, duration: 700 });
+      return;
+    }
     const nearbyLocations = locations.filter((location) =>
       Math.hypot(location.longitude - targetCenter[0], location.latitude - targetCenter[1]) <= 0.08
     );
@@ -379,7 +490,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     } else {
       map.easeTo({ center: targetCenter, zoom: 14, duration: 700 });
     }
-  }, [eventCenter, focusCenter, eventId, locations]);
+  }, [eventCenter, focusCenter, eventId, locations, wildfireDemo]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -395,14 +506,24 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         if (source) source.setData(data);
         else map.addSource(sourceId, { type: "geojson", data });
         if (!map.getLayer(mapLayerId)) {
-          if (style.type === "line") map.addLayer({ id: mapLayerId, type: "line", source: sourceId, paint: { "line-color": style.color, "line-width": 4, "line-opacity": 0.88 } });
+          if (style.type === "line") map.addLayer({
+            id: mapLayerId,
+            type: "line",
+            source: sourceId,
+            paint: {
+              "line-color": style.color,
+              "line-width": layerId === "firelines" ? 7 : layerId === "evacuation-routes" ? 6 : 4,
+              "line-opacity": style.opacity ?? 0.95,
+              "line-blur": layerId === "firelines" ? 0.35 : 0,
+            },
+          });
           if (style.type === "fill") map.addLayer({ id: mapLayerId, type: "fill", source: sourceId, paint: { "fill-color": style.color, "fill-opacity": style.opacity ?? 0.16, "fill-outline-color": style.color } });
           if (style.type === "circle") map.addLayer({ id: mapLayerId, type: "circle", source: sourceId, paint: { "circle-color": style.color, "circle-radius":
             layerId === "victim-candidates"
               ? 11
               : layerId === "external-firms"
-                ? 9
-                : 7, "circle-opacity": 0.75, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+                ? 10
+                : 8, "circle-opacity": 0.84, "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
         }
         map.setLayoutProperty(mapLayerId, "visibility", visibleLayerIds.has(layerId) ? "visible" : "none");
       }
@@ -410,6 +531,50 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     if (map.isStyleLoaded()) render(); else map.once("load", render);
     return () => { map.off("load", render); };
   }, [domainLayers, visibleLayerIds]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const render = () => {
+      const sourceId = "wildfire-risk-heat-source";
+      const layerId = "wildfire-risk-heatmap";
+      const data = wildfireHeatFeatureCollection(eventCenter, domainLayers);
+      const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+
+      if (source) source.setData(data);
+      else map.addSource(sourceId, { type: "geojson", data });
+
+      if (!map.getLayer(layerId)) {
+        map.addLayer({
+          id: layerId,
+          type: "heatmap",
+          source: sourceId,
+          maxzoom: 16,
+          paint: {
+            "heatmap-weight": ["coalesce", ["get", "weight"], 0.7],
+            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 14, 1.8],
+            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 40, 14, 118],
+            "heatmap-opacity": 0.86,
+            "heatmap-color": [
+              "interpolate", ["linear"], ["heatmap-density"],
+              0, "rgba(255,220,0,0)",
+              0.2, "rgba(255,214,0,.18)",
+              0.42, "rgba(255,155,0,.36)",
+              0.65, "rgba(255,82,0,.54)",
+              0.84, "rgba(220,28,18,.68)",
+              1, "rgba(150,0,0,.8)",
+            ],
+          },
+        });
+      }
+
+      map.setLayoutProperty(layerId, "visibility", wildfireDemo && riskHeatmap ? "visible" : "none");
+    };
+
+    if (map.isStyleLoaded()) render(); else map.once("load", render);
+    return () => { map.off("load", render); };
+  }, [domainLayers, eventCenter, riskHeatmap, wildfireDemo]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -563,19 +728,39 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       else map.setLayoutProperty("communication-topology-label", "visibility", topologyVisibility);
       if (!map.getLayer("event-origin-halo")) map.addLayer({
         id: "event-origin-halo", type: "circle", source: "event-origin-source",
-        paint: { "circle-radius": 17, "circle-color": "#ed2f38", "circle-opacity": 0.18 },
+        paint: {
+          "circle-radius": wildfireDemo ? 62 : 20,
+          "circle-color": "#e02b20",
+          "circle-opacity": wildfireDemo ? 0.12 : 0.18,
+          "circle-blur": wildfireDemo ? 0.68 : 0.2,
+        },
+      });
+      if (!map.getLayer("event-origin-ring")) map.addLayer({
+        id: "event-origin-ring", type: "circle", source: "event-origin-source",
+        paint: {
+          "circle-radius": wildfireDemo ? 31 : 13,
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-stroke-color": "#ff5b45",
+          "circle-stroke-width": wildfireDemo ? 4 : 2,
+          "circle-stroke-opacity": wildfireDemo ? 0.85 : 0.35,
+        },
       });
       if (!map.getLayer("event-origin-point")) map.addLayer({
         id: "event-origin-point", type: "circle", source: "event-origin-source",
-        paint: { "circle-radius": 9, "circle-color": "#e32636", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 },
+        paint: {
+          "circle-radius": wildfireDemo ? 12 : 9,
+          "circle-color": "#d91f18",
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": wildfireDemo ? 4 : 3,
+        },
       });
       if (!map.hasImage("event-origin-label")) {
-        const image = createLabelImage("재난 발생지점");
+        const image = createLabelImage(wildfireDemo ? "산불 발생지점" : "재난 발생지점");
         if (image) map.addImage("event-origin-label", image, { pixelRatio: 2 });
       }
       if (!map.getLayer("event-origin-label")) map.addLayer({
         id: "event-origin-label", type: "symbol", source: "event-origin-source",
-        layout: { "icon-image": "event-origin-label", "icon-anchor": "left", "icon-offset": [13, 0], "icon-allow-overlap": false, "icon-padding": 3 },
+        layout: { "icon-image": "event-origin-label", "icon-anchor": "left", "icon-offset": [13, 0], "icon-allow-overlap": true, "icon-ignore-placement": true, "icon-padding": 3 },
       });
 
       for (const location of locations) {
@@ -635,13 +820,13 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           "icon-image": ["get", "labelIcon"],
           "icon-anchor": "left",
           "icon-offset": [13, 0],
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
+          "icon-allow-overlap": false,
+          "icon-ignore-placement": false,
           "icon-padding": 4,
         },
       });
 
-      for (const layerId of ["event-origin-halo", "event-origin-point", "event-origin-label"]) {
+      for (const layerId of ["event-origin-halo", "event-origin-ring", "event-origin-point", "event-origin-label"]) {
         map.setLayoutProperty(layerId, "visibility", showEvent ? "visible" : "none");
       }
       for (const layerId of ["field-resource-halo", "field-resource-pulse-1", "field-resource-pulse-2", "field-resource-pulse-3", "field-resource-point", "field-resource-label"]) {
@@ -653,7 +838,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       }
       for (const layerId of [
         "communication-topology-active", "communication-topology-delayed", "communication-topology-disconnected", "communication-topology-label",
-        "event-origin-halo", "event-origin-point", "event-origin-label",
+        "event-origin-halo", "event-origin-ring", "event-origin-point", "event-origin-label",
         "field-resource-halo", "field-resource-pulse-1", "field-resource-pulse-2", "field-resource-pulse-3",
         "field-resource-point", "field-resource-label",
       ]) {
@@ -773,18 +958,22 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   return (
     <div className={`live-map-shell${tileDegraded ? " is-tile-degraded" : ""}`}>
       <div ref={containerRef} className="live-basemap" aria-label="실시간 현장 지도" />
-      <div className="basemap-switch" aria-label="배경지도 전환">
-        <button type="button" className={!mutedBasemap ? "active" : ""} aria-pressed={!mutedBasemap} onClick={() => setMutedBasemap(false)}>일반지도</button>
-        <button type="button" className={mutedBasemap ? "active" : ""} aria-pressed={mutedBasemap} onClick={() => setMutedBasemap(true)}>정보강조</button>
+      <div className="basemap-switch" aria-label="지도 표현 전환">
+        <button type="button" className={!mutedBasemap ? "active" : ""} aria-pressed={!mutedBasemap} onClick={() => setMutedBasemap(false)}>2D 지도</button>
+        <button type="button" className={mutedBasemap ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap} onClick={() => setMutedBasemap(true)}>재난 강조</button>
+        {wildfireDemo && <button type="button" className={riskHeatmap ? "active heatmap" : "heatmap"} aria-pressed={riskHeatmap} onClick={() => setRiskHeatmap((value) => !value)}>위험도</button>}
         <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => setTerrain3d((value) => !value)}>3D 지형</button>
       </div>
       {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
-      <section className="map-meaning-legend" aria-label="지도 범례">
-        <strong>범례</strong>
-        <span><i className="personnel" />현장 인원</span>
-        <span><i className="asset" />장비·차량</span>
-        <span><i className="observed" />관측 결과</span>
-        <span><i className="predicted" />AI 예측</span>
+      <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
+        <strong>지도 범례</strong>
+        <span><i className="fireline" />화선</span>
+        <span><i className="spread" />확산예측</span>
+        <span><i className="risk" />위험지역</span>
+        <span><i className="evacuation" />대피로</span>
+        {wildfireDemo && <span><i className="heat" />위험도</span>}
+        <span><i className="personnel" />인원</span>
+        <span><i className="asset" />자원</span>
       </section>
       {showTopology && <section className="map-topology-hint" aria-label="통신 토폴로지 상태 범례">
         <strong>{topologyFocusKey ? "선택 마커 연결 강조" : "통신 토폴로지"}</strong>
