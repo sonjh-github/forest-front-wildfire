@@ -9,8 +9,8 @@ describe("47개 요구사항 개발 증빙", () => {
   });
 
   it("모든 항목이 소프트웨어 구현 근거를 가진다", () => {
-    expect(REQUIREMENTS_READINESS.every((item) => item.softwareComplete && item.evidence.length > 0)).toBe(true);
-    expect(requirementSummary().softwareComplete).toBe(REQUIREMENT_TOTAL);
+    expect(REQUIREMENTS_READINESS.every((item) => item.softwareComplete === (item.implementation === "IMPLEMENTED") && item.evidence.length > 0)).toBe(true);
+    expect(requirementSummary().softwareComplete).toBeLessThan(REQUIREMENT_TOTAL);
   });
 
   it("외부 승인·현장 검증을 운영 완료로 오인하지 않는다", () => {
@@ -19,7 +19,7 @@ describe("47개 요구사항 개발 증빙", () => {
     expect(pending.every((item) => item.validation !== "OPERATING")).toBe(true);
   });
 
-  it("외부조건 7개를 제외한 40개 데모 수용조건을 자동 검증한다", () => {
+  it("외부조건 7개를 제외한 40개 DEMO 데이터·화면 입력 계약을 검사한다", () => {
     const report = runDemoAcceptance();
     expect(report.total).toBe(40);
     expect(report.failed).toBe(0);

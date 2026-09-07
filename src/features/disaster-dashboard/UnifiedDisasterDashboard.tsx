@@ -982,11 +982,12 @@ export default function UnifiedDisasterDashboard() {
   }, [refreshEvents]);
 
   useEffect(() => {
+    if (demoMode) return;
     const timer = window.setInterval(() => {
       refreshEvents().catch(() => undefined);
     }, 10_000);
     return () => window.clearInterval(timer);
-  }, [refreshEvents]);
+  }, [demoMode, refreshEvents]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1346,6 +1347,7 @@ export default function UnifiedDisasterDashboard() {
                   void refreshExternalIntegrations();
                 }}
                 telemetryStreamStatus={telemetryStreamStatus}
+                onOpenDroneVideo={(location) => setVideoDrone(location)}
                 telemetrySamples={telemetrySamples}
               />
             </div>

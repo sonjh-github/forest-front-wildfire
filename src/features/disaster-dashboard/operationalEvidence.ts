@@ -96,9 +96,8 @@ export function buildOperationalEvidence(input: {
 }) {
   const expectedIntervalSec = input.expectedIntervalSec ?? 3;
   const metrics = calculateTelemetryMetrics(input.samples, expectedIntervalSec);
-  const networkDeploymentMinutes = input.startedAt && input.networkReadyAt
-    ? Number(Math.max(0, (Date.parse(input.networkReadyAt) - Date.parse(input.startedAt)) / 60_000).toFixed(2))
-    : null;
+  const elapsed = input.startedAt && input.networkReadyAt ? Date.parse(input.networkReadyAt) - Date.parse(input.startedAt) : NaN;
+  const networkDeploymentMinutes = Number.isFinite(elapsed) && elapsed >= 0 ? Number((elapsed / 60_000).toFixed(2)) : null;
   const raw = JSON.stringify(input.samples);
   return {
     schemaVersion: "forest-kpi-evidence/v1",
@@ -106,7 +105,13 @@ export function buildOperationalEvidence(input: {
     eventId: input.eventId,
     generatedAt: new Date().toISOString(),
     expectedIntervalSec,
-    metrics: { ...metrics, networkDeploymentMinutes },
+    metrics: { ...metrics,
+      averageLatencySec: input.samples.length ? metrics.averageLatencySec : null,
+      maxGapSec: input.samples.length > 1 ? metrics.maxGapSec : null,
+      availabilityPct: input.samples.length ? metrics.availabilityPct : null,
+      sharingSuccessPct: input.samples.length ? metrics.sharingSuccessPct : null,
+      networkDeploymentMinutes },
+    measurementScope: "Received-sample estimates only; not official RFP KPI results",
     integrity: { algorithm: "FNV-1a-32", checksum: checksum(raw), sampleCount: input.samples.length },
     rawSamples: input.samples,
   };

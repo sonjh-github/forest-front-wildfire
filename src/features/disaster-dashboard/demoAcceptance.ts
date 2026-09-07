@@ -1,3 +1,4 @@
+import { BONGPYEONG_DEM } from "./terrainConfig";
 import { createDemoOverview, type DemoScenario } from "./demoOverview";
 import { buildOperationalEvidence, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
 import { REQUIREMENTS_READINESS } from "./requirementsReadiness";
@@ -6,12 +7,16 @@ export type DemoAcceptanceCase = { requirementId: string; passed: boolean; evide
 
 const scenarios: DemoScenario[] = ["WILDFIRE", "LANDSLIDE", "COMMUNICATION_FAILURE", "DRONE_EMERGENCY"];
 
+export const DEMO_CHECK_LABEL = "DEMO 데이터·화면 계약 검증";
+
 export function runDemoAcceptance(now = new Date("2026-09-04T00:00:30Z")) {
   const overview = Object.fromEntries(scenarios.map((scenario) => [scenario, createDemoOverview(now, scenario)])) as Record<DemoScenario, ReturnType<typeof createDemoOverview>>;
   const wildfire = overview.WILDFIRE;
   const drone = wildfire.assets.find((asset) => asset.assetId === "DRONE-01")!;
   const emergencyDrone = overview.DRONE_EMERGENCY.assets.find((asset) => asset.assetId === "DRONE-01")!;
   const relayFailure = overview.COMMUNICATION_FAILURE.assets.find((asset) => asset.assetId === "RELAY-02")!;
+  const terrain = wildfire.domainDetail?.terrain as typeof BONGPYEONG_DEM | undefined;
+  const terrainConfigured = Boolean(terrain?.sourceId && terrain.tiles.length && terrain.resolutionMeters > 0 && terrain.encoding === "terrarium");
   const layers = wildfire.domainLayers;
   const layer = (id: string) => (layers[id] ?? []).length > 0;
   const locationSamples = wildfire.assets.slice(0, 4).map((asset, sequence) => ({
@@ -46,21 +51,21 @@ export function runDemoAcceptance(now = new Date("2026-09-04T00:00:30Z")) {
     "NET-03": [classifyLinkHealth(String(relayFailure.observedAt), now, 3) === "DISCONNECTED", "목표주기 기반 두절판정"],
     "NET-04": [wildfire.networks.every((network) => Number(network.availabilityPct) > 0), "망별 가용률"],
     "NET-05": [wildfire.assets.every((asset) => Number(asset.expectedTelemetryIntervalSec) === 3), "3초 목표 수신주기"],
-    "DEM-02": [wildfire.domainDetail?.terrain === "DEM 10m", "DEM terrain 계약"],
+    "DEM-02": [terrainConfigured, "DEM terrain 계약"],
     "DEM-03": [layer("slope-gradients"), "경사도 분석면"],
-    "DEM-04": [wildfire.domainDetail?.terrain === "DEM 10m", "3D terrain 입력자료"],
+    "DEM-04": [terrainConfigured, "3D terrain 입력자료"],
     "DEM-05": [layer("viewsheds") && layer("communication-shadows"), "가시권·통신음영 독립 레이어"],
     "RESP-01": [layer("wildfire-risk-zones"), "위험지역"], "RESP-02": [layer("evacuation-routes"), "안전 대피로"],
     "RESP-03": [layer("suppression-resources"), "진화자원"], "RESP-04": [layer("water-sources"), "소화용수"],
     "RESP-05": [layer("nearby-response-resources"), "주변 대응자원·ETA"],
-    "KPI-01": [evidence.metrics.averageLatencySec <= 3, "원시표본 평균 수신지연"],
+    "KPI-01": [(evidence.metrics.averageLatencySec ?? Infinity) <= 3, "원시표본 평균 수신지연"],
     "KPI-02": [Number(evidence.metrics.networkDeploymentMinutes ?? Number.POSITIVE_INFINITY) <= 7, "시작-망준비 6.4분"],
-    "KPI-03": [evidence.metrics.sharingSuccessPct >= 98, "sequence 수신 성공률"],
-    "KPI-04": [evidence.metrics.availabilityPct >= 98, "목표주기 대비 가용률"],
+    "KPI-03": [(evidence.metrics.sharingSuccessPct ?? -1) >= 98, "sequence 수신 성공률"],
+    "KPI-04": [(evidence.metrics.availabilityPct ?? -1) >= 98, "목표주기 대비 가용률"],
     "KPI-05": [evidence.rawSamples.length > 0 && Boolean(evidence.integrity.checksum), "실행 ID·원시표본·체크섬"],
   };
   const cases: DemoAcceptanceCase[] = REQUIREMENTS_READINESS
     .filter((item) => ["OPERATING", "DEMO_VERIFIED"].includes(item.validation))
     .map((item) => ({ requirementId: item.id, passed: checks[item.id]?.[0] === true, evidence: checks[item.id]?.[1] ?? "자동검증 정의 누락" }));
-  return { generatedAt: new Date().toISOString(), scenarios, total: cases.length, passed: cases.filter((item) => item.passed).length, failed: cases.filter((item) => !item.passed).length, cases };
+  return { label: DEMO_CHECK_LABEL, scope: "Synthetic data and UI input contracts only; no browser, field or official acceptance test", generatedAt: new Date().toISOString(), scenarios, total: cases.length, passed: cases.filter((item) => item.passed).length, failed: cases.filter((item) => !item.passed).length, cases };
 }

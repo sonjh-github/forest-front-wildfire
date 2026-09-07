@@ -31,6 +31,7 @@ export type LiveTelemetryMessage = {
 };
 
 function finite(value: unknown) {
+  if (value == null || typeof value === "boolean" || (typeof value !== "number" && typeof value !== "string") || String(value).trim() === "") return undefined;
   const number = Number(value);
   return Number.isFinite(number) ? number : undefined;
 }

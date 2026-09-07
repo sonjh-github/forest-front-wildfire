@@ -1,3 +1,4 @@
+import { BONGPYEONG_DEM, resolveTerrainConfig } from "./terrainConfig";
 import type { EventOverview, ForestEvent } from "../../http-api";
 import { evaluateRiskZone } from "./operationalEvidence";
 
@@ -78,7 +79,7 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
       { kpiMeasurementId: "KPI-DEPLOY", metricCode: "NETWORK_DEPLOYMENT_TIME", metricName: "통신망 구축시간", measuredValue: 6.4, unit: "분", targetOperator: "≤", targetValue: 7, passed: true, measuredTo: observedAt, sourceSystem: "DEMO 현장시험 타임라인", evidence: ["demo-run-20260903-01"] },
     ],
     integrations: [],
-    domainDetail: { mode: "SIMULATION", terrain: "DEM 10m", windDirection: "서남서", windSpeedMps: 4.2 },
+    domainDetail: { mode: "SIMULATION", terrain: scenario === "WILDFIRE" ? BONGPYEONG_DEM : resolveTerrainConfig({}), windDirection: "서남서", windSpeedMps: 4.2 },
     domainLayers: {
       firelines: [{ id: "fireline-1", observedAt, fireline: line([[128.359,37.616],[128.364,37.618],[128.369,37.616],[128.372,37.613]]) }],
       "spread-predictions": [{ id: "spread-1", baseTime: observedAt, modelName: "ForestSpread AI", modelVersion: "2.4", confidence: 0.86, predictedArea: polygon([[128.357,37.611],[128.360,37.622],[128.373,37.624],[128.379,37.614],[128.369,37.606]]) }],
