@@ -1,3 +1,5 @@
+import { nmsSummary, receivedNumber } from "./nmsSummary";
+import { OFFICIAL_RFP_BASELINE, PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
 import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
@@ -41,6 +43,7 @@ interface OperationsPanelProps {
   onRefreshExternalIntegrations: () => void;
   telemetryStreamStatus: TelemetryStreamStatus;
   telemetrySamples: TelemetrySample[];
+  onOpenDroneVideo: (location: LiveLocation) => void;
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -87,8 +90,8 @@ function value(row: ApiRecord, keys: string[], fallback = "-") {
 
 function numeric(row: ApiRecord, keys: string[]) {
   for (const key of keys) {
-    const candidate = Number(row[key]);
-    if (Number.isFinite(candidate)) return candidate;
+    const candidate = receivedNumber(row[key]);
+    if (candidate != null) return candidate;
   }
   return null;
 }
@@ -128,7 +131,11 @@ export function OperationsPanel({
   onRefreshExternalIntegrations,
   telemetryStreamStatus,
   telemetrySamples,
+  onOpenDroneVideo,
 }: OperationsPanelProps) {
+  const [fieldResourceKey, setFieldResourceKey] = useState("");
+  const fieldResource = locations.find(x => `${x.kind}-${x.id}` === fieldResourceKey);
+  const nms = nmsSummary(overview.networks, overview.assets);
   const [collapsed, setCollapsed] = useState(false);
   const [alertOverrides, setAlertOverrides] = useState<Record<string, AlertWorkflowStatus>>({});
   const [alertAudit, setAlertAudit] = useState<Array<ReturnType<typeof createAlertAudit>>>([]);
@@ -304,19 +311,11 @@ export function OperationsPanel({
   };
   const downloadKpiEvidence = () => {
     const now = new Date();
-    const snapshotSamples: TelemetrySample[] = locations.map((location, index) => ({
-      assetId: location.id,
-      sequence: index + 1,
-      observedAt: location.observedAt,
-      receivedAt: now.toISOString(),
-      latitude: location.latitude,
-      longitude: location.longitude,
-    }));
-    const runId = `run-${now.toISOString().replaceAll(/[-:.TZ]/g, "").slice(0, 14)}`;
-    const samples = telemetrySamples.length ? telemetrySamples : snapshotSamples;
-    const evidence = buildOperationalEvidence({ eventId: String(overview.event.eventId), runId, samples,
-      ...(telemetrySamples.length ? {} : { startedAt: new Date(now.getTime() - 6.4 * 60_000).toISOString(), networkReadyAt: now.toISOString() }) });
-    const payload = { ...evidence, mode: overview.domainDetail?.mode ?? "UNKNOWN", event: overview.event, measurements: overview.kpis };
+    const runId = `export-${now.toISOString()}`;
+    const evidence = buildOperationalEvidence({ eventId: String(overview.event.eventId), runId, samples: telemetrySamples });
+    const payload = { ...evidence, mode: overview.domainDetail?.mode ?? "UNKNOWN", event: overview.event, measurements: overview.kpis,
+      officialRfpBaseline: OFFICIAL_RFP_BASELINE, projectEnhancedTarget: PROJECT_ENHANCED_TARGET,
+      limitations: ["브라우저 수신표본만 포함; 생성한 export ID는 실제 시험실행 ID가 아님", "망구축 시작/완료 시각 미수신으로 구축시간 미판정", "표본비율은 공식 정보공유 성공률·시간기반 가용률이 아님"] };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -406,7 +405,7 @@ export function OperationsPanel({
               )}
             </div>
           </section>}
-                      <section
+          {activeTab === "layers" && <section
               className="layer-level-group"
               aria-labelledby="external-layer-title"
             >
@@ -440,7 +439,7 @@ export function OperationsPanel({
               <p className="operation-readonly-note">
                 좌표가 없는 기관 행정구역 자료는 시군구 대표영역으로 공간화해 표시하며, 상세 경계 데이터가 제공되면 동일 레이어에서 교체됩니다.
               </p>
-            </section>
+            </section>}
 
           {activeTab === "alerts" && <section className="operations-records" aria-label="활성 경보" aria-live="polite">
             {activeAlerts.length === 0 && <p className="operation-empty-state"><b>현재 활성 경보 없음</b><span>정상 상태입니다.</span></p>}
@@ -461,6 +460,14 @@ export function OperationsPanel({
             <p className="operation-readonly-note">DEMO 조치는 브라우저 세션에서만 유지됩니다. 운영 저장은 명령센터 권한 및 감사 이력 API 연계 후 사용합니다.</p>
           </section>}
           {activeTab === "networks" && <section className="operations-records" aria-label="통신망 상태">
+            <article className="network-detail-card">
+              <div><strong>NMS / 전원·BMS 요약</strong><span>{overview.domainDetail?.mode === "SIMULATION" ? "DEMO 수신값" : "수신값 조회"}</span></div>
+              <p>{nms.networksReceived ? `정상망 ${nms.active} · 성능저하 ${nms.degraded} · 장애 ${nms.failed} · 미확인 ${nms.unknown}` : "통신망 상태 미수신"}</p>
+              <dl><div><dt>최저 배터리</dt><dd>{nms.minBatteryPct == null ? "미수신" : `${nms.minBatteryPct}%`}</dd></div><div><dt>잔량 ≤20%</dt><dd>{nms.lowBatteryCount == null ? "미수신" : `${nms.lowBatteryCount}대`}</dd></div><div><dt>수신 장비</dt><dd>{nms.batteriesReceived}/{overview.assets.length}</dd></div></dl>
+              <small>최저 수신 전압: {nms.minVoltageV == null ? "미수신" : `${nms.minVoltageV.toFixed(2)} V`} · MAVLink 상태값</small>
+              <small>온도·전원 상태: Core API 계약 미확인 · 현장 연계 대기</small>
+              <small>마지막 상태수신 {nms.lastReceivedAt ? relativeTime(nms.lastReceivedAt) : "미수신"} · 잔량 기준은 저전압 측정이 아닙니다.</small>
+            </article>
             <article data-status={linkHealthSummary.disconnected > 0 ? "FAILED" : linkHealthSummary.delayed > 0 ? "DEGRADED" : "ACTIVE"} className="network-detail-card">
               <div><strong>장비 수신 상태 자동판정</strong><span>{linkHealthSummary.disconnected > 0 ? "두절 발생" : linkHealthSummary.delayed > 0 ? "일부 지연" : "정상"}</span></div>
               <p>연결 {linkHealthSummary.connected} · 지연 {linkHealthSummary.delayed} · 두절 {linkHealthSummary.disconnected}</p>
@@ -486,12 +493,23 @@ export function OperationsPanel({
                   <div><dt>지연</dt><dd>{measured && numeric(measured, ["latencyMs"]) != null ? `${numeric(measured, ["latencyMs"])} ms` : "측정값 없음"}</dd></div>
                   <div><dt>손실</dt><dd>{measured && numeric(measured, ["packetLossPct"]) != null ? `${numeric(measured, ["packetLossPct"])}%` : "측정값 없음"}</dd></div>
                 </dl>
-                <small>현재 경로 {String(attributes?.primary ?? attributes?.activePath ?? "미확인")} · 전환 사유 {String(attributes?.switchReason ?? "없음")}</small>
+                <small>수신 가용률 {numeric(network, ["availabilityPct"]) == null ? "미수신" : `${numeric(network, ["availabilityPct"])}%`} · 마지막 수신 {occurredAt(network, ["lastReceivedAt"])}</small>
+                <small>현재 경로 {value(attributes ?? {}, ["activePath"], "미수신")} · 기본 경로 {value(attributes ?? {}, ["primary"], "미수신")} · 전환 사유 {value(attributes ?? {}, ["switchReason"], "미수신")}</small>
               </article>;
             })}
             <p className="operation-readonly-note">상태 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "측정 중"} · NMS 연계 오류와 현장망 두절은 별도 판정합니다.</p>
           </section>}
           {activeTab === "reports" && <section className="operations-records" aria-label="상황 보고">
+            <article className="field-information-card" aria-label="현장 통합정보">
+              <div><strong>현장 통합정보</strong><span>{overview.domainDetail?.mode === "SIMULATION" ? "DEMO" : "수신 정보"}</span></div>
+              <p>{overview.event.eventName}</p>
+              <small>중요 경보: {activeAlerts[0] ? value(activeAlerts[0], ["title", "message"], "내용 미수신") : "수신된 활성 경보 없음"}</small>
+              <label>현장 자원<select aria-label="현장 통합정보 자원" value={fieldResource ? fieldResourceKey : ""} onChange={event => setFieldResourceKey(event.target.value)}><option value="">자원 선택</option>{locations.map(x => <option key={`${x.kind}-${x.id}`} value={`${x.kind}-${x.id}`}>{x.label}</option>)}</select></label>
+              {fieldResource && <><small>{fieldResource.status} · {fieldResource.latitude.toFixed(5)}, {fieldResource.longitude.toFixed(5)}</small>{["UAV", "MAIN_RELAY_DRONE", "SERVICE_RELAY_DRONE"].includes(fieldResource.category) && <button type="button" onClick={() => onOpenDroneVideo(fieldResource)}>드론 영상 채널·연결 정보</button>}</>}
+              <small>관측 화선: {overview.domainLayers.firelines?.length ? `${overview.domainLayers.firelines.length}건 · ${visibleLayerIds.has("firelines") ? "지도 ON" : "지도 OFF"}` : "미수신"}</small>
+              <small>대피로: {overview.domainLayers["evacuation-routes"]?.length ? `${overview.domainLayers["evacuation-routes"].length}건 · ${visibleLayerIds.has("evacuation-routes") ? "지도 ON" : "지도 OFF"}` : "미수신"}</small>
+              <small>아래 최신 상황보고를 함께 조회합니다. 보고 송신·영상 재생은 별도 연계 대기입니다.</small>
+            </article>
             {overview.reports.length === 0 && <p className="operation-empty-state"><b>등록된 상황 보고 없음</b><span>보고 미등록 상태입니다.</span></p>}
             {[...overview.reports].sort((a, b) => Date.parse(value(b, ["reportedAt", "createdAt"], "0")) - Date.parse(value(a, ["reportedAt", "createdAt"], "0"))).slice(0, 12).map((report) => <article key={value(report, ["reportId", "id", "sourceRecordId"], value(report, ["reportedAt"]))}>
               <div><strong>{value(report, ["title", "reportType"], "상황 보고")}</strong><span>{label(value(report, ["urgency"], "NORMAL"))}</span></div>
@@ -501,11 +519,12 @@ export function OperationsPanel({
             <p className="operation-readonly-note">미디어 원본은 권한이 확인된 경우에만 별도 화면에서 재생·다운로드합니다.</p>
           </section>}
           {activeTab === "kpis" && <section className="operations-records" aria-label="실증 KPI">
-            <button type="button" className="kpi-evidence-download" onClick={downloadKpiEvidence} disabled={overview.kpis.length === 0}>시험 증적 JSON 내보내기</button>
-            {liveTelemetryMetrics && <article data-status={liveTelemetryMetrics.averageLatencySec <= 3 && liveTelemetryMetrics.availabilityPct >= 98 ? "ACTIVE" : "FAILED"}>
-              <div><strong>Gateway 실시간 측정</strong><span>{liveTelemetryMetrics.received}개 표본</span></div>
+            <button type="button" className="kpi-evidence-download" onClick={downloadKpiEvidence} disabled={overview.kpis.length === 0}>수신표본·KPI JSON 내보내기</button>
+            <p className="operation-readonly-note">공식 RFP: ≤10분 / ≤5초 / ≥98% / ≥98%<br />연구개발계획 강화 목표: ≤7분 / ≤3초 / ≥98% / ≥98%<br />망 구축 / 위치 갱신 / 공유 성공 / 망 가용률 순서</p>
+            {liveTelemetryMetrics && <article data-status="INACTIVE">
+              <div><strong>{overview.domainDetail?.mode === "SIMULATION" ? "DEMO 모의 수신표본" : "브라우저 수신표본 참고 지표"}</strong><span>{liveTelemetryMetrics.received}개 표본</span></div>
               <p>평균 지연 {liveTelemetryMetrics.averageLatencySec}초 · 최대 공백 {liveTelemetryMetrics.maxGapSec}초</p>
-              <small>가용률 {liveTelemetryMetrics.availabilityPct}% · 정보공유 {liveTelemetryMetrics.sharingSuccessPct}% · 메모리 내 원시표본 기준</small>
+              <small>표본 수신비율 {liveTelemetryMetrics.availabilityPct ?? "N/A"}% · sequence 표본비율 {liveTelemetryMetrics.sharingSuccessPct ?? "N/A"}% · 공식 KPI 판정 불가</small>
             </article>}
             {overview.kpis.length === 0 && <p className="operation-empty-state"><b>수집된 실증 KPI 없음</b><span>모사값은 공식 실증값으로 표시하지 않습니다.</span></p>}
             {overview.kpis.map((kpi) => <article key={value(kpi, ["kpiMeasurementId", "metricCode"])} data-status={kpi.passed === true ? "ACTIVE" : kpi.passed === false ? "FAILED" : "INACTIVE"}>

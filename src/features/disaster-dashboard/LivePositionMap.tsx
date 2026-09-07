@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
-import { resolveTerrainConfig } from "./terrainConfig";
+import { BONGPYEONG_DEM, resolveTerrainConfig } from "./terrainConfig";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./command-center-visuals.css";
 import type { ApiRecord, NetworkTopology } from "../../http-api";
@@ -335,18 +335,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const [riskHeatmap, setRiskHeatmap] = useState(wildfireDemo);
   const [terrainElevationM, setTerrainElevationM] = useState<number | null>(null);
   const fallbackTerrainConfig = resolveTerrainConfig(import.meta.env);
-  const terrainConfig = wildfireDemo
-    ? {
-      ...fallbackTerrainConfig,
-      tiles: ["/dem/37806/{z}/{x}/{y}.png"],
-      tileSize: 256 as const,
-      encoding: "terrarium" as const,
-      maxzoom: 13,
-      attribution: "국토지리정보원 공개DEM 37806 (2025)",
-      resolutionLabel: "90m 공개DEM",
-      sourceLabel: "평창 봉평 37806 실지형",
-    }
-    : fallbackTerrainConfig;
+  const terrainConfig = wildfireDemo ? BONGPYEONG_DEM : fallbackTerrainConfig;
   const [tileDegraded, setTileDegraded] = useState(false);
   const selectedEventRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
