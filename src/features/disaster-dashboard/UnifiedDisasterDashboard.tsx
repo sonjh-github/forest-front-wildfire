@@ -622,7 +622,7 @@ export default function UnifiedDisasterDashboard() {
   const [visibleResourceGroups, setVisibleResourceGroups] = useState<Set<ResourceGroup>>(
     () => new Set(["PERSONNEL", "UAV", "COMMAND", "POSITIONING", "COMMUNICATION", "DETECTION", "UNASSIGNED"]),
   );
-  const [operationsTab, setOperationsTab] = useState<PanelTab>("layers");
+  const [operationsTab, setOperationsTab] = useState<PanelTab>(FORCE_DEMO_MODE ? "kpis" : "layers");
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(null);
   const [topologyLocationKey, setTopologyLocationKey] = useState<string | null>(null);
   const [resourceDialogGroup, setResourceDialogGroup] = useState<ResourceGroup | "ALL" | "ALL_ASSETS" | null>(null);

@@ -296,3 +296,193 @@
     font-size: 7px;
   }
 }
+
+/* performance-measurement-session-v2 */
+.performance-measurement-session {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d8e4df;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.performance-measurement-session > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.performance-measurement-session > header > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.performance-measurement-session > header strong {
+  font-size: 11px;
+}
+
+.performance-measurement-session > header small {
+  color: #6e7975;
+  font-size: 8px;
+}
+
+.performance-measurement-session > header > span {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #eef2f1;
+  color: #5c6763;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.performance-measurement-session[data-state="RUNNING"] > header > span {
+  background: #e3f4ef;
+  color: #08765c;
+}
+
+.performance-measurement-session[data-state="DONE"] > header > span {
+  background: #e8eef7;
+  color: #35597f;
+}
+
+.performance-session-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.performance-session-times > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 6px;
+  background: #f6f8f7;
+}
+
+.performance-session-times span {
+  color: #79827f;
+  font-size: 7px;
+}
+
+.performance-session-times strong {
+  overflow-wrap: anywhere;
+  font-size: 9px;
+}
+
+.performance-session-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.performance-session-actions button,
+.performance-session-export {
+  min-height: 28px;
+  border: 1px solid #137c64;
+  border-radius: 6px;
+  background: #137c64;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.performance-session-actions button.secondary {
+  border-color: #cbd7d2;
+  background: #fff;
+  color: #52605b;
+}
+
+.performance-session-actions button:disabled,
+.performance-session-export:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.performance-session-live {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.performance-session-live > span {
+  min-width: 0;
+  padding: 5px;
+  border-radius: 5px;
+  background: #f5f8f7;
+  color: #68736f;
+  font-size: 7px;
+  text-align: center;
+}
+
+.performance-session-live b {
+  display: block;
+  margin-top: 2px;
+  color: #25342f;
+  font-size: 9px;
+}
+
+.performance-session-export {
+  width: 100%;
+  border-color: #a9cfc3;
+  background: #edf8f4;
+  color: #126651;
+}
+
+.performance-interface-requirements {
+  padding: 8px 9px;
+  border: 1px dashed #cbd9d4;
+  border-radius: 8px;
+  background: #f8faf9;
+}
+
+.performance-interface-requirements summary {
+  cursor: pointer;
+  color: #40514b;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.performance-interface-requirements > div {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.performance-interface-requirements span {
+  color: #737e79;
+  font-size: 7px;
+}
+
+.performance-interface-requirements code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: #25342f;
+  font-size: 7px;
+}
+
+/* 기존 일반 export는 세션 export로 대체 */
+.performance-kpi-dashboard + .kpi-evidence-download {
+  display: none;
+}
+
+@media (min-width: 2200px) {
+  .performance-session-times {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .performance-measurement-session > header strong {
+    font-size: 12px;
+  }
+
+  .performance-session-actions button,
+  .performance-session-export {
+    min-height: 32px;
+    font-size: 9px;
+  }
+}
