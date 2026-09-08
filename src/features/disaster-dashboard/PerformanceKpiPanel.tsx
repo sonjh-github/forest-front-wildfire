@@ -9,11 +9,15 @@ import {
   type TelemetrySample,
 } from "./operationalEvidence";
 import {
+  calculateInformationSharingSuccess,
   calculateNetworkDeploymentMinutes,
-  calculateTimeBasedAvailability,
+  calculateOfficialAvailability,
+  calculatePositionUpdateStatistics,
   createPerformanceRunId,
   filterTelemetryForSession,
+  normalizePerformanceMeasurementSession,
   PERFORMANCE_INTERFACE_REQUIREMENTS,
+  type InformationSharingAttempt,
   type PerformanceMeasurementSession,
 } from "./performanceMeasurement";
 import {
@@ -89,7 +93,9 @@ function loadStoredSession(key: string): PerformanceMeasurementSession | null {
     const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PerformanceMeasurementSession;
-    return parsed?.runId && parsed?.startedAt ? parsed : null;
+    return parsed?.runId && parsed?.startedAt
+      ? normalizePerformanceMeasurementSession(parsed)
+      : null;
   } catch {
     return null;
   }
@@ -184,20 +190,27 @@ export default function PerformanceKpiPanel({
     ? session.endedAt ?? new Date(clockMs).toISOString()
     : null;
 
+  const officialOperationStartedAt = session?.networkReadyAt ?? null;
+
   const sessionSamples = useMemo(
     () =>
-      session && effectiveEndAt
+      session && effectiveEndAt && officialOperationStartedAt
         ? filterTelemetryForSession(
             telemetrySamples,
-            session.startedAt,
+            officialOperationStartedAt,
             effectiveEndAt,
           )
         : [],
-    [effectiveEndAt, session, telemetrySamples],
+    [
+      effectiveEndAt,
+      officialOperationStartedAt,
+      session,
+      telemetrySamples,
+    ],
   );
 
-  const sessionTelemetryMetrics = useMemo(
-    () => calculateTelemetryMetrics(sessionSamples, 3),
+  const sessionPositionStats = useMemo(
+    () => calculatePositionUpdateStatistics(sessionSamples),
     [sessionSamples],
   );
 
@@ -206,17 +219,25 @@ export default function PerformanceKpiPanel({
     [sessionSamples],
   );
 
+  const sessionSharingStats = useMemo(
+    () =>
+      calculateInformationSharingSuccess(
+        session?.sharingAttempts ?? [],
+      ),
+    [session],
+  );
+
   const sessionAvailability = useMemo(
     () =>
-      session && effectiveEndAt
-        ? calculateTimeBasedAvailability(
-            telemetrySamples,
-            session.startedAt,
+      session && effectiveEndAt && session.networkReadyAt
+        ? calculateOfficialAvailability(
+            session.networkReadyAt,
             effectiveEndAt,
-            3,
+            session.serviceInterruptions,
+            session.activeServiceInterruptionStartedAt,
           )
-        : calculateTimeBasedAvailability([], "", "", 3),
-    [effectiveEndAt, session, telemetrySamples],
+        : calculateOfficialAvailability("", "", []),
+    [effectiveEndAt, session],
   );
 
   const sessionElapsedSec =
@@ -232,20 +253,9 @@ export default function PerformanceKpiPanel({
     session?.networkReadyAt,
   );
 
-  const sessionLocationMeasured =
-    sessionSamples.length > 1 && sessionTelemetryMetrics.maxGapSec > 0
-      ? sessionTelemetryMetrics.maxGapSec
-      : null;
-
-  const sessionSharingMeasured =
-    sessionPacketMetrics.expected > 0
-      ? sessionPacketMetrics.successPct
-      : null;
-
-  const sessionAvailabilityMeasured =
-    sessionAvailability.sampleCount > 0
-      ? sessionAvailability.availabilityPct
-      : null;
+  const sessionLocationMeasured = sessionPositionStats.maxGapSec;
+  const sessionSharingMeasured = sessionSharingStats.successPct;
+  const sessionAvailabilityMeasured = sessionAvailability.availabilityPct;
 
   const deployment = metricByCode(overview, "NETWORK_DEPLOYMENT_TIME");
   const location = metricByCode(overview, "LOCATION_LATENCY");
@@ -278,14 +288,14 @@ export default function PerformanceKpiPanel({
       officialTarget: OFFICIAL_RFP_BASELINE.networkDeploymentMinutes,
       source: sessionMode
         ? session.networkReadyAt
-          ? `${session.runId} · 시작/망 준비 완료 시각 실측`
+          ? `${session.runId} · 구축팀 투입→망 준비 완료 실측`
           : `${session.runId} · 망 준비 완료 입력 대기`
         : deployment
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
               deployment.sourceSystem ?? "출처 미상",
             )}`
           : "시작·망 준비 완료 시각 수신 대기",
-      note: "측정 시작 시각부터 망 준비 완료 시각까지 실제 경과시간",
+      note: "공식 방법: 지정 시각 구축팀 투입부터 망 준비 완료까지 경과시간",
     },
     {
       id: "location",
@@ -299,8 +309,8 @@ export default function PerformanceKpiPanel({
       officialTarget: OFFICIAL_RFP_BASELINE.locationUpdateSeconds,
       source: sessionMode
         ? sessionLocationMeasured != null
-          ? `${session.runId} · 텔레메트리 ${sessionSamples.length}건`
-          : `${session.runId} · 연속 위치표본 수신 대기`
+          ? `${session.runId} · 평균 ${sessionPositionStats.averageGapSec}초 · 최대 ${sessionPositionStats.maxGapSec}초 · ${sessionPositionStats.intervalCount}구간`
+          : `${session.runId} · 연속 위치 갱신 이벤트 수신 대기`
         : location
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
               location.sourceSystem ?? "출처 미상",
@@ -308,7 +318,7 @@ export default function PerformanceKpiPanel({
           : locationFallback != null
             ? "브라우저 수신표본 최대 갱신 간격"
             : "위치 텔레메트리 수신 대기",
-      note: "동일 자산의 연속 수신 간격 중 최대값으로 갱신주기 측정",
+      note: "공식 방법: 모든 갱신 이벤트 기록 후 평균·최대 갱신주기 산출; PASS는 최대값 기준",
     },
     {
       id: "sharing",
@@ -321,9 +331,9 @@ export default function PerformanceKpiPanel({
       target: PROJECT_ENHANCED_TARGET.sharingSuccessPct,
       officialTarget: OFFICIAL_RFP_BASELINE.sharingSuccessPct,
       source: sessionMode
-        ? sessionPacketMetrics.expected > 0
-          ? `${session.runId} · 전체 자산 Sequence ${sessionPacketMetrics.received}/${sessionPacketMetrics.expected}`
-          : `${session.runId} · Sequence 수신 대기`
+        ? sessionSharingStats.attempts > 0
+          ? `${session.runId} · 전송시도 ${sessionSharingStats.attempts}건 · 성공수신 ${sessionSharingStats.successes}건 · 실패 ${sessionSharingStats.failures}건`
+          : `${session.runId} · 전송 시도/성공 수신 이벤트 대기`
         : sharing
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
               sharing.sourceSystem ?? "출처 미상",
@@ -331,7 +341,7 @@ export default function PerformanceKpiPanel({
           : sharingFallback != null
             ? `Sequence ${packetMetrics.received}/${packetMetrics.expected}`
             : "Sequence 수신 대기",
-      note: "자산별 Sequence 번호 공백을 유실로 계산하여 성공률 산정",
+      note: "공식 방법: 성공 수신 건수 ÷ 전송 시도 건수 × 100; Sequence Loss는 별도 진단",
     },
     {
       id: "availability",
@@ -344,9 +354,9 @@ export default function PerformanceKpiPanel({
       target: PROJECT_ENHANCED_TARGET.availabilityPct,
       officialTarget: OFFICIAL_RFP_BASELINE.availabilityPct,
       source: sessionMode
-        ? sessionAvailability.sampleCount > 0
-          ? `${session.runId} · 가용 ${sessionAvailability.availableSlotCount}/${sessionAvailability.slotCount} 시간슬롯`
-          : `${session.runId} · 가용성 표본 수신 대기`
+        ? session.networkReadyAt
+          ? `${session.runId} · 총 운영 ${sessionAvailability.totalOperationSec}초 · 중단 ${sessionAvailability.downtimeSec}초`
+          : `${session.runId} · 망 준비 완료 입력 대기`
         : availability
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
               availability.sourceSystem ?? "출처 미상",
@@ -355,8 +365,8 @@ export default function PerformanceKpiPanel({
             ? "브라우저 수신표본 기준 참고값"
             : "NMS/텔레메트리 수신 대기",
       note: sessionMode
-        ? `3초 시간슬롯 기준 · 장애 누적 ${sessionAvailability.downtimeSec}초`
-        : "측정 세션 시작 시 총 경과시간과 장애시간 기반으로 별도 산정",
+        ? "공식 방법: (총 운영시간-총 서비스 중단시간) ÷ 총 운영시간 × 100"
+        : "측정 세션 시작 시 공식 운영시간·중단시간 방식으로 전환",
     },
   ];
 
@@ -369,6 +379,9 @@ export default function PerformanceKpiPanel({
       startedAt: now.toISOString(),
       networkReadyAt: null,
       endedAt: null,
+      sharingAttempts: [],
+      serviceInterruptions: [],
+      activeServiceInterruptionStartedAt: null,
     });
   };
 
@@ -381,11 +394,109 @@ export default function PerformanceKpiPanel({
   };
 
   const finishSession = () => {
+    setSession((current) => {
+      if (!current || current.endedAt) return current;
+      const endedAt = new Date().toISOString();
+      const serviceInterruptions =
+        current.activeServiceInterruptionStartedAt
+          ? [
+              ...current.serviceInterruptions,
+              {
+                startedAt: current.activeServiceInterruptionStartedAt,
+                endedAt,
+              },
+            ]
+          : current.serviceInterruptions;
+
+      return {
+        ...current,
+        endedAt,
+        serviceInterruptions,
+        activeServiceInterruptionStartedAt: null,
+      };
+    });
+  };
+
+  const addSharingAttempts = (
+    successCount: number,
+    failureCount: number,
+  ) => {
+    setSession((current) => {
+      if (
+        !current ||
+        !current.networkReadyAt ||
+        current.endedAt
+      ) {
+        return current;
+      }
+
+      const attemptedAt = new Date().toISOString();
+      const base = current.sharingAttempts.length;
+      const rows: InformationSharingAttempt[] = [];
+
+      for (let index = 0; index < successCount; index += 1) {
+        rows.push({
+          transmissionId: `${current.runId}-TX-${base + rows.length + 1}`,
+          attemptedAt,
+          receivedAt: attemptedAt,
+          status: "SUCCESS",
+        });
+      }
+
+      for (let index = 0; index < failureCount; index += 1) {
+        rows.push({
+          transmissionId: `${current.runId}-TX-${base + rows.length + 1}`,
+          attemptedAt,
+          receivedAt: null,
+          status: "FAILED",
+        });
+      }
+
+      return {
+        ...current,
+        sharingAttempts: [...current.sharingAttempts, ...rows],
+      };
+    });
+  };
+
+  const beginServiceInterruption = () => {
     setSession((current) =>
-      current && !current.endedAt
-        ? { ...current, endedAt: new Date().toISOString() }
+      current &&
+      current.networkReadyAt &&
+      !current.endedAt &&
+      !current.activeServiceInterruptionStartedAt
+        ? {
+            ...current,
+            activeServiceInterruptionStartedAt:
+              new Date().toISOString(),
+          }
         : current,
     );
+  };
+
+  const endServiceInterruption = () => {
+    setSession((current) => {
+      if (
+        !current ||
+        !current.activeServiceInterruptionStartedAt ||
+        current.endedAt
+      ) {
+        return current;
+      }
+
+      const endedAt = new Date().toISOString();
+      return {
+        ...current,
+        serviceInterruptions: [
+          ...current.serviceInterruptions,
+          {
+            startedAt: current.activeServiceInterruptionStartedAt,
+            endedAt,
+          },
+        ],
+        activeServiceInterruptionStartedAt: null,
+      };
+    });
   };
 
   const resetSession = () => {
@@ -406,7 +517,7 @@ export default function PerformanceKpiPanel({
 
     const payload = {
       ...evidence,
-      schemaVersion: "forest-kpi-evidence/v2",
+      schemaVersion: "forest-kpi-evidence/v3",
       mode: overview.domainDetail?.mode ?? "UNKNOWN",
       session: {
         ...session,
@@ -415,17 +526,28 @@ export default function PerformanceKpiPanel({
       metrics: {
         ...evidence.metrics,
         networkDeploymentMinutes: deploymentMeasured,
-        maxGapSec: sessionLocationMeasured,
+        averageGapSec: sessionPositionStats.averageGapSec,
+        maxGapSec: sessionPositionStats.maxGapSec,
+        positionIntervalCount: sessionPositionStats.intervalCount,
         sharingSuccessPct: sessionSharingMeasured,
+        sharingAttemptCount: sessionSharingStats.attempts,
+        sharingSuccessCount: sessionSharingStats.successes,
+        sharingFailureCount: sessionSharingStats.failures,
         packetLossPct: sessionPacketMetrics.lossPct,
         sequenceReceived: sessionPacketMetrics.received,
         sequenceLost: sessionPacketMetrics.lost,
         sequenceExpected: sessionPacketMetrics.expected,
         availabilityPct: sessionAvailabilityMeasured,
-        totalOperationSec: sessionAvailability.totalDurationSec,
-        availableOperationSec: sessionAvailability.availableDurationSec,
+        totalOperationSec: sessionAvailability.totalOperationSec,
+        availableOperationSec: sessionAvailability.availableOperationSec,
         downtimeSec: sessionAvailability.downtimeSec,
         availabilityMethod: sessionAvailability.method,
+      },
+      officialMeasurementEvents: {
+        sharingAttempts: session.sharingAttempts,
+        serviceInterruptions: session.serviceInterruptions,
+        activeServiceInterruptionStartedAt:
+          session.activeServiceInterruptionStartedAt,
       },
       measurements: overview.kpis,
       officialRfpBaseline: OFFICIAL_RFP_BASELINE,
@@ -435,8 +557,9 @@ export default function PerformanceKpiPanel({
         demoMode
           ? "DEMO 데이터는 공식 성능시험 결과가 아님"
           : "브라우저 측정값은 실장비 원시로그와 대조 필요",
-        "가용률은 3초 텔레메트리 시간슬롯 기준 웹 측정값이며 공식 판정 시 NMS/장애로그와 대조",
-        "공식 판정은 실제 시험실행 ID와 원시로그가 연결된 측정값만 사용",
+        "정보공유 성공률은 전송시도/성공수신 이벤트 기준이며 Packet Loss Sequence는 별도 진단 지표",
+        "통신망 가용률은 망 준비 완료 이후 총 운영시간과 서비스 중단 이벤트 기준",
+        "공식 판정은 실제 시험실행 ID와 송신/ACK/NMS 원시로그가 연결된 측정값만 사용",
       ],
     };
 
@@ -500,7 +623,7 @@ export default function PerformanceKpiPanel({
             <strong>{session?.runId ?? "-"}</strong>
           </div>
           <div>
-            <span>측정 시작</span>
+            <span>구축팀 투입</span>
             <strong>{displayTime(session?.startedAt ?? null)}</strong>
           </div>
           <div>
@@ -520,7 +643,7 @@ export default function PerformanceKpiPanel({
             disabled={Boolean(session && !session.endedAt)}
           >
             {!session
-              ? "측정 시작"
+              ? "구축팀 투입·측정 시작"
               : session.endedAt
                 ? "새 측정 시작"
                 : "측정 중"}
@@ -564,17 +687,17 @@ export default function PerformanceKpiPanel({
 
         <div className="performance-session-live">
           <span>
-            Telemetry <b>{sessionSamples.length}</b>
+            위치 이벤트 <b>{sessionSamples.length}</b>
           </span>
           <span>
-            Sequence{" "}
+            공유 성공{" "}
             <b>
-              {sessionPacketMetrics.received}/
-              {sessionPacketMetrics.expected}
+              {sessionSharingStats.successes}/
+              {sessionSharingStats.attempts}
             </b>
           </span>
           <span>
-            Packet Loss{" "}
+            Seq Loss(참고){" "}
             <b>
               {sessionPacketMetrics.lossPct == null
                 ? "-"
@@ -586,14 +709,106 @@ export default function PerformanceKpiPanel({
           </span>
         </div>
 
+        <section className="performance-official-events">
+          <header>
+            <strong>공식 평가 이벤트 입력</strong>
+            <small>
+              실제 연동 시 송신/ACK 및 NMS linkStatus 이벤트로 자동 대체
+            </small>
+          </header>
+
+          <div className="performance-official-event-grid">
+            <div>
+              <span>정보공유</span>
+              <b>
+                시도 {sessionSharingStats.attempts} · 성공{" "}
+                {sessionSharingStats.successes} · 실패{" "}
+                {sessionSharingStats.failures}
+              </b>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => addSharingAttempts(1, 0)}
+                  disabled={
+                    !session?.networkReadyAt ||
+                    Boolean(session?.endedAt)
+                  }
+                >
+                  성공수신 +1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSharingAttempts(0, 1)}
+                  disabled={
+                    !session?.networkReadyAt ||
+                    Boolean(session?.endedAt)
+                  }
+                >
+                  수신실패 +1
+                </button>
+                {demoMode ? (
+                  <button
+                    type="button"
+                    onClick={() => addSharingAttempts(99, 1)}
+                    disabled={
+                      !session?.networkReadyAt ||
+                      Boolean(session?.endedAt)
+                    }
+                  >
+                    DEMO 100건(99성공)
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div>
+              <span>통신망 서비스</span>
+              <b>
+                {session?.activeServiceInterruptionStartedAt
+                  ? "DOWN · 장애 측정 중"
+                  : "UP"}
+              </b>
+              <div>
+                <button
+                  type="button"
+                  onClick={beginServiceInterruption}
+                  disabled={
+                    !session?.networkReadyAt ||
+                    Boolean(session?.endedAt) ||
+                    Boolean(
+                      session?.activeServiceInterruptionStartedAt,
+                    )
+                  }
+                >
+                  서비스 중단 시작
+                </button>
+                <button
+                  type="button"
+                  onClick={endServiceInterruption}
+                  disabled={
+                    !session?.activeServiceInterruptionStartedAt ||
+                    Boolean(session?.endedAt)
+                  }
+                >
+                  서비스 복구
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <button
           type="button"
           className="performance-session-export"
           onClick={exportSessionEvidence}
-          disabled={!session || !session.networkReadyAt}
+          disabled={
+            !session ||
+            !session.networkReadyAt ||
+            !session.endedAt
+          }
           title={
-            session && !session.networkReadyAt
-              ? "망 준비 완료 시각 기록 후 증적을 내보낼 수 있습니다."
+            session && !session.endedAt
+              ? "측정 종료 후 최종 증적을 내보낼 수 있습니다."
               : undefined
           }
         >
@@ -783,6 +998,22 @@ export default function PerformanceKpiPanel({
           <span>시험 세션 필수</span>
           <code>
             {PERFORMANCE_INTERFACE_REQUIREMENTS.sessionRequired.join(
+              " / ",
+            )}
+          </code>
+        </div>
+        <div>
+          <span>정보공유 성공률 필수</span>
+          <code>
+            {PERFORMANCE_INTERFACE_REQUIREMENTS.sharingRequired.join(
+              " / ",
+            )}
+          </code>
+        </div>
+        <div>
+          <span>통신망 가용률 필수</span>
+          <code>
+            {PERFORMANCE_INTERFACE_REQUIREMENTS.availabilityRequired.join(
               " / ",
             )}
           </code>
