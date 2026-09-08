@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateInformationSharingSuccess,
   calculateNetworkDeploymentMinutes,
+  calculateOfficialAvailability,
+  calculatePositionUpdateStatistics,
   calculateTimeBasedAvailability,
   createPerformanceRunId,
   filterTelemetryForSession,
+  normalizePerformanceMeasurementSession,
+  type InformationSharingAttempt,
 } from "./performanceMeasurement";
 import type { TelemetrySample } from "./operationalEvidence";
 
@@ -19,13 +24,13 @@ function row(second: number, sequence = second + 1): TelemetrySample {
 }
 
 describe("performance measurement session", () => {
-  it("시험 실행 ID를 재현 가능한 형식으로 만든다", () => {
+  it("시험 실행 ID를 KST 기준 형식으로 만든다", () => {
     expect(
       createPerformanceRunId(new Date("2026-09-09T00:01:02.345Z")),
     ).toBe("RUN-20260909-090102-345");
   });
 
-  it("구축 시작부터 망 준비 완료까지 분 단위로 계산한다", () => {
+  it("구축팀 투입부터 망 준비 완료까지 분 단위로 계산한다", () => {
     expect(
       calculateNetworkDeploymentMinutes(
         "2026-09-09T00:00:00Z",
@@ -44,7 +49,89 @@ describe("performance measurement session", () => {
     expect(filtered.map((sample) => sample.sequence)).toEqual([4, 7]);
   });
 
-  it("경과시간을 시간 슬롯으로 나눠 가용시간과 장애시간을 계산한다", () => {
+  it("위치 갱신 이벤트의 평균과 최대 갱신주기를 함께 계산한다", () => {
+    const stats = calculatePositionUpdateStatistics([
+      row(0),
+      row(2),
+      row(5),
+    ]);
+    expect(stats.intervalCount).toBe(2);
+    expect(stats.averageGapSec).toBe(2.5);
+    expect(stats.maxGapSec).toBe(3);
+  });
+
+  it("정보공유 성공률을 전송 시도 대비 성공 수신 건수로 계산한다", () => {
+    const attempts: InformationSharingAttempt[] = Array.from(
+      { length: 100 },
+      (_, index) => ({
+        transmissionId: `TX-${index + 1}`,
+        attemptedAt: "2026-09-09T00:00:00Z",
+        receivedAt:
+          index < 99 ? "2026-09-09T00:00:01Z" : null,
+        status: index < 99 ? "SUCCESS" : "FAILED",
+      }),
+    );
+    const stats = calculateInformationSharingSuccess(attempts);
+    expect(stats.attempts).toBe(100);
+    expect(stats.successes).toBe(99);
+    expect(stats.failures).toBe(1);
+    expect(stats.successPct).toBe(99);
+  });
+
+  it("통신망 가용률을 총 운영시간과 서비스 중단시간 공식으로 계산한다", () => {
+    const stats = calculateOfficialAvailability(
+      "2026-09-09T00:00:00Z",
+      "2026-09-09T00:01:40Z",
+      [
+        {
+          startedAt: "2026-09-09T00:00:10Z",
+          endedAt: "2026-09-09T00:00:15Z",
+        },
+        {
+          startedAt: "2026-09-09T00:00:40Z",
+          endedAt: "2026-09-09T00:00:43Z",
+        },
+      ],
+    );
+    expect(stats.totalOperationSec).toBe(100);
+    expect(stats.downtimeSec).toBe(8);
+    expect(stats.availableOperationSec).toBe(92);
+    expect(stats.availabilityPct).toBe(92);
+  });
+
+  it("중첩 장애시간은 중복 합산하지 않는다", () => {
+    const stats = calculateOfficialAvailability(
+      "2026-09-09T00:00:00Z",
+      "2026-09-09T00:01:40Z",
+      [
+        {
+          startedAt: "2026-09-09T00:00:10Z",
+          endedAt: "2026-09-09T00:00:20Z",
+        },
+        {
+          startedAt: "2026-09-09T00:00:15Z",
+          endedAt: "2026-09-09T00:00:25Z",
+        },
+      ],
+    );
+    expect(stats.downtimeSec).toBe(15);
+    expect(stats.availabilityPct).toBe(85);
+  });
+
+  it("과거 세션 데이터도 공식 평가 필드를 기본값으로 보정한다", () => {
+    const normalized = normalizePerformanceMeasurementSession({
+      runId: "RUN-1",
+      eventId: "EVENT-1",
+      startedAt: "2026-09-09T00:00:00Z",
+      networkReadyAt: null,
+      endedAt: null,
+    });
+    expect(normalized.sharingAttempts).toEqual([]);
+    expect(normalized.serviceInterruptions).toEqual([]);
+    expect(normalized.activeServiceInterruptionStartedAt).toBeNull();
+  });
+
+  it("기존 텔레메트리 시간슬롯 가용률은 참고값으로 유지한다", () => {
     const availability = calculateTimeBasedAvailability(
       [row(1), row(4), row(10)],
       "2026-09-09T00:00:00Z",
