@@ -1,0 +1,636 @@
+/*
+ * TV / desktop responsive guard
+ * Targets:
+ * - FHD 1920x1080
+ * - QHD 2560x1440
+ * - UHD 3840x2160
+ * - Ultrawide 3440x1440 / 21:9
+ * - Browser zoom 80% ~ 125%
+ */
+
+/* -----------------------------------------------------------
+ * Shared desktop collision guards
+ * ----------------------------------------------------------- */
+
+.unified-disaster-board {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
+}
+
+.map-command-header {
+  min-width: 0;
+}
+
+.map-command-header > * {
+  min-width: 0;
+}
+
+.service-brand {
+  flex: 0 1 220px;
+}
+
+.event-selector {
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.header-event-state {
+  flex: 1 1 240px;
+  overflow: hidden;
+}
+
+.header-summary {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.header-summary button {
+  min-width: 0;
+}
+
+.demo-mode-badge,
+.demo-scenario-selector,
+.asset-registry-open,
+.requirements-open,
+.asset-status-open,
+.map-command-header .last-updated {
+  flex-shrink: 0;
+}
+
+/* Modal must never leave viewport */
+.requirements-backdrop,
+.drone-video-backdrop {
+  box-sizing: border-box;
+  padding: clamp(12px, 2vmin, 32px);
+}
+
+.requirements-modal {
+  width: min(1180px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+}
+
+.requirements-modal .requirements-groups {
+  min-height: 0;
+  overflow: auto;
+}
+
+.drone-video-modal {
+  width: min(980px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+
+/* -----------------------------------------------------------
+ * 125% zoom / smaller desktop effective viewport
+ * ----------------------------------------------------------- */
+
+@media (max-width: 1800px) and (min-width: 1101px) {
+  .map-command-header {
+    gap: 8px;
+    padding-inline: 9px;
+  }
+
+  .service-brand {
+    flex-basis: 180px;
+    min-width: 160px;
+  }
+
+  .service-brand small {
+    display: none;
+  }
+
+  .event-selector {
+    min-width: 220px;
+    max-width: 320px;
+  }
+
+  .header-event-state small {
+    display: none;
+  }
+
+  .header-summary {
+    display: none;
+  }
+}
+
+@media (max-width: 1500px) and (min-width: 1101px) {
+  .service-brand {
+    flex: 0 0 34px;
+    min-width: 34px;
+  }
+
+  .service-brand > div {
+    display: none;
+  }
+
+  .demo-mode-badge span {
+    display: none;
+  }
+
+  .asset-status-open {
+    display: none;
+  }
+}
+
+@media (max-width: 1366px) and (min-width: 1101px) {
+  .asset-registry-open {
+    display: none;
+  }
+
+  .event-selector {
+    min-width: 200px;
+  }
+}
+
+/* Short-height monitor / 125% browser zoom */
+@media (max-height: 900px) and (min-width: 761px) {
+  .map-command-header {
+    top: 8px;
+    height: 48px;
+  }
+
+  .event-overview-floor {
+    top: 62px;
+  }
+
+  .operation-rail-brand {
+    height: 60px;
+  }
+
+  .operations-panel > nav button {
+    min-height: 58px;
+  }
+
+  .operation-drawer {
+    top: 60px;
+    bottom: 46px;
+  }
+
+  .location-list {
+    top: 68px;
+    bottom: 40px;
+  }
+
+  .selected-location-drawer {
+    bottom: 40px;
+  }
+}
+
+/* -----------------------------------------------------------
+ * QHD / large desktop / ultrawide
+ * ----------------------------------------------------------- */
+
+@media (min-width: 2200px) and (min-height: 1100px) {
+  .operations-panel {
+    width: 76px;
+  }
+
+  .operation-rail-brand,
+  .operations-panel > nav button,
+  .operation-collapse {
+    width: 76px;
+  }
+
+  .operation-rail-brand {
+    height: 80px;
+  }
+
+  .operations-panel > nav button {
+    min-height: 76px;
+  }
+
+  .operations-panel > nav button i {
+    width: 29px;
+    height: 29px;
+    font-size: 16px;
+  }
+
+  .operations-panel > nav button span {
+    font-size: 9px;
+  }
+
+  .operation-drawer {
+    top: 80px;
+    bottom: 58px;
+    left: 76px;
+    width: 320px;
+  }
+
+  .map-command-header {
+    top: 18px;
+    right: 20px;
+    left: 96px;
+    height: 64px;
+    padding-inline: 16px;
+    gap: 14px;
+  }
+
+  .service-brand {
+    flex-basis: 260px;
+  }
+
+  .service-brand strong {
+    font-size: 15px;
+  }
+
+  .service-brand small {
+    font-size: 8px;
+  }
+
+  .event-selector {
+    min-width: 360px;
+    max-width: 480px;
+    height: 42px;
+  }
+
+  .event-selector select {
+    font-size: 12px;
+  }
+
+  .header-event-state {
+    font-size: 10px;
+  }
+
+  .event-overview-floor {
+    top: 92px;
+    right: 370px;
+    left: 96px;
+    height: 54px;
+  }
+
+  .event-metric-floor article {
+    min-width: 110px;
+    height: 48px;
+    padding-inline: 11px;
+  }
+
+  .event-metric-floor article span {
+    font-size: 8px;
+  }
+
+  .event-metric-floor article strong {
+    font-size: 18px;
+  }
+
+  .location-list {
+    top: 92px;
+    right: 18px;
+    bottom: 56px;
+    width: 340px;
+  }
+
+  .location-panel-heading {
+    height: 54px;
+  }
+
+  .location-panel-heading strong {
+    font-size: 12px;
+  }
+
+  .location-card-button {
+    min-height: 66px;
+  }
+
+  .selected-location-drawer {
+    right: 378px;
+    bottom: 56px;
+    left: 420px;
+    max-width: 760px;
+  }
+
+  .map-status-pill {
+    bottom: 16px;
+    left: 94px;
+    height: 28px;
+    font-size: 9px;
+  }
+
+  .live-basemap .maplibregl-ctrl-bottom-left {
+    left: 86px;
+    bottom: 42px;
+  }
+
+  .live-basemap .maplibregl-ctrl-bottom-right {
+    right: 358px;
+    bottom: 42px;
+  }
+
+  .requirements-modal {
+    width: min(1320px, calc(100vw - 48px));
+  }
+
+  .drone-video-modal {
+    width: min(1080px, calc(100vw - 48px));
+  }
+}
+
+/* -----------------------------------------------------------
+ * UHD / 4K TV
+ * ----------------------------------------------------------- */
+
+@media (min-width: 3200px) and (min-height: 1800px) {
+  .operations-panel {
+    width: 88px;
+  }
+
+  .operation-rail-brand,
+  .operations-panel > nav button,
+  .operation-collapse {
+    width: 88px;
+  }
+
+  .operation-rail-brand {
+    height: 94px;
+  }
+
+  .operation-rail-brand b {
+    font-size: 18px;
+  }
+
+  .operation-rail-brand span {
+    font-size: 9px;
+  }
+
+  .operations-panel > nav button {
+    min-height: 88px;
+  }
+
+  .operations-panel > nav button i {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+
+  .operations-panel > nav button span {
+    font-size: 10px;
+  }
+
+  .operation-drawer {
+    top: 94px;
+    bottom: 68px;
+    left: 88px;
+    width: 380px;
+  }
+
+  .operation-drawer > header {
+    min-height: 70px;
+    padding: 16px 18px;
+  }
+
+  .operations-panel-body {
+    padding: 14px;
+  }
+
+  .map-command-header {
+    top: 22px;
+    right: 24px;
+    left: 112px;
+    height: 78px;
+    padding-inline: 20px;
+    gap: 18px;
+    border-radius: 11px;
+  }
+
+  .service-brand {
+    flex-basis: 320px;
+  }
+
+  .service-brand > span {
+    width: 42px;
+    height: 42px;
+    font-size: 17px;
+  }
+
+  .service-brand strong {
+    font-size: 18px;
+  }
+
+  .service-brand small {
+    font-size: 9px;
+  }
+
+  .event-selector {
+    min-width: 440px;
+    max-width: 560px;
+    height: 50px;
+    padding: 7px 38px 6px 14px;
+  }
+
+  .event-selector > span {
+    font-size: 9px;
+  }
+
+  .event-selector select {
+    font-size: 14px;
+  }
+
+  .header-event-state {
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .header-event-state b {
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+
+  .header-event-state span {
+    padding: 5px 8px;
+  }
+
+  .map-command-header .last-updated {
+    font-size: 10px;
+  }
+
+  .event-overview-floor {
+    top: 114px;
+    right: 460px;
+    left: 112px;
+    height: 64px;
+  }
+
+  .event-metric-floor {
+    gap: 9px;
+  }
+
+  .event-metric-floor article {
+    min-width: 135px;
+    height: 58px;
+    padding: 8px 13px;
+    border-radius: 8px;
+  }
+
+  .event-metric-floor article span {
+    font-size: 10px;
+  }
+
+  .event-metric-floor article strong {
+    font-size: 22px;
+  }
+
+  .event-metric-floor article small {
+    font-size: 9px;
+  }
+
+  .location-list {
+    top: 114px;
+    right: 24px;
+    bottom: 68px;
+    width: 420px;
+    border-radius: 11px;
+  }
+
+  .location-panel-heading {
+    height: 64px;
+    padding-inline: 16px;
+  }
+
+  .location-panel-heading strong {
+    font-size: 15px;
+  }
+
+  .location-panel-heading small {
+    font-size: 10px;
+  }
+
+  .location-card-button {
+    min-height: 78px;
+    padding: 10px 12px;
+  }
+
+  .location-list article strong {
+    font-size: 13px;
+  }
+
+  .selected-location-drawer {
+    right: 468px;
+    bottom: 68px;
+    left: 486px;
+    max-width: 900px;
+    min-height: 72px;
+  }
+
+  .map-status-pill {
+    bottom: 20px;
+    left: 108px;
+    height: 34px;
+    padding-inline: 13px;
+    font-size: 11px;
+  }
+
+  .live-basemap .maplibregl-ctrl-bottom-left {
+    left: 100px;
+    bottom: 52px;
+  }
+
+  .live-basemap .maplibregl-ctrl-bottom-right {
+    right: 444px;
+    bottom: 52px;
+  }
+
+  .map-position-marker {
+    width: 28px;
+    height: 28px;
+  }
+
+  .map-position-marker b,
+  .map-event-marker b {
+    font-size: 12px;
+  }
+
+  .requirements-modal {
+    width: min(1560px, calc(100vw - 64px));
+  }
+
+  .drone-video-modal {
+    width: min(1260px, calc(100vw - 64px));
+  }
+}
+
+/* -----------------------------------------------------------
+ * Ultrawide guard
+ * Keep information near the operational center instead of
+ * stretching cards across the entire screen.
+ * ----------------------------------------------------------- */
+
+@media (min-aspect-ratio: 2/1) and (min-width: 1800px) {
+  .event-selector {
+    max-width: 480px;
+  }
+
+  .header-event-state {
+    max-width: 580px;
+  }
+
+  .event-overview-floor {
+    max-width: 1700px;
+  }
+
+  .event-metric-floor {
+    flex: 0 1 1000px;
+  }
+}
+
+/* -----------------------------------------------------------
+ * Accessibility / browser zoom resilience
+ * ----------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .location-list,
+  .operations-panel,
+  .operation-drawer,
+  .map-command-header {
+    transition: none !important;
+  }
+}
+
+/* -----------------------------------------------------------
+ * FHD / laptop effective viewport polish
+ * ----------------------------------------------------------- */
+
+@media (max-width: 1700px) and (min-width: 1101px) {
+  .map-command-header button,
+  .map-command-header .asset-registry-open,
+  .map-command-header .requirements-open,
+  .map-command-header .asset-status-open {
+    padding-inline: 9px;
+    font-size: 10px;
+  }
+
+  .demo-scenario-selector {
+    min-width: 118px;
+  }
+
+  .event-selector {
+    flex-basis: 250px;
+  }
+}
+
+/* Ensure the left operational drawer never clips vertically */
+.operation-drawer {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.operation-drawer .operations-panel-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Short monitor / browser chrome occupied height */
+@media (max-height: 850px) and (min-width: 1101px) {
+  .event-overview-floor {
+    transform: scale(0.94);
+    transform-origin: top left;
+  }
+
+  .map-status-pill {
+    transform: scale(0.92);
+    transform-origin: bottom left;
+  }
+}
+
