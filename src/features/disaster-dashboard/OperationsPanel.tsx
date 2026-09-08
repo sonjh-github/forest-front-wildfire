@@ -3,9 +3,10 @@ import { OFFICIAL_RFP_BASELINE, PROJECT_ENHANCED_TARGET } from "./officialRfpGap
 import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
-import { buildOperationalEvidence, calculateTelemetryMetrics, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import { buildOperationalEvidence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import type { TelemetryStreamStatus } from "./telemetryStream";
 import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
+import PerformanceKpiPanel from "./PerformanceKpiPanel";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
@@ -172,7 +173,6 @@ export function OperationsPanel({
       lastReceivedAt: rows.map((row) => row.observedAt).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null,
     };
   }, [locations, lastUpdatedAt]);
-  const liveTelemetryMetrics = useMemo(() => telemetrySamples.length ? calculateTelemetryMetrics(telemetrySamples, 3) : null, [telemetrySamples]);
   const domainLayers = overview.event.disasterType === "LANDSLIDE"
     ? [
       { id: "slope-assessments", label: "산사태 위험면", description: "사면 위험·분석 결과" },
@@ -519,20 +519,17 @@ export function OperationsPanel({
             <p className="operation-readonly-note">미디어 원본은 권한이 확인된 경우에만 별도 화면에서 재생·다운로드합니다.</p>
           </section>}
           {activeTab === "kpis" && <section className="operations-records" aria-label="실증 KPI">
-            <button type="button" className="kpi-evidence-download" onClick={downloadKpiEvidence} disabled={overview.kpis.length === 0}>수신표본·KPI JSON 내보내기</button>
-            <p className="operation-readonly-note">공식 RFP: ≤10분 / ≤5초 / ≥98% / ≥98%<br />연구개발계획 강화 목표: ≤7분 / ≤3초 / ≥98% / ≥98%<br />망 구축 / 위치 갱신 / 공유 성공 / 망 가용률 순서</p>
-            {liveTelemetryMetrics && <article data-status="INACTIVE">
-              <div><strong>{overview.domainDetail?.mode === "SIMULATION" ? "DEMO 모의 수신표본" : "브라우저 수신표본 참고 지표"}</strong><span>{liveTelemetryMetrics.received}개 표본</span></div>
-              <p>평균 지연 {liveTelemetryMetrics.averageLatencySec}초 · 최대 공백 {liveTelemetryMetrics.maxGapSec}초</p>
-              <small>표본 수신비율 {liveTelemetryMetrics.availabilityPct ?? "N/A"}% · sequence 표본비율 {liveTelemetryMetrics.sharingSuccessPct ?? "N/A"}% · 공식 KPI 판정 불가</small>
-            </article>}
-            {overview.kpis.length === 0 && <p className="operation-empty-state"><b>수집된 실증 KPI 없음</b><span>모사값은 공식 실증값으로 표시하지 않습니다.</span></p>}
-            {overview.kpis.map((kpi) => <article key={value(kpi, ["kpiMeasurementId", "metricCode"])} data-status={kpi.passed === true ? "ACTIVE" : kpi.passed === false ? "FAILED" : "INACTIVE"}>
-              <div><strong>{value(kpi, ["metricName", "metricCode"], "실증 지표")}</strong><span>{kpi.passed === true ? "충족" : kpi.passed === false ? "미충족" : "판정 전"}</span></div>
-              <p>{value(kpi, ["measuredValue"])} {value(kpi, ["unit"], "")} · 목표 {value(kpi, ["targetOperator"], "-")} {value(kpi, ["targetValue"], "-")}</p>
-              <small>{occurredAt(kpi, ["measuredTo", "createdAt"])} · {value(kpi, ["sourceSystem"], "출처 미상")} · 원시 증적 {Array.isArray(kpi.evidence) ? kpi.evidence.length : 0}건</small>
-            </article>)}
-            <p className="operation-readonly-note">공식 판정은 실장비 원시로그와 시험실행 ID가 연결된 측정값만 사용합니다.</p>
+            <PerformanceKpiPanel overview={overview} telemetrySamples={telemetrySamples} />
+            <button
+              type="button"
+              className="kpi-evidence-download"
+              onClick={downloadKpiEvidence}
+            >
+              수신표본·KPI JSON 내보내기
+            </button>
+            <p className="operation-readonly-note">
+              공식 판정은 실장비 원시로그와 시험실행 ID가 연결된 측정값만 사용합니다.
+            </p>
           </section>}
           {activeTab === "integrations" && <section className="operations-records" aria-label="외부기관 데이터 연계 상태">
             <p className="operation-section-title"><strong>외부기관 실시간 연계</strong></p>

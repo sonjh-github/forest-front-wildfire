@@ -613,6 +613,7 @@ export default function UnifiedDisasterDashboard() {
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
   const [telemetrySamples, setTelemetrySamples] = useState<TelemetrySample[]>([]);
+  const demoSequenceRef = useRef(0);
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -944,6 +945,7 @@ export default function UnifiedDisasterDashboard() {
     setTimelineIndex(null);
     setTimelinePlaying(false);
     setTelemetrySamples([]);
+    demoSequenceRef.current = 0;
   }, [selectedId]);
 
   useEffect(() => {
@@ -996,12 +998,14 @@ export default function UnifiedDisasterDashboard() {
       ? (() => {
           const next = createDemoOverview();
           setOverview(next);
-          const sequenceBase = Math.floor(Date.now() / 1_000) * 100;
-          setTelemetrySamples((current) => [...current, ...next.assets.map((asset, index) => {
+          const sequence = ++demoSequenceRef.current;
+          setTelemetrySamples((current) => [...current, ...next.assets
+            .filter((asset) => !(String(asset.assetId) === "DRONE-01" && sequence % 20 === 0))
+            .map((asset) => {
             const coordinates = (asset.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
             return {
               assetId: String(asset.assetId), observedAt: String(asset.observedAt), receivedAt: new Date().toISOString(),
-              sequence: sequenceBase + index, latitude: Number(coordinates?.[1]), longitude: Number(coordinates?.[0]),
+              sequence, latitude: Number(coordinates?.[1]), longitude: Number(coordinates?.[0]),
             } satisfies TelemetrySample;
           })].slice(-3_600));
           setLastUpdatedAt(new Date());

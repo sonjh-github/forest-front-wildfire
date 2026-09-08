@@ -58,20 +58,261 @@ export function classifyLinkHealth(lastReceivedAt: string, now: Date, expectedIn
   return "CONNECTED";
 }
 
-export function calculateTelemetryMetrics(samples: TelemetrySample[], expectedIntervalSec = 3) {
-  const ordered = [...samples].sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
-  if (ordered.length === 0) return { averageLatencySec: 0, maxGapSec: 0, availabilityPct: 0, sharingSuccessPct: 0, received: 0, expected: 0 };
-  const latencies = ordered.map((sample) => Math.max(0, Date.parse(sample.receivedAt) - Date.parse(sample.observedAt)) / 1_000);
-  const gaps = ordered.slice(1).map((sample, index) => Math.max(0, Date.parse(sample.observedAt) - Date.parse(ordered[index].observedAt)) / 1_000);
-  const durationSec = Math.max(expectedIntervalSec, (Date.parse(ordered.at(-1)!.observedAt) - Date.parse(ordered[0].observedAt)) / 1_000 + expectedIntervalSec);
-  const expected = Math.max(1, Math.round(durationSec / expectedIntervalSec));
-  const uniqueSequences = new Set(ordered.map((sample) => sample.sequence).filter((value) => value != null)).size;
-  const receivedForSharing = uniqueSequences || ordered.length;
+export type PacketSequenceSlot = {
+  sequence: number;
+  state: "RECEIVED" | "LOST";
+  observedAt: string | null;
+  receivedAt: string | null;
+};
+
+export type PacketSequenceSummary = {
+  assetId: string | null;
+  slots: PacketSequenceSlot[];
+  fromSequence: number | null;
+  toSequence: number | null;
+  received: number;
+  lost: number;
+  expected: number;
+  successPct: number | null;
+  lossPct: number | null;
+};
+
+export function packetSequenceAssetIds(samples: TelemetrySample[]) {
+  const latestByAsset = new Map<string, number>();
+
+  for (const sample of samples) {
+    const sequence = sample.sequence;
+    if (sequence == null || !Number.isInteger(sequence)) continue;
+
+    const timestamp = Date.parse(sample.observedAt);
+    const normalized = Number.isFinite(timestamp) ? timestamp : 0;
+    latestByAsset.set(
+      sample.assetId,
+      Math.max(latestByAsset.get(sample.assetId) ?? 0, normalized),
+    );
+  }
+
+  return [...latestByAsset.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([assetId]) => assetId);
+}
+
+export function calculatePacketSequence(
+  samples: TelemetrySample[],
+  assetId?: string,
+  maxSlots = 36,
+): PacketSequenceSummary {
+  const assetIds = packetSequenceAssetIds(samples);
+  const selectedAssetId =
+    assetId && assetIds.includes(assetId)
+      ? assetId
+      : assetIds[0] ?? null;
+
+  if (!selectedAssetId) {
+    return {
+      assetId: null,
+      slots: [],
+      fromSequence: null,
+      toSequence: null,
+      received: 0,
+      lost: 0,
+      expected: 0,
+      successPct: null,
+      lossPct: null,
+    };
+  }
+
+  const bySequence = new Map<number, TelemetrySample>();
+
+  for (const sample of samples) {
+    if (sample.assetId !== selectedAssetId) continue;
+
+    const sequence = sample.sequence;
+    if (sequence == null || !Number.isInteger(sequence)) continue;
+
+    bySequence.set(sequence, sample);
+  }
+
+  const sequences = [...bySequence.keys()].sort((a, b) => a - b);
+
+  if (sequences.length === 0) {
+    return {
+      assetId: selectedAssetId,
+      slots: [],
+      fromSequence: null,
+      toSequence: null,
+      received: 0,
+      lost: 0,
+      expected: 0,
+      successPct: null,
+      lossPct: null,
+    };
+  }
+
+  const toSequence = sequences[sequences.length - 1];
+  const slotLimit = Math.max(1, Math.floor(maxSlots));
+  const fromSequence = Math.max(sequences[0], toSequence - slotLimit + 1);
+
+  const slots = Array.from(
+    { length: toSequence - fromSequence + 1 },
+    (_, index): PacketSequenceSlot => {
+      const sequence = fromSequence + index;
+      const sample = bySequence.get(sequence);
+
+      return {
+        sequence,
+        state: sample ? "RECEIVED" : "LOST",
+        observedAt: sample?.observedAt ?? null,
+        receivedAt: sample?.receivedAt ?? null,
+      };
+    },
+  );
+
+  const received = slots.filter((slot) => slot.state === "RECEIVED").length;
+  const lost = slots.length - received;
+  const expected = slots.length;
+
   return {
-    averageLatencySec: Number((latencies.reduce((sum, value) => sum + value, 0) / latencies.length).toFixed(3)),
-    maxGapSec: Number((gaps.length ? Math.max(...gaps) : 0).toFixed(3)),
-    availabilityPct: Number((Math.min(1, ordered.length / expected) * 100).toFixed(2)),
-    sharingSuccessPct: Number((Math.min(1, receivedForSharing / expected) * 100).toFixed(2)),
+    assetId: selectedAssetId,
+    slots,
+    fromSequence,
+    toSequence,
+    received,
+    lost,
+    expected,
+    successPct:
+      expected > 0
+        ? Number(((received / expected) * 100).toFixed(2))
+        : null,
+    lossPct:
+      expected > 0
+        ? Number(((lost / expected) * 100).toFixed(2))
+        : null,
+  };
+}
+
+export function calculatePacketSequenceMetrics(
+  samples: TelemetrySample[],
+  maxSlotsPerAsset = 120,
+) {
+  const summaries = packetSequenceAssetIds(samples).map((assetId) =>
+    calculatePacketSequence(samples, assetId, maxSlotsPerAsset),
+  );
+
+  const received = summaries.reduce((sum, row) => sum + row.received, 0);
+  const lost = summaries.reduce((sum, row) => sum + row.lost, 0);
+  const expected = summaries.reduce((sum, row) => sum + row.expected, 0);
+
+  return {
+    assetCount: summaries.length,
+    received,
+    lost,
+    expected,
+    successPct:
+      expected > 0
+        ? Number(((received / expected) * 100).toFixed(2))
+        : null,
+    lossPct:
+      expected > 0
+        ? Number(((lost / expected) * 100).toFixed(2))
+        : null,
+  };
+}
+
+export function calculateTelemetryMetrics(
+  samples: TelemetrySample[],
+  expectedIntervalSec = 3,
+) {
+  const ordered = [...samples].sort(
+    (a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt),
+  );
+
+  if (ordered.length === 0) {
+    return {
+      averageLatencySec: 0,
+      maxGapSec: 0,
+      availabilityPct: 0,
+      sharingSuccessPct: 0,
+      packetLossPct: null,
+      sequenceReceived: 0,
+      sequenceLost: 0,
+      sequenceExpected: 0,
+      received: 0,
+      expected: 0,
+    };
+  }
+
+  const latencies = ordered.map(
+    (sample) =>
+      Math.max(
+        0,
+        Date.parse(sample.receivedAt) - Date.parse(sample.observedAt),
+      ) / 1_000,
+  );
+
+  const grouped = new Map<string, TelemetrySample[]>();
+
+  for (const sample of ordered) {
+    const rows = grouped.get(sample.assetId) ?? [];
+    rows.push(sample);
+    grouped.set(sample.assetId, rows);
+  }
+
+  const gaps: number[] = [];
+  let expected = 0;
+
+  for (const rows of grouped.values()) {
+    rows.sort(
+      (a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt),
+    );
+
+    for (let index = 1; index < rows.length; index += 1) {
+      gaps.push(
+        Math.max(
+          0,
+          Date.parse(rows[index].observedAt) -
+            Date.parse(rows[index - 1].observedAt),
+        ) / 1_000,
+      );
+    }
+
+    const durationSec = Math.max(
+      expectedIntervalSec,
+      (Date.parse(rows.at(-1)!.observedAt) -
+        Date.parse(rows[0].observedAt)) /
+        1_000 +
+        expectedIntervalSec,
+    );
+
+    expected += Math.max(
+      1,
+      Math.round(durationSec / expectedIntervalSec),
+    );
+  }
+
+  const availabilityPct = Number(
+    (Math.min(1, ordered.length / Math.max(1, expected)) * 100).toFixed(2),
+  );
+
+  const sequenceMetrics = calculatePacketSequenceMetrics(ordered);
+
+  return {
+    averageLatencySec: Number(
+      (
+        latencies.reduce((sum, value) => sum + value, 0) /
+        latencies.length
+      ).toFixed(3),
+    ),
+    maxGapSec: Number(
+      (gaps.length ? Math.max(...gaps) : 0).toFixed(3),
+    ),
+    availabilityPct,
+    sharingSuccessPct:
+      sequenceMetrics.successPct ?? availabilityPct,
+    packetLossPct: sequenceMetrics.lossPct,
+    sequenceReceived: sequenceMetrics.received,
+    sequenceLost: sequenceMetrics.lost,
+    sequenceExpected: sequenceMetrics.expected,
     received: ordered.length,
     expected,
   };
