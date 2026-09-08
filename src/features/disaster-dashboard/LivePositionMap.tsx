@@ -387,39 +387,44 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     if (!map) return;
 
     const apply = () => {
-      // DEM source가 이전 설정으로 만들어졌을 수 있어 시나리오/모드 전환 시 안전하게 재생성합니다.
-      map.setTerrain(null);
-
-      if (map.getLayer("terrain-hillshade")) {
-        map.removeLayer("terrain-hillshade");
+      // Terrain source는 최초 1회만 생성합니다.
+      // 2D/3D 전환마다 source를 제거하면 DEM 타일 재요청과 프레임 드롭이 발생합니다.
+      if (!map.getSource("terrain-dem")) {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          tiles: terrainConfig.tiles,
+          tileSize: terrainConfig.tileSize,
+          encoding: terrainConfig.encoding,
+          maxzoom: terrainConfig.maxzoom,
+          attribution: terrainConfig.attribution,
+          ...("bounds" in terrainConfig && Array.isArray(terrainConfig.bounds)
+            ? { bounds: terrainConfig.bounds as [number, number, number, number] }
+            : {}),
+        });
       }
-      if (map.getSource("terrain-dem")) {
-        map.removeSource("terrain-dem");
+
+      if (!map.getLayer("terrain-hillshade")) {
+        map.addLayer({
+          id: "terrain-hillshade",
+          type: "hillshade",
+          source: "terrain-dem",
+          layout: { visibility: terrain3d ? "visible" : "none" },
+          paint: {
+            "hillshade-exaggeration": wildfireDemo ? 0.55 : 0.45,
+            "hillshade-shadow-color": "#2f3d36",
+            "hillshade-highlight-color": "#ffffff",
+            "hillshade-accent-color": "#6f8178",
+            "hillshade-illumination-anchor": "map",
+            "hillshade-illumination-direction": 315,
+          },
+        });
+      } else {
+        map.setLayoutProperty(
+          "terrain-hillshade",
+          "visibility",
+          terrain3d ? "visible" : "none",
+        );
       }
-
-      map.addSource("terrain-dem", {
-        type: "raster-dem",
-        tiles: terrainConfig.tiles,
-        tileSize: terrainConfig.tileSize,
-        encoding: terrainConfig.encoding,
-        maxzoom: terrainConfig.maxzoom,
-        attribution: terrainConfig.attribution,
-      });
-
-      map.addLayer({
-        id: "terrain-hillshade",
-        type: "hillshade",
-        source: "terrain-dem",
-        layout: { visibility: terrain3d ? "visible" : "none" },
-        paint: {
-          "hillshade-exaggeration": wildfireDemo ? 0.55 : 0.45,
-          "hillshade-shadow-color": "#2f3d36",
-          "hillshade-highlight-color": "#ffffff",
-          "hillshade-accent-color": "#6f8178",
-          "hillshade-illumination-anchor": "map",
-          "hillshade-illumination-direction": 315,
-        },
-      });
 
       map.setTerrain(
         terrain3d
@@ -430,7 +435,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       map.easeTo({
         pitch: terrain3d ? (wildfireDemo ? 64 : 58) : 0,
         bearing: terrain3d ? (wildfireDemo ? -24 : -18) : 0,
-        duration: 760,
+        duration: terrain3d ? 420 : 280,
       });
     };
 
@@ -921,7 +926,13 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     const startedAt = performance.now();
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frame = 0;
+    let lastPaintAt = 0;
     const animate = (now: number) => {
+      if (!reduceMotion && lastPaintAt > 0 && now - lastPaintAt < 33) {
+        frame = requestAnimationFrame(animate);
+        return;
+      }
+      lastPaintAt = now;
       const elapsed = reduceMotion ? 500 : now - startedAt;
       const intensity = reduceMotion ? 1 : Math.sin(Math.min(1, elapsed / highlightDurationMs) * Math.PI);
       const strokeWidth = 2 + intensity * 1.2;
