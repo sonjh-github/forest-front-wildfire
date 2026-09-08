@@ -3,6 +3,7 @@ import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibr
 import { DEOKSUNG_DEM, resolveTerrainConfig } from "./terrainConfig";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./command-center-visuals.css";
+import "./dashboard-responsive-tv.css";
 import type { ApiRecord, NetworkTopology } from "../../http-api";
 import type { LiveLocation } from "./UnifiedDisasterDashboard";
 
