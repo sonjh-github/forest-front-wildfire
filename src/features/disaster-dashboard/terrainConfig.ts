@@ -41,3 +41,24 @@ export const BONGPYEONG_DEM = {
   resolutionLabel: "90m 공개DEM",
   sourceLabel: "평창 봉평 37806 실지형",
 } satisfies TerrainConfig & { sourceId: string; resolutionMeters: number; sourceCrs: string; bounds: number[] };
+
+
+/** Bundled source metadata from public/dem/36607/README.txt; WILDFIRE demo selects it. */
+export const DEOKSUNG_DEM = {
+  sourceId: "ngii-36607-2025",
+  resolutionMeters: 90,
+  sourceCrs: "EPSG:5179",
+  bounds: [126.4957253, 36.4923479, 126.7572796, 36.7514111],
+  tiles: ["/dem/36607/{z}/{x}/{y}.png"],
+  tileSize: 256,
+  encoding: "terrarium",
+  maxzoom: 13,
+  attribution: "국토지리정보원 공개DEM 36607 (2025)",
+  resolutionLabel: "90m 공개DEM",
+  sourceLabel: "예산 덕숭산 36607 실지형",
+} satisfies TerrainConfig & {
+  sourceId: string;
+  resolutionMeters: number;
+  sourceCrs: string;
+  bounds: number[];
+};

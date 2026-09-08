@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { requirementSummary, REQUIREMENTS_READINESS, type ImplementationStatus } from "./requirementsReadiness";
 import { buildReadinessEvidence } from "./readinessEvidence";
-import { BONGPYEONG_DEM } from "./terrainConfig";
+import { DEOKSUNG_DEM } from "./terrainConfig";
 import { createDemoOverview } from "./demoOverview";
 import { nmsSummary, receivedNumber } from "./nmsSummary";
 import { buildOperationalEvidence } from "./operationalEvidence";
@@ -29,12 +29,20 @@ describe("truthful RFP evidence", () => {
     expect(report.fieldDependencies.length).toBeGreaterThan(0);
     expect(report.limitations.length).toBeGreaterThan(0);
   });
-  it("uses the actual bundled 90m metadata only for wildfire demo", () => {
+  it("uses the actual bundled Deoksungsan 90m DEM for wildfire demo", () => {
     const wildfire = createDemoOverview(new Date(), "WILDFIRE");
-    expect(wildfire.domainDetail?.terrain).toEqual(BONGPYEONG_DEM);
-    expect(BONGPYEONG_DEM).toMatchObject({sourceId:"ngii-37806-2025", resolutionMeters:90, encoding:"terrarium", maxzoom:13});
-    expect(BONGPYEONG_DEM.tiles[0]).toBe("/dem/37806/{z}/{x}/{y}.png");
-    expect(createDemoOverview(new Date(), "LANDSLIDE").domainDetail?.terrain).not.toEqual(BONGPYEONG_DEM);
+    expect(wildfire.domainDetail?.terrain).toEqual(DEOKSUNG_DEM);
+    expect(DEOKSUNG_DEM).toMatchObject({
+      sourceId:"ngii-36607-2025",
+      resolutionMeters:90,
+      sourceCrs:"EPSG:5179",
+      encoding:"terrarium",
+      maxzoom:13,
+      resolutionLabel:"90m 공개DEM",
+      sourceLabel:"예산 덕숭산 36607 실지형",
+    });
+    expect(DEOKSUNG_DEM.tiles[0]).toBe("/dem/36607/{z}/{x}/{y}.png");
+    expect(createDemoOverview(new Date(), "LANDSLIDE").domainDetail?.terrain).not.toEqual(DEOKSUNG_DEM);
   });
   it("renders implementation and contract-check wording without blanket completion", () => {
     const html = renderToStaticMarkup(createElement(RequirementsReadinessModal,{onClose:()=>{}}));
@@ -86,7 +94,7 @@ describe("operations tab contracts", () => {
   it("combines read-only situation context without inventing report submission", () => {
     const html = renderPanel("reports");
     expect(html).toContain("현장 통합정보");
-    expect(html).toContain("평창군 봉평면 산림화재 대응");
+    expect(html).toContain("예산군 덕산면 덕숭산 산림화재 대응");
     expect(html).toContain("동측 화선 대응 보고");
     expect(html).toContain("보고 송신·영상 재생은 별도 연계 대기");
     expect(html).not.toContain("외부기관 데이터 레이어");

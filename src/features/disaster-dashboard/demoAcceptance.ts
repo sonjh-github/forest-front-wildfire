@@ -1,4 +1,4 @@
-import { BONGPYEONG_DEM } from "./terrainConfig";
+import { DEOKSUNG_DEM } from "./terrainConfig";
 import { createDemoOverview, type DemoScenario } from "./demoOverview";
 import { buildOperationalEvidence, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
 import { REQUIREMENTS_READINESS } from "./requirementsReadiness";
@@ -15,8 +15,8 @@ export function runDemoAcceptance(now = new Date("2026-09-04T00:00:30Z")) {
   const drone = wildfire.assets.find((asset) => asset.assetId === "DRONE-01")!;
   const emergencyDrone = overview.DRONE_EMERGENCY.assets.find((asset) => asset.assetId === "DRONE-01")!;
   const relayFailure = overview.COMMUNICATION_FAILURE.assets.find((asset) => asset.assetId === "RELAY-02")!;
-  const terrain = wildfire.domainDetail?.terrain as typeof BONGPYEONG_DEM | undefined;
-  const terrainConfigured = Boolean(terrain?.sourceId && terrain.tiles.length && terrain.resolutionMeters > 0 && terrain.encoding === "terrarium");
+  const terrain = wildfire.domainDetail?.terrain as typeof DEOKSUNG_DEM | undefined;
+  const terrainConfigured = Boolean(terrain?.tiles.length && terrain.maxzoom >= 8 && terrain.encoding === "terrarium");
   const layers = wildfire.domainLayers;
   const layer = (id: string) => (layers[id] ?? []).length > 0;
   const locationSamples = wildfire.assets.slice(0, 4).map((asset, sequence) => ({
@@ -44,7 +44,7 @@ export function runDemoAcceptance(now = new Date("2026-09-04T00:00:30Z")) {
     "DRONE-05": [(emergencyDrone.attributes as Record<string, unknown>).flightMode === "RTL" && emergencyDrone.operationalStatus === "RETURNING", "저전압 RTL 비상복귀"],
     "ALERT-01": [wildfire.alerts.length > 0 && overview.LANDSLIDE.alerts.length > 0, "산불·산사태 관제 경보"],
     "ALERT-02": [overview.COMMUNICATION_FAILURE.alerts.some((alert) => String(alert.title).includes("통신")), "통신두절 경보"],
-    "ALERT-03": [evaluateRiskZone([128.372, 37.615], [[128.355,37.608],[128.356,37.624],[128.378,37.625],[128.382,37.608]]).shouldAlert, "좌표-위험면 공간판정"],
+    "ALERT-03": [evaluateRiskZone([126.623667, 36.667667], [[126.606667,36.660667],[126.607667,36.676667],[126.629667,36.677667],[126.633667,36.660667]]).shouldAlert, "좌표-위험면 공간판정"],
     "ALERT-04": [wildfire.alerts.every((alert) => Boolean(alert.issuedAt)), "발령시각 포함 경보목록"],
     "NET-01": [wildfire.networks.length >= 2 && overview.COMMUNICATION_FAILURE.networks.some((network) => network.status === "FAILED"), "현장망·백홀·장애 시나리오"],
     "NET-02": [wildfire.networks.every((network) => Boolean(network.lastReceivedAt)), "망별 마지막 수신시각"],
