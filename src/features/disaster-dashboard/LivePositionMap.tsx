@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
-import { BONGPYEONG_DEM, resolveTerrainConfig } from "./terrainConfig";
+import { DEOKSUNG_DEM, resolveTerrainConfig } from "./terrainConfig";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./command-center-visuals.css";
 import type { ApiRecord, NetworkTopology } from "../../http-api";
@@ -335,7 +335,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const [riskHeatmap, setRiskHeatmap] = useState(wildfireDemo);
   const [terrainElevationM, setTerrainElevationM] = useState<number | null>(null);
   const fallbackTerrainConfig = resolveTerrainConfig(import.meta.env);
-  const terrainConfig = wildfireDemo ? BONGPYEONG_DEM : fallbackTerrainConfig;
+  const terrainConfig = wildfireDemo ? DEOKSUNG_DEM : fallbackTerrainConfig;
   const [tileDegraded, setTileDegraded] = useState(false);
   const selectedEventRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
@@ -404,9 +404,6 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         encoding: terrainConfig.encoding,
         maxzoom: terrainConfig.maxzoom,
         attribution: terrainConfig.attribution,
-        ...(wildfireDemo
-          ? { bounds: [128.2461776, 37.4926055, 128.5082070, 37.7508433] as [number, number, number, number] }
-          : {}),
       });
 
       map.addLayer({

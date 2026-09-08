@@ -4,8 +4,8 @@ import { MavlinkTelemetryAccumulator, applyTelemetrySafetyRules, isTelemetryStre
 
 describe("Gateway telemetry stream", () => {
   it("Gateway 좌표 메시지를 표준 텔레메트리로 검증한다", () => {
-    const message = parseTelemetryMessage(JSON.stringify({ data: { assetId: "DRONE-01", eventId: "demo-wildfire-pyeongchang", observedAt: "2026-09-04T01:00:00Z", lat: 37.62, lng: 128.37, sequence: 10, positioningMethod: "RTK_FIXED" } }));
-    expect(message).toMatchObject({ assetId: "DRONE-01", latitude: 37.62, longitude: 128.37, sequence: 10 });
+    const message = parseTelemetryMessage(JSON.stringify({ data: { assetId: "DRONE-01", eventId: "demo-wildfire-deoksungsan", observedAt: "2026-09-04T01:00:00Z", lat: 36.672667, lng: 126.621667, sequence: 10, positioningMethod: "RTK_FIXED" } }));
+    expect(message).toMatchObject({ assetId: "DRONE-01", latitude: 36.672667, longitude: 126.621667, sequence: 10 });
   });
 
   it("잘못된 좌표·시각 메시지를 폐기한다", () => {
@@ -40,7 +40,7 @@ describe("Gateway telemetry stream", () => {
 
   it("실시간 위치가 위험면에 진입하면 관제 경보를 자동 발령한다", () => {
     const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
-    const updated = applyTelemetrySafetyRules(overview, { assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", receivedAt: "2026-09-04T00:00:03Z", latitude: 37.615, longitude: 128.37 });
+    const updated = applyTelemetrySafetyRules(overview, { assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", receivedAt: "2026-09-04T00:00:03Z", latitude: 36.667667, longitude: 126.621667 });
     expect(updated.alerts.find((alert) => alert.alertId === "ALT-GEOFENCE-DRONE-01")).toMatchObject({ status: "ACTIVE", severity: "CRITICAL", issuerOrgCode: "공간판정 엔진" });
   });
 

@@ -1,4 +1,4 @@
-import { BONGPYEONG_DEM, resolveTerrainConfig } from "./terrainConfig";
+import { DEOKSUNG_DEM, resolveTerrainConfig } from "./terrainConfig";
 import type { EventOverview, ForestEvent } from "../../http-api";
 import { evaluateRiskZone } from "./operationalEvidence";
 
@@ -7,14 +7,14 @@ const line = (coordinates: [number, number][]) => ({ type: "LineString", coordin
 const polygon = (coordinates: [number, number][]) => ({ type: "Polygon", coordinates: [[...coordinates, coordinates[0]]] });
 
 export const DEMO_EVENT: ForestEvent = {
-  eventId: "demo-wildfire-pyeongchang",
+  eventId: "demo-wildfire-deoksungsan",
   eventCode: "WF-2026-0903-01",
   disasterType: "WILDFIRE",
-  eventName: "평창군 봉평면 산림화재 대응",
+  eventName: "예산군 덕산면 덕숭산 산림화재 대응",
   status: "RESPONDING",
   severityCode: "SEVERE",
-  locationName: "강원특별자치도 평창군 봉평면",
-  geometry: point([128.365, 37.614]),
+  locationName: "충청남도 예산군 덕산면 덕숭산",
+  geometry: point([126.616667, 36.666667]),
 };
 
 export type DemoScenario = "WILDFIRE" | "LANDSLIDE" | "COMMUNICATION_FAILURE" | "DRONE_EMERGENCY";
@@ -34,10 +34,10 @@ export function demoScenarioFromLocation(): DemoScenario {
 export function createDemoOverview(now = new Date(), scenario: DemoScenario = demoScenarioFromLocation()): EventOverview {
   const observedAt = now.toISOString();
   const phase = (now.getTime() / 1000) % 120;
-  const droneLng = 128.359 + Math.cos((phase / 120) * Math.PI * 2) * 0.006;
-  const droneLat = 37.619 + Math.sin((phase / 120) * Math.PI * 2) * 0.004;
-  const wildfireRiskBoundary: [number, number][] = [[128.355,37.608],[128.356,37.624],[128.378,37.625],[128.382,37.608]];
-  const crew12Position: [number, number] = [128.372, 37.615];
+  const droneLng = 126.610667 + Math.cos((phase / 120) * Math.PI * 2) * 0.006;
+  const droneLat = 36.671667 + Math.sin((phase / 120) * Math.PI * 2) * 0.004;
+  const wildfireRiskBoundary: [number, number][] = [[126.606667,36.660667],[126.607667,36.676667],[126.629667,36.677667],[126.633667,36.660667]];
+  const crew12Position: [number, number] = [126.623667, 36.667667];
   const crew12Risk = evaluateRiskZone(crew12Position, wildfireRiskBoundary, 100);
   const asset = (assetId: string, assetName: string, assetType: string, coordinates: [number, number, number], extra = {}) => ({
     assetId, assetName, assetCode: assetId, assetType, operationalStatus: "ACTIVE", observedAt,
@@ -52,14 +52,14 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
     event: { ...DEMO_EVENT, updatedAt: observedAt },
     assets: [
       asset("DRONE-01", "정찰드론 1호", "UAV", [droneLng, droneLat, 312 + Math.sin(phase / 8) * 12], { operationalStatus: "FLYING", mission: "화선 정찰", batteryPct: 68, attributes: { flightMode: "AUTO", armed: true, missionSequence: Math.floor(phase / 15) + 1, emergencyStatus: "NORMAL", groundSpeedMps: 11.4, headingDeg: (phase * 3) % 360 } }),
-      asset("CMD-01", "현장지휘차량", "COMMAND_VEHICLE", [128.349, 37.607, 196], { mission: "통합 지휘" }),
-      asset("GW-RTK-01", "RTK·LPWA 이동기지국", "RTK_BASE_LPWA_GATEWAY", [128.354, 37.611, 224], { mission: "정밀측위·수집", batteryPct: 91 }),
-      asset("FIRE-ENG-03", "산불진화차 3호", "ASSET", [128.371, 37.608, 241], { mission: "동측 화선 방어", operationalStatus: "MOVING" }),
-      asset("RELAY-02", "산악 중계기 2호", "FIXED_RELAY", [128.376, 37.621, 428], { mission: "통신 음영 보완", signalStrengthDbm: -82 }),
+      asset("CMD-01", "현장지휘차량", "COMMAND_VEHICLE", [126.600667, 36.659667, 196], { mission: "통합 지휘" }),
+      asset("GW-RTK-01", "RTK·LPWA 이동기지국", "RTK_BASE_LPWA_GATEWAY", [126.605667, 36.663667, 224], { mission: "정밀측위·수집", batteryPct: 91 }),
+      asset("FIRE-ENG-03", "산불진화차 3호", "ASSET", [126.622667, 36.660667, 241], { mission: "동측 화선 방어", operationalStatus: "MOVING" }),
+      asset("RELAY-02", "산악 중계기 2호", "FIXED_RELAY", [126.627667, 36.673667, 428], { mission: "통신 음영 보완", signalStrengthDbm: -82 }),
     ],
     unregisteredAssets: [],
     personnel: [
-      { personExternalId: "CREW-07", activityStatus: "APPROACHING", safetyStatus: "SAFE", observedAt, geometry: point([128.363, 37.611]), altitude: 238, batteryPct: 84, signalStrengthDbm: -71, latencyMs: 188, packetLossPct: 1.1, positioningMethod: "RTK_FIXED", horizontalAccuracyM: 0.06, sourceAssetId: "RTK-07", reportedByAssetId: "GW-RTK-01", reportingRole: "GATEWAY", activeLink: "LPWA", expectedTelemetryIntervalSec: 3 },
+      { personExternalId: "CREW-07", activityStatus: "APPROACHING", safetyStatus: "SAFE", observedAt, geometry: point([126.614667, 36.663667]), altitude: 238, batteryPct: 84, signalStrengthDbm: -71, latencyMs: 188, packetLossPct: 1.1, positioningMethod: "RTK_FIXED", horizontalAccuracyM: 0.06, sourceAssetId: "RTK-07", reportedByAssetId: "GW-RTK-01", reportingRole: "GATEWAY", activeLink: "LPWA", expectedTelemetryIntervalSec: 3 },
       { personExternalId: "CREW-12", activityStatus: "HOLDING", safetyStatus: crew12Risk.shouldAlert ? "CAUTION" : "SAFE", observedAt, geometry: point(crew12Position), altitude: 286, batteryPct: 61, signalStrengthDbm: -86, latencyMs: 291, packetLossPct: 2.3, positioningMethod: "RTK_FLOAT", horizontalAccuracyM: 0.43, sourceAssetId: "RTK-12", reportedByAssetId: "GW-RTK-01", reportingRole: "GATEWAY", activeLink: "LPWA", expectedTelemetryIntervalSec: 3 },
     ],
     networks: [
@@ -79,31 +79,31 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
       { kpiMeasurementId: "KPI-DEPLOY", metricCode: "NETWORK_DEPLOYMENT_TIME", metricName: "통신망 구축시간", measuredValue: 6.4, unit: "분", targetOperator: "≤", targetValue: 7, passed: true, measuredTo: observedAt, sourceSystem: "DEMO 현장시험 타임라인", evidence: ["demo-run-20260903-01"] },
     ],
     integrations: [],
-    domainDetail: { mode: "SIMULATION", terrain: scenario === "WILDFIRE" ? BONGPYEONG_DEM : resolveTerrainConfig({}), windDirection: "서남서", windSpeedMps: 4.2 },
+    domainDetail: { mode: "SIMULATION", terrain: scenario === "WILDFIRE" ? DEOKSUNG_DEM : resolveTerrainConfig({}), windDirection: "서남서", windSpeedMps: 4.2 },
     domainLayers: {
-      firelines: [{ id: "fireline-1", observedAt, fireline: line([[128.359,37.616],[128.364,37.618],[128.369,37.616],[128.372,37.613]]) }],
-      "spread-predictions": [{ id: "spread-1", baseTime: observedAt, modelName: "ForestSpread AI", modelVersion: "2.4", confidence: 0.86, predictedArea: polygon([[128.357,37.611],[128.360,37.622],[128.373,37.624],[128.379,37.614],[128.369,37.606]]) }],
+      firelines: [{ id: "fireline-1", observedAt, fireline: line([[126.610667,36.668667],[126.615667,36.670667],[126.620667,36.668667],[126.623667,36.665667]]) }],
+      "spread-predictions": [{ id: "spread-1", baseTime: observedAt, modelName: "ForestSpread AI", modelVersion: "2.4", confidence: 0.86, predictedArea: polygon([[126.608667,36.663667],[126.611667,36.674667],[126.624667,36.676667],[126.630667,36.666667],[126.620667,36.658667]]) }],
       "wildfire-risk-zones": [{ id: "risk-1", observedAt, resultGeometry: polygon(wildfireRiskBoundary) }],
-      "evacuation-routes": [{ id: "evac-1", observedAt, resultGeometry: line([[128.373,37.616],[128.365,37.610],[128.355,37.606],[128.346,37.603]]) }],
-      "suppression-resources": [{ id: "sup-1", observedAt, resultGeometry: point([128.351,37.606]) }, { id: "sup-2", observedAt, resultGeometry: point([128.375,37.608]) }],
-      "water-sources": [{ id: "water-1", observedAt, resultGeometry: point([128.343,37.609]) }, { id: "water-2", observedAt, resultGeometry: point([128.382,37.604]) }],
-      "nearby-response-resources": [{ id: "station-1", observedAt, resourceType: "산불대응센터", etaMinutes: 12, resultGeometry: point([128.337,37.601]) }, { id: "heli-1", observedAt, resourceType: "임차헬기 대기장", etaMinutes: 18, resultGeometry: point([128.397,37.631]) }],
-      viewsheds: [{ id: "viewshed-1", observedAt, observerAltitudeM: 428, resultGeometry: polygon([[128.362,37.610],[128.353,37.622],[128.368,37.631],[128.388,37.626],[128.389,37.611],[128.376,37.604]]) }],
-      "communication-shadows": [{ id: "shadow-1", observedAt, reason: "북동 능선 차폐", resultGeometry: polygon([[128.378,37.617],[128.385,37.624],[128.393,37.620],[128.389,37.612]]) }],
-      "slope-gradients": [{ id: "slope-gradient-1", assessedAt: observedAt, maxSlopeDeg: 37, resultGeometry: polygon([[128.369,37.616],[128.376,37.622],[128.382,37.616],[128.376,37.609]]) }],
-      "external-firms": [{ id: "firms-demo-1", observedAt, provider: "NASA FIRMS", confidence: "high", frp: 18.4, resultGeometry: point([128.366,37.616]) }],
-      "slope-assessments": [{ id: "slope-1", assessedAt: observedAt, geometry: polygon([[128.371,37.619],[128.377,37.621],[128.379,37.615],[128.374,37.613]]) }],
-      "external-landslide-history": [{ id: "slide-history-1", observedAt, provider: "재난안전데이터", resultGeometry: point([128.379,37.620]) }],
+      "evacuation-routes": [{ id: "evac-1", observedAt, resultGeometry: line([[126.624667,36.668667],[126.616667,36.662667],[126.606667,36.658667],[126.597667,36.655667]]) }],
+      "suppression-resources": [{ id: "sup-1", observedAt, resultGeometry: point([126.602667,36.658667]) }, { id: "sup-2", observedAt, resultGeometry: point([126.626667,36.660667]) }],
+      "water-sources": [{ id: "water-1", observedAt, resultGeometry: point([126.594667,36.661667]) }, { id: "water-2", observedAt, resultGeometry: point([126.633667,36.656667]) }],
+      "nearby-response-resources": [{ id: "station-1", observedAt, resourceType: "산불대응센터", etaMinutes: 12, resultGeometry: point([126.588667,36.653667]) }, { id: "heli-1", observedAt, resourceType: "임차헬기 대기장", etaMinutes: 18, resultGeometry: point([126.648667,36.683667]) }],
+      viewsheds: [{ id: "viewshed-1", observedAt, observerAltitudeM: 428, resultGeometry: polygon([[126.613667,36.662667],[126.604667,36.674667],[126.619667,36.683667],[126.639667,36.678667],[126.640667,36.663667],[126.627667,36.656667]]) }],
+      "communication-shadows": [{ id: "shadow-1", observedAt, reason: "북동 능선 차폐", resultGeometry: polygon([[126.629667,36.669667],[126.636667,36.676667],[126.644667,36.672667],[126.640667,36.664667]]) }],
+      "slope-gradients": [{ id: "slope-gradient-1", assessedAt: observedAt, maxSlopeDeg: 37, resultGeometry: polygon([[126.620667,36.668667],[126.627667,36.674667],[126.633667,36.668667],[126.627667,36.661667]]) }],
+      "external-firms": [{ id: "firms-demo-1", observedAt, provider: "NASA FIRMS", confidence: "high", frp: 18.4, resultGeometry: point([126.617667,36.668667]) }],
+      "slope-assessments": [{ id: "slope-1", assessedAt: observedAt, geometry: polygon([[126.622667,36.671667],[126.628667,36.673667],[126.630667,36.667667],[126.625667,36.665667]]) }],
+      "external-landslide-history": [{ id: "slide-history-1", observedAt, provider: "재난안전데이터", resultGeometry: point([126.630667,36.672667]) }],
     },
   };
 
   if (scenario === "LANDSLIDE") {
     overview.event = {
       ...overview.event,
-      eventId: "demo-landslide-pyeongchang",
+      eventId: "demo-landslide-deoksungsan",
       eventCode: "LS-2026-0903-01",
       disasterType: "LANDSLIDE",
-      eventName: "평창군 봉평면 산사태 위험대응",
+      eventName: "예산군 덕산면 덕숭산 산사태 위험대응",
       severityCode: "CRITICAL",
     };
     overview.alerts = [{

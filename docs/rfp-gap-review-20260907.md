@@ -85,8 +85,8 @@ IMPLEMENTED: 해당 내부 요구의 Frontend 경로 구현. PARTIAL: 일부 동
 |NET-03|IMPLEMENTED|DEMO_VERIFIED|operationalEvidence.ts classifyLinkHealth 및 테스트: 목표주기 대비 1.5배/3배 판정|
 |NET-04|PARTIAL|DEMO_VERIFIED|OperationsPanel.tsx API 가용률 표시; 수신 표본 비율은 운영시간 기반 공식 가용률과 다름|
 |NET-05|PARTIAL|DEMO_VERIFIED|operationalEvidence.ts: 지연·표본간 공백 계산; 장비별 평균/최대 갱신주기 공식 시험 미완|
-|DEM-01|PARTIAL|EXTERNAL_PENDING|public/dem/37806/README.txt: 봉평 공개DEM 90m 준비; 기관 고해상도 실증 원본은 대기|
-|DEM-02|IMPLEMENTED|DEMO_VERIFIED|LivePositionMap.tsx raster-dem / public/dem/37806: 90m Terrarium 타일 적용|
+|DEM-01|PARTIAL|EXTERNAL_PENDING|public/dem/36607/README.txt: 덕숭산 공개DEM 90m 적용; 기관 고해상도 실증 원본은 대기|
+|DEM-02|IMPLEMENTED|DEMO_VERIFIED|LivePositionMap.tsx raster-dem / public/dem/36607: 덕숭산 90m Terrarium 타일 적용|
 |DEM-03|PARTIAL|DEMO_VERIFIED|LivePositionMap.tsx 고도·hillshade 구현; 경사면은 입력 GeoJSON 표시, DEM 경사 분석 엔진 없음|
 |DEM-04|IMPLEMENTED|OPERATING|LivePositionMap.tsx setTerrain / pitch·bearing: 2D/3D 전환|
 |DEM-05|PARTIAL|DEMO_VERIFIED|LivePositionMap.tsx Viewshed·통신음영 입력면 표시; 실지형 가시권/전파해석 계산 엔진 없음|
