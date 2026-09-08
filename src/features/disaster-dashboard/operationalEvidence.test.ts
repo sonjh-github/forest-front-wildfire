@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOperationalEvidence, calculateTelemetryMetrics, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
+import { buildOperationalEvidence, calculatePacketSequence, calculatePacketSequenceMetrics, calculateTelemetryMetrics, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
 
 const sample = (sequence: number, second: number, latencyMs = 200) => ({
   assetId: "DRONE-01", sequence,
@@ -22,6 +22,29 @@ describe("operational evidence", () => {
     expect(metrics.maxGapSec).toBe(3);
     expect(metrics.availabilityPct).toBe(100);
     expect(metrics.sharingSuccessPct).toBe(100);
+  });
+
+  it("sequence 공백을 패킷 유실로 계산하고 시퀀스 슬롯을 만든다", () => {
+    const rows = [sample(10, 0), sample(11, 3), sample(13, 9)];
+    const sequence = calculatePacketSequence(rows, "DRONE-01", 12);
+
+    expect(sequence.fromSequence).toBe(10);
+    expect(sequence.toSequence).toBe(13);
+    expect(sequence.received).toBe(3);
+    expect(sequence.lost).toBe(1);
+    expect(sequence.successPct).toBe(75);
+    expect(sequence.lossPct).toBe(25);
+    expect(sequence.slots.map((slot) => slot.state)).toEqual([
+      "RECEIVED",
+      "RECEIVED",
+      "LOST",
+      "RECEIVED",
+    ]);
+
+    const aggregate = calculatePacketSequenceMetrics(rows);
+    expect(aggregate.expected).toBe(4);
+    expect(aggregate.lost).toBe(1);
+    expect(aggregate.successPct).toBe(75);
   });
 
   it("시험 실행 ID·원시표본·무결성값을 포함한 증적을 만든다", () => {
