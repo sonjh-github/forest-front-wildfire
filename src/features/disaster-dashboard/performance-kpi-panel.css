@@ -486,3 +486,81 @@
     font-size: 9px;
   }
 }
+
+
+/* official-evaluation-method-v3 */
+.performance-official-events {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #d4e0dc;
+  border-radius: 7px;
+  background: #f8fbfa;
+}
+
+.performance-official-events > header {
+  display: grid;
+  gap: 2px;
+}
+
+.performance-official-events > header strong {
+  font-size: 9px;
+}
+
+.performance-official-events > header small {
+  color: #73807b;
+  font-size: 7px;
+}
+
+.performance-official-event-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+
+.performance-official-event-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.performance-official-event-grid span {
+  color: #74807b;
+  font-size: 7px;
+}
+
+.performance-official-event-grid b {
+  color: #273a33;
+  font-size: 8px;
+}
+
+.performance-official-event-grid > div > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.performance-official-event-grid button {
+  min-height: 24px;
+  padding: 0 6px;
+  border: 1px solid #b9d4ca;
+  border-radius: 5px;
+  background: #eef8f4;
+  color: #176651;
+  font-size: 7px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.performance-official-event-grid button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+@media (min-width: 2200px) {
+  .performance-official-event-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
