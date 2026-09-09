@@ -36,7 +36,7 @@ export const OFFICIAL_RFP_GAPS: OfficialRfpGap[] = [
   gap(12, "RFP5 정보연계·RFP7 통신연계", "NOT_IMPLEMENTED", "schema 추적 문서는 decision_recommendation/field_task 설계만 명시", "상대 시스템 ICD·명령/응답·합동 연계시험 필요", ["AGENCY", "BACKEND", "HW"]),
   gap(12, "연구 협의체 참여·성과물 및 등록 3건", "NOT_IMPLEMENTED", "Frontend 저장소에서 협의체·특허/등록 증빙 확인 불가", "프로젝트 관리 산출물 별도 확인; 기관 전체 미수행 판정 아님", ["PROJECT"]),
   gap(12, "이동형 현장통신망·차량 모듈·정보공유 시스템 각 1식", "PARTIAL", "GIS 관제 Frontend 및 API 클라이언트", "HW 프로토타입·종단 시스템 납품/검증 증적 필요", ["HW", "BACKEND", "FIELD"]),
-  gap(12, "공식 KPI 10분·5초·98%·98%", "PARTIAL", "PerformanceKpiPanel.tsx / performanceMeasurement.ts: 구축팀 투입→망 준비, 위치 평균+최대, 전송시도/성공수신, 총운영-중단시간 공식 평가식 구현", "실장비 송신/ACK·linkStatus 이벤트와 시험 ID 연결 및 현장검증 필요; DEMO는 공인 성능시험 아님", ["BACKEND", "FIELD"]),
+  gap(12, "공식 KPI 10분·5초·98%·98%", "PARTIAL", "operationalEvidence.ts 표본 계산 / OperationsPanel.tsx API 측정값 조회", "송신 분모·ACK·운영/중단시간·실증 시험 ID 필요; DEMO는 공인 성능시험 아님", ["BACKEND", "FIELD"]),
 ];
 export function officialRfpGapSummary(items = OFFICIAL_RFP_GAPS) {
   return { total: items.length,
