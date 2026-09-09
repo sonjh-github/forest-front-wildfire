@@ -523,13 +523,13 @@ export default function AssetRegistryModal({
                 물리 장비 등록
               </strong>
               <span>
-                빨간색 필수 항목 5개만 입력하면 Core UUID 발급과 업체 연결이 한 번에 완료됩니다.
+                빨간색 필수 항목 4개만 입력하면 Core UUID 발급과 업체 연결이 한 번에 완료됩니다.
               </span>
             </header>
 
             <div className="asset-required-guide">
               <strong>처음 등록하시나요?</strong>
-              <span>장비 유형·업체·실제 장비번호를 입력하고 추천된 업체 장비 유형을 확인하세요. 관리코드는 아래의 자동 만들기 버튼으로 만들 수 있습니다.</span>
+              <span>장비 유형·업체·실제 장비번호를 입력하세요. 업체 장비 유형은 선택한 장비 유형을 기준으로 자동 설정됩니다.</span>
             </div>
 
             {result && (
@@ -654,29 +654,6 @@ export default function AssetRegistryModal({
                 <small>장비 본체나 업체 시스템에서 사용하는 실제 고유번호를 입력하세요.</small>
               </label>
 
-              <label>
-                <span>
-                  업체 장비 유형 <b>필수</b>
-                </span>
-                <select
-                  value={form.deviceType}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      deviceType:
-                        event.target.value,
-                    })
-                  }
-                  required
-                >
-                  {DEVICE_TYPE_SUGGESTIONS[
-                    form.vendor
-                  ].map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                <small>선택한 업체와 장비 유형에 맞는 값을 자동 추천합니다.</small>
-              </label>
             </div>
 
             <button className="asset-optional-toggle" type="button" onClick={() => setShowOptional((value) => !value)}>
