@@ -211,16 +211,16 @@
 .packet-sequence-grid {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 3px;
+  gap: 2px;
 }
 
 .packet-sequence-grid > span {
   display: grid;
   place-items: center;
   min-width: 0;
-  height: 18px;
-  border-radius: 3px;
-  font-size: 6px;
+  height: 13px;
+  border-radius: 2px;
+  font-size: 5.5px;
   font-weight: 700;
 }
 
@@ -234,6 +234,12 @@
   color: #9e201b;
   background: #fce0de;
   border: 1px solid #e9aaa5;
+}
+
+.packet-sequence-grid > span.empty {
+  color: #8b9591;
+  background: #f2f5f4;
+  border: 1px solid #dce4e1;
 }
 
 .packet-sequence-legend {
@@ -263,6 +269,10 @@
 
 .packet-sequence-legend i.lost {
   background: #df7069;
+}
+
+.packet-sequence-legend i.empty {
+  background: #c8d1ce;
 }
 
 .packet-sequence-legend b {

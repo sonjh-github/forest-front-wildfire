@@ -181,10 +181,42 @@ export default function PerformanceKpiPanel({
       calculatePacketSequence(
         telemetrySamples,
         selectedAssetId || undefined,
-        50,
+        100,
       ),
     [selectedAssetId, telemetrySamples],
   );
+
+  const sequenceDisplaySlots = useMemo(() => {
+    if (sequence.toSequence == null) return [];
+
+    const startSequence =
+      sequence.toSequence <= 100
+        ? 1
+        : sequence.toSequence - 99;
+
+    const known = new Map(
+      sequence.slots.map((slot) => [slot.sequence, slot]),
+    );
+
+    return Array.from({ length: 100 }, (_, index) => {
+      const sequenceNumber = startSequence + index;
+      const slot = known.get(sequenceNumber);
+
+      if (slot) {
+        return {
+          ...slot,
+          displayState: slot.state as "RECEIVED" | "LOST",
+        };
+      }
+
+      return {
+        sequence: sequenceNumber,
+        observedAt: null,
+        receivedAt: null,
+        displayState: "EMPTY" as const,
+      };
+    });
+  }, [sequence]);
 
   const effectiveEndAt = session
     ? session.endedAt ?? new Date(clockMs).toISOString()
@@ -883,7 +915,7 @@ export default function PerformanceKpiPanel({
           <div>
             <strong>Packet Loss Sequence</strong>
             <small>
-              자산별 sequence 번호 공백을 시간 순으로 표시
+              선택 장비의 최근 100개 sequence를 10×10으로 표시
             </small>
           </div>
 
@@ -931,23 +963,33 @@ export default function PerformanceKpiPanel({
             <div
               className="packet-sequence-grid"
               role="img"
-              aria-label={`Sequence ${sequence.fromSequence}부터 ${sequence.toSequence}까지`}
+              aria-label={
+                sequenceDisplaySlots.length > 0
+                  ? `Sequence ${sequenceDisplaySlots[0].sequence}부터 ${
+                      sequenceDisplaySlots[sequenceDisplaySlots.length - 1].sequence
+                    }까지`
+                  : "Sequence 수신 대기"
+              }
             >
-              {sequence.slots.map((slot) => (
+              {sequenceDisplaySlots.map((slot) => (
                 <span
                   key={slot.sequence}
                   className={
-                    slot.state === "RECEIVED"
+                    slot.displayState === "RECEIVED"
                       ? "received"
-                      : "lost"
+                      : slot.displayState === "LOST"
+                        ? "lost"
+                        : "empty"
                   }
                   title={`SEQ ${slot.sequence} · ${
-                    slot.state === "RECEIVED"
+                    slot.displayState === "RECEIVED"
                       ? "수신"
-                      : "유실"
+                      : slot.displayState === "LOST"
+                        ? "유실"
+                        : "관측 전/대기"
                   }`}
                 >
-                  {slot.sequence % 100}
+                  {slot.sequence}
                 </span>
               ))}
             </div>
@@ -959,8 +1001,15 @@ export default function PerformanceKpiPanel({
               <span>
                 <i className="lost" /> Sequence 유실
               </span>
+              <span>
+                <i className="empty" /> 관측 전/대기
+              </span>
               <b>
-                SEQ {sequence.fromSequence}–{sequence.toSequence}
+                {sequenceDisplaySlots.length > 0
+                  ? `SEQ ${sequenceDisplaySlots[0].sequence}–${
+                      sequenceDisplaySlots[sequenceDisplaySlots.length - 1].sequence
+                    }`
+                  : "SEQ -"}
               </b>
             </div>
           </>
@@ -971,8 +1020,9 @@ export default function PerformanceKpiPanel({
         )}
 
         <p className="packet-sequence-notice">
-          동일 자산의 sequence를 독립적으로 계산합니다. DEMO 데이터와
-          브라우저 수신표본은 공식 성능시험 결과로 사용하지 않습니다.
+          동일 자산 기준으로 100칸을 고정 표시하며, 관측 전/대기 칸은
+          유실률 계산에 포함하지 않습니다. DEMO 데이터와 브라우저 수신표본은
+          공식 성능시험 결과로 사용하지 않습니다.
         </p>
       </section>
 
