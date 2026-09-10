@@ -221,6 +221,75 @@ export function calculatePacketSequenceMetrics(
   };
 }
 
+export type PacketLossQualityAlert = {
+  alertId: string;
+  assetId: string;
+  title: string;
+  message: string;
+  severity: "WARNING" | "SEVERE";
+  status: "ACTIVE";
+  issuedAt: string;
+  issuerOrgCode: "SEQ-DIAGNOSTIC";
+  lossPct: number;
+  lost: number;
+  expected: number;
+};
+
+export function buildPacketLossQualityAlerts(
+  samples: TelemetrySample[],
+  options: {
+    maxSlots?: number;
+    minExpected?: number;
+    warningLossPct?: number;
+    severeLossPct?: number;
+  } = {},
+): PacketLossQualityAlert[] {
+  const maxSlots = Math.max(1, Math.floor(options.maxSlots ?? 100));
+  const minExpected = Math.max(1, Math.floor(options.minExpected ?? 8));
+  const warningLossPct = Math.max(0, options.warningLossPct ?? 3);
+  const severeLossPct = Math.max(warningLossPct, options.severeLossPct ?? 8);
+
+  return packetSequenceAssetIds(samples).flatMap((assetId) => {
+    const summary = calculatePacketSequence(samples, assetId, maxSlots);
+    const lossPct = summary.lossPct ?? 0;
+
+    if (
+      summary.expected < minExpected ||
+      summary.lost <= 0 ||
+      lossPct < warningLossPct
+    ) {
+      return [];
+    }
+
+    const latest = samples
+      .filter((sample) => sample.assetId === assetId)
+      .sort(
+        (a, b) =>
+          Date.parse(b.receivedAt || b.observedAt) -
+          Date.parse(a.receivedAt || a.observedAt),
+      )[0];
+
+    const severity: PacketLossQualityAlert["severity"] =
+      lossPct >= severeLossPct ? "SEVERE" : "WARNING";
+
+    return [{
+      alertId: `SEQ-LOSS-${assetId}`,
+      assetId,
+      title: `통신 품질 저하 · ${assetId}`,
+      message:
+        `최근 ${summary.expected} SEQ 중 ${summary.lost}개 누락 · ` +
+        `Packet Loss ${lossPct}%`,
+      severity,
+      status: "ACTIVE",
+      issuedAt: latest?.receivedAt ?? latest?.observedAt ?? new Date(0).toISOString(),
+      issuerOrgCode: "SEQ-DIAGNOSTIC",
+      lossPct,
+      lost: summary.lost,
+      expected: summary.expected,
+    }];
+  });
+}
+
 export function calculateTelemetryMetrics(
   samples: TelemetrySample[],
   expectedIntervalSec = 3,

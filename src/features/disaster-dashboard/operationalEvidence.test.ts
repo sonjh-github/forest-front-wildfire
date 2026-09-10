@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOperationalEvidence, calculatePacketSequence, calculatePacketSequenceMetrics, calculateTelemetryMetrics, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
+import { buildOperationalEvidence, buildPacketLossQualityAlerts, calculatePacketSequence, calculatePacketSequenceMetrics, calculateTelemetryMetrics, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
 
 const sample = (sequence: number, second: number, latencyMs = 200) => ({
   assetId: "DRONE-01", sequence,
@@ -45,6 +45,24 @@ describe("operational evidence", () => {
     expect(aggregate.expected).toBe(4);
     expect(aggregate.lost).toBe(1);
     expect(aggregate.successPct).toBe(75);
+  });
+
+  it("SEQ Packet Loss가 임계치를 넘으면 통신품질 경보를 만든다", () => {
+    const rows = [
+      sample(1, 0), sample(2, 3), sample(3, 6), sample(4, 9),
+      sample(6, 15), sample(7, 18), sample(8, 21), sample(9, 24), sample(10, 27),
+    ];
+
+    const alerts = buildPacketLossQualityAlerts(rows, {
+      minExpected: 8,
+      warningLossPct: 3,
+      severeLossPct: 8,
+    });
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].assetId).toBe("DRONE-01");
+    expect(alerts[0].lossPct).toBe(10);
+    expect(alerts[0].severity).toBe("SEVERE");
   });
 
   it("시험 실행 ID·원시표본·무결성값을 포함한 증적을 만든다", () => {
