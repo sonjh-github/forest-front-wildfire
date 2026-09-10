@@ -181,10 +181,42 @@ export default function PerformanceKpiPanel({
       calculatePacketSequence(
         telemetrySamples,
         selectedAssetId || undefined,
-        50,
+        100,
       ),
     [selectedAssetId, telemetrySamples],
   );
+
+  const sequenceDisplaySlots = useMemo(() => {
+    if (sequence.toSequence == null) return [];
+
+    const startSequence =
+      sequence.toSequence <= 100
+        ? 1
+        : sequence.toSequence - 99;
+
+    const known = new Map(
+      sequence.slots.map((slot) => [slot.sequence, slot]),
+    );
+
+    return Array.from({ length: 100 }, (_, index) => {
+      const sequenceNumber = startSequence + index;
+      const slot = known.get(sequenceNumber);
+
+      if (slot) {
+        return {
+          ...slot,
+          displayState: slot.state as "RECEIVED" | "LOST",
+        };
+      }
+
+      return {
+        sequence: sequenceNumber,
+        observedAt: null,
+        receivedAt: null,
+        displayState: "EMPTY" as const,
+      };
+    });
+  }, [sequence]);
 
   const effectiveEndAt = session
     ? session.endedAt ?? new Date(clockMs).toISOString()
@@ -240,13 +272,29 @@ export default function PerformanceKpiPanel({
     [effectiveEndAt, session],
   );
 
-  const sessionElapsedSec =
-    session && effectiveEndAt
+  // 긴급통신망 구축시간: 구축팀 투입 시 시작하고 망 준비 완료 시 정지한다.
+  const deploymentTimerEndAt =
+    session?.networkReadyAt ?? effectiveEndAt;
+
+  const deploymentTimerSec =
+    session && deploymentTimerEndAt
       ? Math.max(
           0,
-          (Date.parse(effectiveEndAt) - Date.parse(session.startedAt)) / 1_000,
+          (Date.parse(deploymentTimerEndAt) -
+            Date.parse(session.startedAt)) /
+            1_000,
         )
       : 0;
+
+  const deploymentTargetSec =
+    PROJECT_ENHANCED_TARGET.networkDeploymentMinutes * 60;
+
+  const deploymentTimerResult =
+    session?.networkReadyAt
+      ? deploymentTimerSec <= deploymentTargetSec
+        ? "PASS"
+        : "FAIL"
+      : null;
 
   const deploymentMeasured = calculateNetworkDeploymentMinutes(
     session?.startedAt,
@@ -274,6 +322,34 @@ export default function PerformanceKpiPanel({
     telemetrySamples.length > 0 ? telemetryMetrics.availabilityPct : null;
 
   const sessionMode = session != null;
+
+  const metricEvidence: Record<string, string> = {
+    deployment: session
+      ? `투입 ${displayTime(session.startedAt)} → ${
+          session.networkReadyAt
+            ? `준비 ${displayTime(session.networkReadyAt)}`
+            : "구축 중"
+        }`
+      : "구축팀 투입 시 측정 시작",
+    location:
+      sessionMode && sessionPositionStats.intervalCount > 0
+        ? `AVG ${sessionPositionStats.averageGapSec}초 · MAX ${sessionPositionStats.maxGapSec}초`
+        : locationFallback != null
+          ? `MAX ${locationFallback}초`
+          : "위치 갱신 이벤트 대기",
+    sharing:
+      sessionMode && sessionSharingStats.attempts > 0
+        ? `${sessionSharingStats.successes}/${sessionSharingStats.attempts} 성공 수신`
+        : sharingFallback != null
+          ? `참고 Sequence ${packetMetrics.received}/${packetMetrics.expected}`
+          : "전송/수신 이벤트 대기",
+    availability:
+      sessionMode && session?.networkReadyAt
+        ? `운영 ${sessionAvailability.totalOperationSec}초 · 장애 ${sessionAvailability.downtimeSec}초`
+        : availabilityFallback != null
+          ? "브라우저 수신표본 참고"
+          : "망 준비 완료 후 측정",
+  };
 
   const cards: MetricCard[] = [
     {
@@ -603,37 +679,37 @@ export default function PerformanceKpiPanel({
       >
         <header>
           <div>
-            <strong>성능 측정 세션</strong>
+            <strong>측정 제어</strong>
             <small>
-              시험 실행 단위로 4개 성능기준을 동일 시간축에서 측정
+              구축팀 투입 → 망 준비 완료 · 이후 4개 지표 실시간 측정
             </small>
           </div>
           <span>
             {!session
               ? "대기"
-              : session.endedAt
-                ? "측정 완료"
-                : "측정 중"}
+              : !session.networkReadyAt
+                ? "측정 중"
+                : deploymentTimerResult}
           </span>
         </header>
 
-        <div className="performance-session-times">
-          <div>
-            <span>시험실행 ID</span>
-            <strong>{session?.runId ?? "-"}</strong>
-          </div>
+        <div className="performance-deployment-timeline">
           <div>
             <span>구축팀 투입</span>
-            <strong>{displayTime(session?.startedAt ?? null)}</strong>
+            <b>{displayTime(session?.startedAt ?? null)}</b>
           </div>
+          <i>→</i>
+          <strong>
+            {session ? displayDuration(deploymentTimerSec) : "00:00"}
+          </strong>
+          <i>→</i>
           <div>
             <span>망 준비 완료</span>
-            <strong>{displayTime(session?.networkReadyAt ?? null)}</strong>
+            <b>{displayTime(session?.networkReadyAt ?? null)}</b>
           </div>
-          <div>
-            <span>경과시간</span>
-            <strong>{session ? displayDuration(sessionElapsedSec) : "-"}</strong>
-          </div>
+          <em>
+            ≤ {PROJECT_ENHANCED_TARGET.networkDeploymentMinutes}분
+          </em>
         </div>
 
         <div className="performance-session-actions">
@@ -685,7 +761,10 @@ export default function PerformanceKpiPanel({
           </button>
         </div>
 
-        <div className="performance-session-live">
+        <details className="performance-measurement-details">
+          <summary>상세 측정·검증</summary>
+          <div className="performance-measurement-details-body">
+            <div className="performance-session-live">
           <span>
             위치 이벤트 <b>{sessionSamples.length}</b>
           </span>
@@ -814,66 +893,151 @@ export default function PerformanceKpiPanel({
         >
           측정 세션·KPI JSON 증적 내보내기
         </button>
+          </div>
+        </details>
       </section>
 
       <div className="performance-kpi-grid">
         {cards.map((card) => {
-          const passed = evaluate(
-            card.value,
-            card.operator,
-            card.target,
+          const deploymentRunning =
+            card.id === "deployment" &&
+            Boolean(session) &&
+            !session?.networkReadyAt;
+
+          const passed = deploymentRunning
+            ? null
+            : evaluate(card.value, card.operator, card.target);
+
+          const status =
+            deploymentRunning
+              ? "RUNNING"
+              : passed == null
+                ? "WAITING"
+                : passed
+                  ? "PASS"
+                  : "FAIL";
+
+          const display =
+            card.id === "deployment" && session
+              ? displayDuration(deploymentTimerSec)
+              : displayValue(card.value, card.unit);
+
+          const progressValue =
+            card.id === "deployment" && session
+              ? deploymentTimerSec / Math.max(1, deploymentTargetSec)
+              : card.value == null
+                ? 0
+                : card.operator === "≤"
+                  ? card.value / Math.max(0.001, card.target)
+                  : card.value / 100;
+
+          const progressPct = Math.max(
+            0,
+            Math.min(100, progressValue * 100),
           );
 
           return (
             <article
               key={card.id}
-              className="performance-kpi-card"
-              data-status={
-                passed == null
-                  ? "WAITING"
-                  : passed
-                    ? "PASS"
-                    : "FAIL"
-              }
+              className="performance-kpi-card performance-vital-card"
+              data-status={status}
             >
               <div className="performance-kpi-card-title">
                 <strong>{card.label}</strong>
                 <span>
-                  {passed == null
-                    ? "측정 대기"
-                    : passed
-                      ? "PASS"
-                      : "FAIL"}
+                  {status === "RUNNING"
+                    ? "LIVE"
+                    : status === "WAITING"
+                      ? "대기"
+                      : status}
                 </span>
               </div>
 
-              <p>{displayValue(card.value, card.unit)}</p>
+              <div className="performance-vital-value">
+                <p>{display}</p>
+                <small>
+                  기준 {card.operator}{card.target}{card.unit}
+                </small>
+              </div>
 
-              <dl>
-                <div>
-                  <dt>강화 목표</dt>
-                  <dd>
-                    {card.operator}
-                    {card.target}
-                    {card.unit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>공식 RFP</dt>
-                  <dd>
-                    {card.operator}
-                    {card.officialTarget}
-                    {card.unit}
-                  </dd>
-                </div>
-              </dl>
-
-              <small>{card.source}</small>
-              <small>{card.note}</small>
+              <div className="performance-vital-track">
+                <span style={{ width: `${progressPct}%` }} />
+                <i />
+              </div>
             </article>
           );
         })}
       </div>
+
+      <details className="performance-proof-hub">
+        <summary>
+          <span>ⓘ</span>
+          성능지표 증명 근거 1–4 보기
+        </summary>
+
+        <div className="performance-proof-list">
+          <article>
+            <b>1</b>
+            <div className="performance-proof-main">
+              <strong>통신망 구축시간 ≤ 7분</strong>
+              <p>계획서 · 구축팀 투입 → 망 준비 완료</p>
+            </div>
+            <em>
+              {session
+                ? displayDuration(deploymentTimerSec)
+                : "대기"}
+            </em>
+          </article>
+
+          <article>
+            <b>2</b>
+            <div className="performance-proof-main">
+              <strong>위치정보 갱신주기 ≤ 3초</strong>
+              <p>계획서 · 평균·최대 갱신주기 산출</p>
+            </div>
+            <em>
+              MAX{" "}
+              {sessionPositionStats.maxGapSec != null
+                ? `${sessionPositionStats.maxGapSec.toFixed(1)}초`
+                : locationFallback != null
+                  ? `${locationFallback.toFixed(1)}초`
+                  : "-"}
+            </em>
+          </article>
+
+          <article>
+            <b>3</b>
+            <div className="performance-proof-main">
+              <strong>정보공유 성공률 ≥ 98%</strong>
+              <p>계획서 · 성공수신 ÷ 전송시도 × 100</p>
+            </div>
+            <em>
+              {sessionSharingStats.attempts > 0
+                ? `${sessionSharingStats.successes}/${sessionSharingStats.attempts} · ${
+                    sessionSharingMeasured ?? "-"
+                  }%`
+                : sharingFallback != null
+                  ? `${sharingFallback}%`
+                  : "-"}
+            </em>
+          </article>
+
+          <article>
+            <b>4</b>
+            <div className="performance-proof-main">
+              <strong>통신망 가용률 ≥ 98%</strong>
+              <p>계획서 · (운영시간-장애시간) ÷ 운영시간</p>
+            </div>
+            <em>
+              {sessionAvailabilityMeasured != null
+                ? `${sessionAvailabilityMeasured}%`
+                : availabilityFallback != null
+                  ? `${availabilityFallback}%`
+                  : "-"}
+            </em>
+          </article>
+        </div>
+      </details>
 
       <section
         className="packet-sequence-panel"
@@ -883,7 +1047,7 @@ export default function PerformanceKpiPanel({
           <div>
             <strong>Packet Loss Sequence</strong>
             <small>
-              자산별 sequence 번호 공백을 시간 순으로 표시
+              선택 장비의 최근 100개 sequence를 10×10으로 표시
             </small>
           </div>
 
@@ -931,23 +1095,33 @@ export default function PerformanceKpiPanel({
             <div
               className="packet-sequence-grid"
               role="img"
-              aria-label={`Sequence ${sequence.fromSequence}부터 ${sequence.toSequence}까지`}
+              aria-label={
+                sequenceDisplaySlots.length > 0
+                  ? `Sequence ${sequenceDisplaySlots[0].sequence}부터 ${
+                      sequenceDisplaySlots[sequenceDisplaySlots.length - 1].sequence
+                    }까지`
+                  : "Sequence 수신 대기"
+              }
             >
-              {sequence.slots.map((slot) => (
+              {sequenceDisplaySlots.map((slot) => (
                 <span
                   key={slot.sequence}
                   className={
-                    slot.state === "RECEIVED"
+                    slot.displayState === "RECEIVED"
                       ? "received"
-                      : "lost"
+                      : slot.displayState === "LOST"
+                        ? "lost"
+                        : "empty"
                   }
                   title={`SEQ ${slot.sequence} · ${
-                    slot.state === "RECEIVED"
+                    slot.displayState === "RECEIVED"
                       ? "수신"
-                      : "유실"
+                      : slot.displayState === "LOST"
+                        ? "유실"
+                        : "관측 전/대기"
                   }`}
                 >
-                  {slot.sequence % 100}
+                  {slot.sequence}
                 </span>
               ))}
             </div>
@@ -959,8 +1133,15 @@ export default function PerformanceKpiPanel({
               <span>
                 <i className="lost" /> Sequence 유실
               </span>
+              <span>
+                <i className="empty" /> 관측 전/대기
+              </span>
               <b>
-                SEQ {sequence.fromSequence}–{sequence.toSequence}
+                {sequenceDisplaySlots.length > 0
+                  ? `SEQ ${sequenceDisplaySlots[0].sequence}–${
+                      sequenceDisplaySlots[sequenceDisplaySlots.length - 1].sequence
+                    }`
+                  : "SEQ -"}
               </b>
             </div>
           </>
@@ -971,8 +1152,9 @@ export default function PerformanceKpiPanel({
         )}
 
         <p className="packet-sequence-notice">
-          동일 자산의 sequence를 독립적으로 계산합니다. DEMO 데이터와
-          브라우저 수신표본은 공식 성능시험 결과로 사용하지 않습니다.
+          동일 자산 기준으로 100칸을 고정 표시하며, 관측 전/대기 칸은
+          유실률 계산에 포함하지 않습니다. DEMO 데이터와 브라우저 수신표본은
+          공식 성능시험 결과로 사용하지 않습니다.
         </p>
       </section>
 
