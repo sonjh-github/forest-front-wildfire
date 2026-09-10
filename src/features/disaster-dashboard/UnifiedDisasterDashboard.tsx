@@ -1004,8 +1004,14 @@ export default function UnifiedDisasterDashboard() {
             .map((asset) => {
             const coordinates = (asset.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
             return {
-              assetId: String(asset.assetId), observedAt: String(asset.observedAt), receivedAt: new Date().toISOString(),
-              sequence, latitude: Number(coordinates?.[1]), longitude: Number(coordinates?.[0]),
+              assetId: String(asset.assetId),
+              entityType: "ASSET",
+              assetType: String(asset.assetType ?? "ASSET"),
+              observedAt: String(asset.observedAt),
+              receivedAt: new Date().toISOString(),
+              sequence,
+              latitude: Number(coordinates?.[1]),
+              longitude: Number(coordinates?.[0]),
             } satisfies TelemetrySample;
           })].slice(-3_600));
           setLastUpdatedAt(new Date());
@@ -1032,9 +1038,14 @@ export default function UnifiedDisasterDashboard() {
       onMessage: (message) => {
         setOverview((current) => current ? applyTelemetrySafetyRules(current, message) : current);
         setTelemetrySamples((current) => [...current, {
-          assetId: message.assetId, observedAt: message.observedAt,
-          receivedAt: message.receivedAt ?? new Date().toISOString(), sequence: message.sequence,
-          latitude: message.latitude, longitude: message.longitude,
+          assetId: message.assetId,
+          entityType: message.entityType,
+          assetType: message.assetType,
+          observedAt: message.observedAt,
+          receivedAt: message.receivedAt ?? new Date().toISOString(),
+          sequence: message.sequence,
+          latitude: message.latitude,
+          longitude: message.longitude,
         }].slice(-3_600));
         setLastUpdatedAt(new Date());
       },

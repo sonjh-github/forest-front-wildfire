@@ -6,6 +6,7 @@ import {
   calculatePositionUpdateStatistics,
   calculateTimeBasedAvailability,
   createPerformanceRunId,
+  filterOfficialPositionSamples,
   filterTelemetryForSession,
   normalizePerformanceMeasurementSession,
   type InformationSharingAttempt,
@@ -47,6 +48,18 @@ describe("performance measurement session", () => {
       "2026-09-09T00:00:07Z",
     );
     expect(filtered.map((sample) => sample.sequence)).toEqual([4, 7]);
+  });
+
+  it("공식 위치 갱신주기 측정은 대원·차량 표본만 사용한다", () => {
+    const samples: TelemetrySample[] = [
+      { ...row(0), assetId: "CREW-01", entityType: "PERSONNEL", assetType: "PERSONNEL" },
+      { ...row(1), assetId: "CMD-01", entityType: "ASSET", assetType: "COMMAND_VEHICLE" },
+      { ...row(2), assetId: "DRONE-01", entityType: "ASSET", assetType: "UAV" },
+    ];
+
+    expect(
+      filterOfficialPositionSamples(samples).map((sample) => sample.assetId),
+    ).toEqual(["CREW-01", "CMD-01"]);
   });
 
   it("위치 갱신 이벤트의 평균과 최대 갱신주기를 함께 계산한다", () => {

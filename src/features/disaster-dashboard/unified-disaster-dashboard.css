@@ -3417,3 +3417,113 @@
   .requirements-groups article { grid-template-columns: 64px minmax(0, 1fr); }
   .requirements-groups article > b, .requirements-groups article > em { justify-self: start; }
 }
+
+/* network-drawer-content-aware-width-v2 */
+/* 통신망 탭은 data-active-tab 문자열에 의존하지 않고
+   실제 SEQ 카드가 들어있는 drawer 자체를 기준으로 폭을 확장한다. */
+@media (min-width: 1101px) {
+  .operation-drawer:has(.network-seq-card) {
+    width: 430px !important;
+  }
+
+  .dashboard-map-stage
+    .live-location-layout:has(
+      .operation-drawer .network-seq-card
+    ) {
+    grid-template-columns: 498px minmax(0, 1fr) 296px !important;
+  }
+
+  .dashboard-map-stage.asset-panel-collapsed
+    .live-location-layout:has(
+      .operation-drawer .network-seq-card
+    ) {
+    grid-template-columns: 498px minmax(0, 1fr) !important;
+  }
+
+  .operation-drawer:has(.network-seq-card)
+    .operations-panel-body {
+    padding-right: 12px !important;
+    overflow-x: hidden !important;
+  }
+
+  .operation-drawer:has(.network-seq-card)
+    .network-seq-card {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .operation-drawer:has(.network-seq-card) {
+    width: 360px !important;
+  }
+
+  .dashboard-map-stage
+    .live-location-layout:has(
+      .operation-drawer .network-seq-card
+    ) {
+    grid-template-columns: 428px minmax(0, 1fr) !important;
+  }
+}
+
+/* operations-drawer-wide-all-tabs-v1 */
+/* 최종 데모: 탭 전환 시 폭이 튀지 않도록 모든 운영 drawer를 통신망과 동일 폭으로 통일 */
+@media (min-width: 1101px) {
+  .operation-drawer {
+    width: 430px !important;
+  }
+
+  .dashboard-map-stage .live-location-layout {
+    grid-template-columns: 498px minmax(0, 1fr) 296px !important;
+  }
+
+  .dashboard-map-stage.asset-panel-collapsed .live-location-layout {
+    grid-template-columns: 498px minmax(0, 1fr) !important;
+  }
+
+  .dashboard-map-stage
+    .live-location-layout:has(.operations-panel.is-collapsed) {
+    grid-template-columns: 68px minmax(0, 1fr) 296px !important;
+  }
+
+  .dashboard-map-stage.asset-panel-collapsed
+    .live-location-layout:has(.operations-panel.is-collapsed) {
+    grid-template-columns: 68px minmax(0, 1fr) !important;
+  }
+
+  .operations-panel-body {
+    padding-right: 12px !important;
+    overflow-x: hidden !important;
+  }
+
+  .dashboard-map-stage .map-status-pill {
+    left: 510px !important;
+  }
+
+  .unified-disaster-board:has(.operations-panel:not(.is-collapsed))
+    .event-overview-floor {
+    left: 510px !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .operation-drawer {
+    width: 360px !important;
+  }
+
+  .dashboard-map-stage .live-location-layout {
+    grid-template-columns: 428px minmax(0, 1fr) !important;
+  }
+
+  .dashboard-map-stage.asset-panel-collapsed .live-location-layout {
+    grid-template-columns: 428px minmax(0, 1fr) !important;
+  }
+
+  .dashboard-map-stage
+    .live-location-layout:has(.operations-panel.is-collapsed),
+  .dashboard-map-stage.asset-panel-collapsed
+    .live-location-layout:has(.operations-panel.is-collapsed) {
+    grid-template-columns: 68px minmax(0, 1fr) !important;
+  }
+}
