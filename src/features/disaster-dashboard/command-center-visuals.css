@@ -188,3 +188,112 @@
     max-width: calc(100% - 68px);
   }
 }
+
+/* wildfire-visual-emphasis-v1 */
+.command-center-legend strong {
+  font-size: 12px !important;
+}
+
+.command-center-legend span {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+.command-center-legend i.incident {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, .96);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 62%, #ffe36d 0 20%, #ff7a1a 21% 55%, #d92d20 56% 100%);
+  box-shadow:
+    0 0 0 2px rgba(217, 45, 32, .28),
+    0 0 10px rgba(230, 67, 31, .38);
+}
+
+.command-center-legend i.fireline {
+  width: 22px;
+  height: 5px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.96),
+    0 0 6px rgba(217, 39, 28, .28);
+}
+
+.command-center-legend i.spread {
+  width: 20px;
+  height: 10px;
+  border-width: 2px;
+  background: rgba(243, 107, 33, .34);
+}
+
+.command-center-legend i.risk {
+  width: 20px;
+  height: 10px;
+  border-width: 2px;
+  background: rgba(217, 45, 32, .32);
+}
+
+.live-map-shell .maplibregl-popup-content {
+  border: 1px solid rgba(70, 82, 78, .22);
+  border-radius: 7px;
+  box-shadow: 0 5px 20px rgba(23, 42, 36, .16);
+  font-size: 12px;
+}
+
+@media (min-width: 1900px) {
+  .command-center-legend strong {
+    font-size: 13px !important;
+  }
+
+  .command-center-legend span {
+    font-size: 12px !important;
+  }
+
+  .live-map-shell .command-center-legend {
+    gap: 7px 13px !important;
+    padding: 8px 11px !important;
+  }
+}
+
+/* wildfire-visual-emphasis-v2 */
+.live-map-shell .command-center-legend {
+  padding: 8px 11px !important;
+  gap: 7px 12px !important;
+}
+
+.command-center-legend strong {
+  font-size: 13px !important;
+}
+
+.command-center-legend span {
+  font-size: 12px !important;
+  font-weight: 750 !important;
+}
+
+.command-center-legend i.incident {
+  width: 18px;
+  height: 18px;
+}
+
+.command-center-legend i.fireline {
+  width: 24px;
+  height: 5px;
+}
+
+.command-center-legend i.spread,
+.command-center-legend i.risk {
+  width: 22px;
+  height: 11px;
+}
+
+@media (max-width: 1100px) {
+  .command-center-legend strong {
+    font-size: 11px !important;
+  }
+
+  .command-center-legend span {
+    font-size: 10px !important;
+  }
+}
+
