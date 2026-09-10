@@ -1,5 +1,7 @@
 export type TelemetrySample = {
   assetId: string;
+  entityType?: "ASSET" | "PERSONNEL";
+  assetType?: string;
   observedAt: string;
   receivedAt: string;
   latitude?: number;

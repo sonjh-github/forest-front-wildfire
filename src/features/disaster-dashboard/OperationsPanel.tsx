@@ -7,6 +7,7 @@ import { buildOperationalEvidence, classifyLinkHealth, type TelemetrySample } fr
 import type { TelemetryStreamStatus } from "./telemetryStream";
 import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
 import PerformanceKpiPanel from "./PerformanceKpiPanel";
+import NetworkSequenceQualityPanel from "./NetworkSequenceQualityPanel";
 
 export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
@@ -468,6 +469,10 @@ export function OperationsPanel({
               <small>온도·전원 상태: Core API 계약 미확인 · 현장 연계 대기</small>
               <small>마지막 상태수신 {nms.lastReceivedAt ? relativeTime(nms.lastReceivedAt) : "미수신"} · 잔량 기준은 저전압 측정이 아닙니다.</small>
             </article>
+            <NetworkSequenceQualityPanel
+              telemetrySamples={telemetrySamples}
+              locations={locations}
+            />
             <article data-status={linkHealthSummary.disconnected > 0 ? "FAILED" : linkHealthSummary.delayed > 0 ? "DEGRADED" : "ACTIVE"} className="network-detail-card">
               <div><strong>장비 수신 상태 자동판정</strong><span>{linkHealthSummary.disconnected > 0 ? "두절 발생" : linkHealthSummary.delayed > 0 ? "일부 지연" : "정상"}</span></div>
               <p>연결 {linkHealthSummary.connected} · 지연 {linkHealthSummary.delayed} · 두절 {linkHealthSummary.disconnected}</p>

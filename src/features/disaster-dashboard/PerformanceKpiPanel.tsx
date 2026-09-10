@@ -14,11 +14,13 @@ import {
   calculateOfficialAvailability,
   calculatePositionUpdateStatistics,
   createPerformanceRunId,
+  filterOfficialPositionSamples,
   filterTelemetryForSession,
   normalizePerformanceMeasurementSession,
   PERFORMANCE_INTERFACE_REQUIREMENTS,
   type InformationSharingAttempt,
   type PerformanceMeasurementSession,
+  type SharingPayloadType,
 } from "./performanceMeasurement";
 import {
   OFFICIAL_RFP_BASELINE,
@@ -241,9 +243,14 @@ export default function PerformanceKpiPanel({
     ],
   );
 
-  const sessionPositionStats = useMemo(
-    () => calculatePositionUpdateStatistics(sessionSamples),
+  const sessionPositionSamples = useMemo(
+    () => filterOfficialPositionSamples(sessionSamples),
     [sessionSamples],
+  );
+
+  const sessionPositionStats = useMemo(
+    () => calculatePositionUpdateStatistics(sessionPositionSamples),
+    [sessionPositionSamples],
   );
 
   const sessionPacketMetrics = useMemo(
@@ -321,6 +328,13 @@ export default function PerformanceKpiPanel({
   const availabilityFallback =
     telemetrySamples.length > 0 ? telemetryMetrics.availabilityPct : null;
 
+  // 세션 시작 전 proof는 카드와 동일한 KPI 소스를 사용한다.
+  // 브라우저 수신표본 기반 fallback은 KPI 원본이 없을 때만 참고값으로 사용한다.
+  const overviewDeploymentValue = measuredNumber(deployment);
+  const overviewLocationValue = measuredNumber(location);
+  const overviewSharingValue = measuredNumber(sharing);
+  const overviewAvailabilityValue = measuredNumber(availability);
+
   const sessionMode = session != null;
 
   const metricEvidence: Record<string, string> = {
@@ -330,7 +344,7 @@ export default function PerformanceKpiPanel({
             ? `준비 ${displayTime(session.networkReadyAt)}`
             : "구축 중"
         }`
-      : "구축팀 투입 시 측정 시작",
+      : "차량 도착·구축팀 투입 시 측정 시작",
     location:
       sessionMode && sessionPositionStats.intervalCount > 0
         ? `AVG ${sessionPositionStats.averageGapSec}초 · MAX ${sessionPositionStats.maxGapSec}초`
@@ -364,14 +378,14 @@ export default function PerformanceKpiPanel({
       officialTarget: OFFICIAL_RFP_BASELINE.networkDeploymentMinutes,
       source: sessionMode
         ? session.networkReadyAt
-          ? `${session.runId} · 구축팀 투입→망 준비 완료 실측`
+          ? `${session.runId} · 차량 도착·구축팀 투입→망 준비 완료 실측`
           : `${session.runId} · 망 준비 완료 입력 대기`
         : deployment
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
               deployment.sourceSystem ?? "출처 미상",
             )}`
           : "시작·망 준비 완료 시각 수신 대기",
-      note: "공식 방법: 지정 시각 구축팀 투입부터 망 준비 완료까지 경과시간",
+      note: "공식 근거: RFP 차량도착→현장통신망 구축 완료 / 계획서 구축팀 투입시각 측정",
     },
     {
       id: "location",
@@ -385,7 +399,7 @@ export default function PerformanceKpiPanel({
       officialTarget: OFFICIAL_RFP_BASELINE.locationUpdateSeconds,
       source: sessionMode
         ? sessionLocationMeasured != null
-          ? `${session.runId} · 평균 ${sessionPositionStats.averageGapSec}초 · 최대 ${sessionPositionStats.maxGapSec}초 · ${sessionPositionStats.intervalCount}구간`
+          ? `${session.runId} · 대원·차량 평균 ${sessionPositionStats.averageGapSec}초 · 최대 ${sessionPositionStats.maxGapSec}초 · ${sessionPositionStats.intervalCount}구간`
           : `${session.runId} · 연속 위치 갱신 이벤트 수신 대기`
         : location
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
@@ -394,7 +408,7 @@ export default function PerformanceKpiPanel({
           : locationFallback != null
             ? "브라우저 수신표본 최대 갱신 간격"
             : "위치 텔레메트리 수신 대기",
-      note: "공식 방법: 모든 갱신 이벤트 기록 후 평균·최대 갱신주기 산출; PASS는 최대값 기준",
+      note: "공식 방법: 대원·차량 위치 갱신 이벤트의 평균·최대 갱신주기 산출; PASS는 최대값 기준",
     },
     {
       id: "sharing",
@@ -496,6 +510,7 @@ export default function PerformanceKpiPanel({
   const addSharingAttempts = (
     successCount: number,
     failureCount: number,
+    payloadType: SharingPayloadType = "MESSAGE",
   ) => {
     setSession((current) => {
       if (
@@ -516,6 +531,7 @@ export default function PerformanceKpiPanel({
           attemptedAt,
           receivedAt: attemptedAt,
           status: "SUCCESS",
+          payloadType,
         });
       }
 
@@ -525,6 +541,7 @@ export default function PerformanceKpiPanel({
           attemptedAt,
           receivedAt: null,
           status: "FAILED",
+          payloadType,
         });
       }
 
@@ -605,6 +622,8 @@ export default function PerformanceKpiPanel({
         averageGapSec: sessionPositionStats.averageGapSec,
         maxGapSec: sessionPositionStats.maxGapSec,
         positionIntervalCount: sessionPositionStats.intervalCount,
+        positionMeasurementSubject: "PERSONNEL_OR_VEHICLE",
+        positionMeasurementSampleCount: sessionPositionSamples.length,
         sharingSuccessPct: sessionSharingMeasured,
         sharingAttemptCount: sessionSharingStats.attempts,
         sharingSuccessCount: sessionSharingStats.successes,
@@ -719,7 +738,7 @@ export default function PerformanceKpiPanel({
             disabled={Boolean(session && !session.endedAt)}
           >
             {!session
-              ? "구축팀 투입·측정 시작"
+              ? "차량 도착·구축팀 투입"
               : session.endedAt
                 ? "새 측정 시작"
                 : "측정 중"}
@@ -807,23 +826,37 @@ export default function PerformanceKpiPanel({
               <div>
                 <button
                   type="button"
-                  onClick={() => addSharingAttempts(1, 0)}
+                  onClick={() => addSharingAttempts(1, 0, "MESSAGE")}
                   disabled={
                     !session?.networkReadyAt ||
                     Boolean(session?.endedAt)
                   }
                 >
-                  성공수신 +1
+                  메시지 성공 +1
                 </button>
                 <button
                   type="button"
-                  onClick={() => addSharingAttempts(0, 1)}
+                  onClick={() => addSharingAttempts(1, 0, "POSITION")}
+                  disabled={!session?.networkReadyAt || Boolean(session?.endedAt)}
+                >
+                  위치 성공 +1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSharingAttempts(1, 0, "VIDEO")}
+                  disabled={!session?.networkReadyAt || Boolean(session?.endedAt)}
+                >
+                  영상 성공 +1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSharingAttempts(0, 1, "MESSAGE")}
                   disabled={
                     !session?.networkReadyAt ||
                     Boolean(session?.endedAt)
                   }
                 >
-                  수신실패 +1
+                  메시지 실패 +1
                 </button>
                 {demoMode ? (
                   <button
@@ -980,12 +1013,14 @@ export default function PerformanceKpiPanel({
             <b>1</b>
             <div className="performance-proof-main">
               <strong>통신망 구축시간 ≤ 7분</strong>
-              <p>계획서 · 구축팀 투입 → 망 준비 완료</p>
+              <p>RFP 10분 · 계획서 7분 · 차량도착/팀투입→망 준비</p>
             </div>
             <em>
-              {session
-                ? displayDuration(deploymentTimerSec)
-                : "대기"}
+              {sessionMode
+                ? `LIVE ${displayDuration(deploymentTimerSec)}`
+                : overviewDeploymentValue != null
+                  ? `${demoMode ? "DEMO " : ""}${overviewDeploymentValue}분`
+                  : "대기"}
             </em>
           </article>
 
@@ -993,15 +1028,19 @@ export default function PerformanceKpiPanel({
             <b>2</b>
             <div className="performance-proof-main">
               <strong>위치정보 갱신주기 ≤ 3초</strong>
-              <p>계획서 · 평균·최대 갱신주기 산출</p>
+              <p>RFP 5초 · 계획서 3초 · 대원·차량 AVG/MAX</p>
             </div>
             <em>
-              MAX{" "}
-              {sessionPositionStats.maxGapSec != null
-                ? `${sessionPositionStats.maxGapSec.toFixed(1)}초`
-                : locationFallback != null
-                  ? `${locationFallback.toFixed(1)}초`
-                  : "-"}
+              {sessionMode
+                ? sessionPositionStats.intervalCount > 0 &&
+                  sessionPositionStats.maxGapSec != null
+                  ? `LIVE MAX ${sessionPositionStats.maxGapSec.toFixed(1)}초`
+                  : "LIVE 대기"
+                : overviewLocationValue != null
+                  ? `${demoMode ? "DEMO " : ""}${overviewLocationValue}초`
+                  : locationFallback != null
+                    ? `참고 MAX ${locationFallback.toFixed(1)}초`
+                    : "-"}
             </em>
           </article>
 
@@ -1009,16 +1048,20 @@ export default function PerformanceKpiPanel({
             <b>3</b>
             <div className="performance-proof-main">
               <strong>정보공유 성공률 ≥ 98%</strong>
-              <p>계획서 · 성공수신 ÷ 전송시도 × 100</p>
+              <p>메시지·영상·위치 · 성공수신/전송시도</p>
             </div>
             <em>
-              {sessionSharingStats.attempts > 0
-                ? `${sessionSharingStats.successes}/${sessionSharingStats.attempts} · ${
-                    sessionSharingMeasured ?? "-"
-                  }%`
-                : sharingFallback != null
-                  ? `${sharingFallback}%`
-                  : "-"}
+              {sessionMode
+                ? sessionSharingStats.attempts > 0
+                  ? `LIVE ${sessionSharingStats.successes}/${sessionSharingStats.attempts} · ${
+                      sessionSharingMeasured ?? "-"
+                    }%`
+                  : "LIVE 대기"
+                : overviewSharingValue != null
+                  ? `${demoMode ? "DEMO " : ""}${overviewSharingValue}%`
+                  : sharingFallback != null
+                    ? `참고 ${sharingFallback}%`
+                    : "-"}
             </em>
           </article>
 
@@ -1026,14 +1069,18 @@ export default function PerformanceKpiPanel({
             <b>4</b>
             <div className="performance-proof-main">
               <strong>통신망 가용률 ≥ 98%</strong>
-              <p>계획서 · (운영시간-장애시간) ÷ 운영시간</p>
+              <p>연속운영 · (운영시간-중단시간)/운영시간</p>
             </div>
             <em>
-              {sessionAvailabilityMeasured != null
-                ? `${sessionAvailabilityMeasured}%`
-                : availabilityFallback != null
-                  ? `${availabilityFallback}%`
-                  : "-"}
+              {sessionMode
+                ? session?.networkReadyAt && sessionAvailabilityMeasured != null
+                  ? `LIVE ${sessionAvailabilityMeasured}%`
+                  : "LIVE 대기"
+                : overviewAvailabilityValue != null
+                  ? `${demoMode ? "DEMO " : ""}${overviewAvailabilityValue}%`
+                  : availabilityFallback != null
+                    ? `참고 ${availabilityFallback}%`
+                    : "-"}
             </em>
           </article>
         </div>

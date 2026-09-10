@@ -1,10 +1,13 @@
 import type { TelemetrySample } from "./operationalEvidence";
 
+export type SharingPayloadType = "MESSAGE" | "VIDEO" | "POSITION";
+
 export type InformationSharingAttempt = {
   transmissionId: string;
   attemptedAt: string;
   receivedAt: string | null;
   status: "SUCCESS" | "FAILED";
+  payloadType?: SharingPayloadType;
 };
 
 export type ServiceInterruption = {
@@ -66,17 +69,20 @@ export const PERFORMANCE_INTERFACE_REQUIREMENTS = {
     "receivedAt",
   ],
   positionRequired: [
+    "entityType(ASSET|PERSONNEL)",
+    "assetType",
     "latitude",
     "longitude",
   ],
   sessionRequired: [
     "runId",
     "eventId",
-    "startedAt(teamDeployedAt)",
+    "startedAt(vehicleArrivedAt|teamDeployedAt)",
     "networkReadyAt",
   ],
   sharingRequired: [
     "transmissionId",
+    "payloadType(MESSAGE|VIDEO|POSITION)",
     "attemptedAt",
     "deliveryStatus(SUCCESS|FAILED)",
     "receivedAt|ackAt",
@@ -161,6 +167,30 @@ export function filterTelemetryForSession(
     const timestamp = sampleTimeMs(sample);
     return timestamp != null && timestamp >= start && timestamp <= end;
   });
+}
+
+export function isOfficialPositionSample(sample: TelemetrySample) {
+  if (sample.entityType === "PERSONNEL") return true;
+
+  const assetType = String(sample.assetType ?? "").toUpperCase();
+  return (
+    assetType.includes("VEHICLE") ||
+    assetType.includes("FIRE_ENGINE") ||
+    assetType.includes("FIRE_TRUCK") ||
+    assetType.includes("COMMAND_CAR")
+  );
+}
+
+// RFP 위치정보 갱신주기 정의는 "대원/차량"이다.
+// 분류 메타데이터가 없는 과거 표본은 호환을 위해 전체 표본을 반환한다.
+export function filterOfficialPositionSamples(samples: TelemetrySample[]) {
+  const hasSubjectMetadata = samples.some(
+    (sample) => sample.entityType != null || sample.assetType != null,
+  );
+
+  return hasSubjectMetadata
+    ? samples.filter(isOfficialPositionSample)
+    : samples;
 }
 
 export function calculatePositionUpdateStatistics(
