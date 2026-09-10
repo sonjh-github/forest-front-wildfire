@@ -100,31 +100,319 @@ function wildfireHeatFeatureCollection(
   return { type: "FeatureCollection", features };
 }
 
-function createLabelImage(text: string) {
+type MapLabelVariant = "incident" | "resource";
+
+function createLabelImage(
+  text: string,
+  variant: MapLabelVariant = "resource",
+) {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) return null;
-  context.font = "700 20px sans-serif";
-  const width = Math.min(310, Math.ceil(context.measureText(text).width) + 24);
+
+  const incident = variant === "incident";
+  // pixelRatio: 2로 등록되므로 실제 지도 표시 크기를 고려해 캔버스 글꼴을 넉넉하게 잡는다.
+  const fontSize = incident ? 42 : 32;
+  const height = incident ? 74 : 60;
+  const paddingX = incident ? 24 : 18;
+
+  context.font = `800 ${fontSize}px sans-serif`;
+  const width = Math.min(
+    incident ? 520 : 420,
+    Math.ceil(context.measureText(text).width) + paddingX * 2,
+  );
+
   canvas.width = width;
-  canvas.height = 42;
-  context.font = "700 20px sans-serif";
-  context.fillStyle = "rgba(255,255,255,0.94)";
-  context.strokeStyle = "rgba(31,55,72,0.24)";
-  context.lineWidth = 2;
+  canvas.height = height;
+
+  context.font = `800 ${fontSize}px sans-serif`;
+  context.fillStyle = incident
+    ? "rgba(255,248,244,0.98)"
+    : "rgba(255,255,255,0.96)";
+  context.strokeStyle = incident
+    ? "rgba(188,47,32,0.62)"
+    : "rgba(31,55,72,0.28)";
+  context.lineWidth = incident ? 3 : 2;
   context.beginPath();
-  context.roundRect(1, 1, width - 2, 40, 9);
+  context.roundRect(
+    1.5,
+    1.5,
+    width - 3,
+    height - 3,
+    incident ? 13 : 10,
+  );
   context.fill();
   context.stroke();
-  context.fillStyle = "#203543";
+
+  context.fillStyle = incident ? "#a92b20" : "#203543";
   context.textBaseline = "middle";
-  context.fillText(text, 12, 22, width - 24);
-  return context.getImageData(0, 0, width, 42);
+  context.fillText(
+    text,
+    paddingX,
+    height / 2 + 1,
+    width - paddingX * 2,
+  );
+
+  return context.getImageData(0, 0, width, height);
+}
+
+type ResourceIconKind =
+  | "personnel"
+  | "uav"
+  | "vehicle"
+  | "communication"
+  | "asset";
+
+function resourceIconId(location: LiveLocation) {
+  if (location.kind === "personnel" || location.category === "PERSONNEL") {
+    return "field-icon-personnel";
+  }
+  if (
+    ["UAV", "MAIN_RELAY_DRONE", "SERVICE_RELAY_DRONE"].includes(
+      location.category,
+    )
+  ) {
+    return "field-icon-uav";
+  }
+  if (["COMMAND_VEHICLE", "GCS"].includes(location.category)) {
+    return "field-icon-vehicle";
+  }
+  if (
+    [
+      "RTK_BASE_LPWA_GATEWAY",
+      "TVWS_BASE_STATION",
+      "TVWS_CPE",
+      "LTE_GATEWAY",
+      "PRIVATE_5G_NTN_GATEWAY",
+      "RADIO_GATEWAY_400MHZ",
+      "FIXED_RELAY",
+      "MOBILE_RELAY",
+      "REF_AP",
+      "ROVER_AP",
+    ].includes(location.category)
+  ) {
+    return "field-icon-communication";
+  }
+  return "field-icon-asset";
+}
+
+function createResourceIconImage(kind: ResourceIconKind) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  canvas.width = 48;
+  canvas.height = 48;
+
+  context.strokeStyle = "#ffffff";
+  context.fillStyle = "#ffffff";
+  context.lineWidth = 4;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  if (kind === "personnel") {
+    context.beginPath();
+    context.arc(24, 14, 6, 0, Math.PI * 2);
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(24, 22);
+    context.lineTo(24, 35);
+    context.moveTo(16, 27);
+    context.lineTo(32, 27);
+    context.moveTo(24, 35);
+    context.lineTo(17, 43);
+    context.moveTo(24, 35);
+    context.lineTo(31, 43);
+    context.stroke();
+  } else if (kind === "uav") {
+    context.beginPath();
+    context.moveTo(11, 16);
+    context.lineTo(37, 32);
+    context.moveTo(37, 16);
+    context.lineTo(11, 32);
+    context.stroke();
+
+    for (const [x, y] of [
+      [10, 15],
+      [38, 15],
+      [10, 33],
+      [38, 33],
+    ] as Array<[number, number]>) {
+      context.beginPath();
+      context.arc(x, y, 5, 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    context.fillRect(20, 20, 8, 8);
+  } else if (kind === "vehicle") {
+    context.beginPath();
+    context.roundRect(8, 18, 32, 17, 4);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(16, 18);
+    context.lineTo(20, 11);
+    context.lineTo(32, 11);
+    context.lineTo(36, 18);
+    context.stroke();
+
+    context.beginPath();
+    context.arc(15, 38, 4, 0, Math.PI * 2);
+    context.arc(34, 38, 4, 0, Math.PI * 2);
+    context.fill();
+  } else if (kind === "communication") {
+    context.beginPath();
+    context.moveTo(24, 14);
+    context.lineTo(24, 41);
+    context.moveTo(18, 41);
+    context.lineTo(30, 41);
+    context.stroke();
+
+    context.beginPath();
+    context.arc(24, 13, 4, 0, Math.PI * 2);
+    context.fill();
+
+    context.beginPath();
+    context.arc(24, 13, 11, -0.9, 0.9);
+    context.stroke();
+    context.beginPath();
+    context.arc(24, 13, 17, -0.75, 0.75);
+    context.stroke();
+  } else {
+    context.beginPath();
+    context.roundRect(10, 10, 28, 28, 6);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(17, 24);
+    context.lineTo(31, 24);
+    context.moveTo(24, 17);
+    context.lineTo(24, 31);
+    context.stroke();
+  }
+
+  return context.getImageData(0, 0, 48, 48);
+}
+
+function createIncidentIconImage() {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  canvas.width = 72;
+  canvas.height = 82;
+
+  context.shadowColor = "rgba(149, 25, 12, 0.35)";
+  context.shadowBlur = 8;
+
+  const gradient = context.createLinearGradient(0, 12, 0, 72);
+  gradient.addColorStop(0, "#ffcf33");
+  gradient.addColorStop(0.45, "#ff6f18");
+  gradient.addColorStop(1, "#d62818");
+
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.moveTo(36, 6);
+  context.bezierCurveTo(39, 23, 56, 26, 57, 44);
+  context.bezierCurveTo(58, 61, 47, 73, 36, 77);
+  context.bezierCurveTo(19, 74, 10, 63, 12, 49);
+  context.bezierCurveTo(14, 35, 26, 30, 24, 17);
+  context.bezierCurveTo(31, 20, 34, 14, 36, 6);
+  context.closePath();
+  context.fill();
+
+  context.shadowBlur = 0;
+  context.fillStyle = "#fff2a8";
+  context.beginPath();
+  context.moveTo(37, 34);
+  context.bezierCurveTo(43, 42, 47, 47, 45, 56);
+  context.bezierCurveTo(43, 64, 37, 68, 31, 65);
+  context.bezierCurveTo(24, 61, 25, 53, 29, 48);
+  context.bezierCurveTo(33, 43, 34, 39, 37, 34);
+  context.closePath();
+  context.fill();
+
+  return context.getImageData(0, 0, 72, 82);
+}
+
+function wildfireIncidentAreaFeatureCollection(
+  eventCenter: [number, number] | null,
+): GeoJSON.FeatureCollection {
+  if (!eventCenter) {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  // DEMO 시각 강조용 영향권.
+  // 공식 화선/위험경계/확산예측 데이터가 아니라 발생지점 인지를 돕기 위한 보조 표현이다.
+  const [longitude, latitude] = eventCenter;
+  const points = 64;
+
+  const createRing = (
+    baseRadiusM: number,
+    phase: number,
+    irregularity: number,
+  ) => {
+    const coordinates: Array<[number, number]> = [];
+
+    for (let index = 0; index <= points; index += 1) {
+      const angle = (index / points) * Math.PI * 2;
+      const wobble =
+        1 +
+        irregularity * 0.46 * Math.sin(angle * 3 + phase) +
+        irregularity * 0.28 * Math.sin(angle * 5 - phase * 0.7) +
+        irregularity * 0.18 * Math.cos(angle * 7 + 0.8);
+
+      const directionalStretch =
+        1 + 0.18 * Math.max(0, Math.cos(angle - 0.7));
+
+      const radiusM = baseRadiusM * wobble * directionalStretch;
+      const latitudeDelta = radiusM / 111_320;
+      const longitudeDelta =
+        radiusM /
+        (111_320 * Math.max(0.2, Math.cos((latitude * Math.PI) / 180)));
+
+      coordinates.push([
+        longitude + Math.cos(angle) * longitudeDelta,
+        latitude + Math.sin(angle) * latitudeDelta,
+      ]);
+    }
+
+    return coordinates;
+  };
+
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        id: "wildfire-incident-emphasis-outer",
+        geometry: {
+          type: "Polygon",
+          coordinates: [createRing(650, 0.5, 0.34)],
+        },
+        properties: {
+          visualOnly: true,
+          severity: "outer",
+        },
+      },
+      {
+        type: "Feature",
+        id: "wildfire-incident-emphasis-core",
+        geometry: {
+          type: "Polygon",
+          coordinates: [createRing(315, 1.2, 0.24)],
+        },
+        properties: {
+          visualOnly: true,
+          severity: "core",
+        },
+      },
+    ],
+  };
 }
 
 const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color: string; opacity?: number }> = {
   firelines: { type: "line", color: "#d9271c" },
-  "spread-predictions": { type: "fill", color: "#f36b21", opacity: 0.27 },
+  "spread-predictions": { type: "fill", color: "#f36b21", opacity: 0.36 },
   "communication-coverages": { type: "fill", color: "#158bcb", opacity: 0.14 },
   "slope-assessments": { type: "fill", color: "#8a52c7", opacity: 0.12 },
   "debris-flow-paths": { type: "line", color: "#70451f" },
@@ -150,10 +438,10 @@ const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color
     color: "#7651a8",
     opacity: 0.8,
   },
-  "external-wildfire-risk": { type: "fill", color: "#f05c2f", opacity: 0.2 },
+  "external-wildfire-risk": { type: "fill", color: "#f05c2f", opacity: 0.29 },
   "external-landslide-forecast": { type: "fill", color: "#d39a28", opacity: 0.18 },
   "external-landslide-regional-risk": { type: "fill", color: "#8550b6", opacity: 0.2 },
-  "wildfire-risk-zones": { type: "fill", color: "#d92d20", opacity: 0.22 },
+  "wildfire-risk-zones": { type: "fill", color: "#d92d20", opacity: 0.34 },
   "evacuation-routes": { type: "line", color: "#16a36d", opacity: 1 },
   "suppression-resources": { type: "circle", color: "#1678c8", opacity: 0.9 },
   "water-sources": { type: "circle", color: "#13a9d6", opacity: 0.9 },
@@ -162,6 +450,12 @@ const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color
   "communication-shadows": { type: "fill", color: "#394a5a", opacity: 0.26 },
   "slope-gradients": { type: "fill", color: "#a85c36", opacity: 0.18 },
 };
+
+const wildfireOutlineLayerIds = new Set([
+  "spread-predictions",
+  "external-wildfire-risk",
+  "wildfire-risk-zones",
+]);
 
 const DEFAULT_EXPECTED_TELEMETRY_INTERVAL_MS = 30_000;
 
@@ -265,6 +559,45 @@ function geometryOf(layerId: string, row: ApiRecord) {
   return candidates.find((candidate) => candidate && typeof candidate === "object" && "type" in candidate) as GeoJSON.Geometry | undefined;
 }
 
+function domainPointLabel(
+  layerId: string,
+  row: ApiRecord,
+  index: number,
+) {
+  if (layerId === "suppression-resources") {
+    return String(
+      row.resourceName ??
+      row.name ??
+      `진화자원 ${index + 1}`,
+    );
+  }
+
+  if (layerId === "water-sources") {
+    return String(
+      row.resourceName ??
+      row.name ??
+      `소화용수 ${index + 1}`,
+    );
+  }
+
+  if (layerId === "nearby-response-resources") {
+    const name = String(
+      row.resourceType ??
+      row.resourceName ??
+      row.name ??
+      `주변 대응자원 ${index + 1}`,
+    );
+
+    const eta = Number(row.etaMinutes);
+
+    return Number.isFinite(eta)
+      ? `${name} · ETA ${eta}분`
+      : name;
+  }
+
+  return "";
+}
+
 function featureCollection(layerId: string, rows: ApiRecord[]): GeoJSON.FeatureCollection {
   const timeOf = (row: ApiRecord) => Date.parse(String(
     row.observedAt ?? row.baseTime ?? row.assessedAt ?? row.lastDetectedAt ?? row.detectedAt ?? row.generatedAt ?? 0
@@ -298,6 +631,7 @@ function featureCollection(layerId: string, rows: ApiRecord[]): GeoJSON.FeatureC
           observedAt: String(row.observedAt ?? ""),
           confidence: row.confidence == null ? "" : String(row.confidence),
           frp: Number.isFinite(Number(row.frp)) ? Number(row.frp) : null,
+          label: domainPointLabel(layerId, row, index),
         },
       } as GeoJSON.Feature] : [];
     }),
@@ -319,6 +653,23 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
           category: location.category,
           registeredToEvent: location.registeredToEvent,
           labelIcon: `field-label-${key}`,
+          resourceIcon: resourceIconId(location),
+          labelSlot:
+            location.id === "CREW-12"
+              ? "crew-up"
+              : location.id === "CREW-07"
+                ? "crew-down"
+                : location.category === "UAV"
+                  ? "uav-up"
+                  : location.category === "COMMAND_VEHICLE"
+                    ? "vehicle-down"
+                    : location.category === "RTK_BASE_LPWA_GATEWAY"
+                      ? "rtk-down"
+                      : location.category === "FIXED_RELAY"
+                        ? "relay-up"
+                        : location.id === "FIRE-ENG-03"
+                          ? "fire-engine-down"
+                          : "default",
           changed: (changedUntil[key] ?? 0) > Date.now(),
           selected: selectedKey === key,
         },
@@ -504,20 +855,124 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
             source: sourceId,
             paint: {
               "line-color": style.color,
-              "line-width": layerId === "firelines" ? 7 : layerId === "evacuation-routes" ? 6 : 4,
+              "line-width": layerId === "firelines" ? 9 : layerId === "evacuation-routes" ? 6 : 4,
               "line-opacity": style.opacity ?? 0.95,
-              "line-blur": layerId === "firelines" ? 0.35 : 0,
+              "line-blur": layerId === "firelines" ? 0.5 : 0,
             },
           });
-          if (style.type === "fill") map.addLayer({ id: mapLayerId, type: "fill", source: sourceId, paint: { "fill-color": style.color, "fill-opacity": style.opacity ?? 0.16, "fill-outline-color": style.color } });
-          if (style.type === "circle") map.addLayer({ id: mapLayerId, type: "circle", source: sourceId, paint: { "circle-color": style.color, "circle-radius":
-            layerId === "victim-candidates"
-              ? 11
-              : layerId === "external-firms"
-                ? 10
-                : 8, "circle-opacity": 0.84, "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
+          if (style.type === "fill") map.addLayer({
+            id: mapLayerId,
+            type: "fill",
+            source: sourceId,
+            paint: {
+              "fill-color": style.color,
+              "fill-opacity": style.opacity ?? 0.16,
+              "fill-outline-color": style.color,
+            },
+          });
+          if (
+            style.type === "fill" &&
+            wildfireOutlineLayerIds.has(layerId)
+          ) {
+            const outlineLayerId = `domain-outline-${layerId}`;
+            if (!map.getLayer(outlineLayerId)) {
+              map.addLayer({
+                id: outlineLayerId,
+                type: "line",
+                source: sourceId,
+                paint: {
+                  "line-color": style.color,
+                  "line-width":
+                    layerId === "wildfire-risk-zones" ? 4.5 : 3,
+                  "line-opacity": 0.92,
+                  "line-dasharray":
+                    layerId === "spread-predictions"
+                      ? [2.4, 1.8]
+                      : [1000, 0.1],
+                },
+              });
+            }
+          }
+          if (style.type === "circle") {
+            map.addLayer({
+              id: mapLayerId,
+              type: "circle",
+              source: sourceId,
+              paint: {
+                "circle-color": style.color,
+                "circle-radius":
+                  layerId === "victim-candidates"
+                    ? 11
+                    : layerId === "external-firms"
+                      ? 10
+                      : 9,
+                "circle-opacity": 0.9,
+                "circle-stroke-color": "#fff",
+                "circle-stroke-width": 2.8,
+              },
+            });
+
+            if (
+              [
+                "suppression-resources",
+                "water-sources",
+                "nearby-response-resources",
+              ].includes(layerId)
+            ) {
+              const labelLayerId = `${mapLayerId}-label`;
+
+              if (!map.getLayer(labelLayerId)) {
+                map.addLayer({
+                  id: labelLayerId,
+                  type: "symbol",
+                  source: sourceId,
+                  layout: {
+                    "text-field": ["get", "label"],
+                    "text-size": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      8, 13,
+                      12, 15,
+                      15, 18,
+                    ],
+                    "text-anchor": "left",
+                    "text-offset": [1.15, 0],
+                    "text-allow-overlap": true,
+                    "text-ignore-placement": true,
+                  },
+                  paint: {
+                    "text-color": "#243b35",
+                    "text-halo-color": "rgba(255,255,255,.98)",
+                    "text-halo-width": 3,
+                    "text-halo-blur": 0.4,
+                  },
+                });
+              }
+            }
+          }
         }
-        map.setLayoutProperty(mapLayerId, "visibility", visibleLayerIds.has(layerId) ? "visible" : "none");
+        const visibility = visibleLayerIds.has(layerId)
+          ? "visible"
+          : "none";
+        map.setLayoutProperty(mapLayerId, "visibility", visibility);
+        const outlineLayerId = `domain-outline-${layerId}`;
+        if (map.getLayer(outlineLayerId)) {
+          map.setLayoutProperty(
+            outlineLayerId,
+            "visibility",
+            visibility,
+          );
+        }
+
+        const labelLayerId = `${mapLayerId}-label`;
+        if (map.getLayer(labelLayerId)) {
+          map.setLayoutProperty(
+            labelLayerId,
+            "visibility",
+            visibility,
+          );
+        }
       }
     };
     if (map.isStyleLoaded()) render(); else map.once("load", render);
@@ -547,7 +1002,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
             "heatmap-weight": ["coalesce", ["get", "weight"], 0.7],
             "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 14, 1.8],
             "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 40, 14, 118],
-            "heatmap-opacity": 0.86,
+            "heatmap-opacity": wildfireDemo ? 0.92 : 0.86,
             "heatmap-color": [
               "interpolate", ["linear"], ["heatmap-density"],
               0, "rgba(255,220,0,0)",
@@ -666,12 +1121,103 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           type: "Feature",
           id: "event-origin",
           geometry: { type: "Point", coordinates: eventCenter },
-          properties: {},
+          properties: {
+            label: wildfireDemo ? "산불 발생지점" : "재난 발생지점",
+          },
         }] : [],
       };
       const eventSource = map.getSource("event-origin-source") as GeoJSONSource | undefined;
       if (eventSource) eventSource.setData(eventData);
       else map.addSource("event-origin-source", { type: "geojson", data: eventData });
+
+      const incidentAreaData = wildfireDemo
+        ? wildfireIncidentAreaFeatureCollection(eventCenter)
+        : { type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection;
+      const incidentAreaSource = map.getSource(
+        "wildfire-incident-area-source",
+      ) as GeoJSONSource | undefined;
+      if (incidentAreaSource) {
+        incidentAreaSource.setData(incidentAreaData);
+      } else {
+        map.addSource("wildfire-incident-area-source", {
+          type: "geojson",
+          data: incidentAreaData,
+        });
+      }
+
+      if (!map.getLayer("wildfire-incident-area-fill")) {
+        map.addLayer({
+          id: "wildfire-incident-area-fill",
+          type: "fill",
+          source: "wildfire-incident-area-source",
+          paint: {
+            "fill-color": [
+              "match",
+              ["get", "severity"],
+              "core",
+              "#e53920",
+              "#ff7b22",
+            ],
+            "fill-opacity": [
+              "match",
+              ["get", "severity"],
+              "core",
+              0.24,
+              0.13,
+            ],
+          },
+        });
+      }
+      if (!map.getLayer("wildfire-incident-area-outline")) {
+        map.addLayer({
+          id: "wildfire-incident-area-outline",
+          type: "line",
+          source: "wildfire-incident-area-source",
+          paint: {
+            "line-color": [
+              "match",
+              ["get", "severity"],
+              "core",
+              "#ff5c26",
+              "#e33122",
+            ],
+            "line-width": [
+              "match",
+              ["get", "severity"],
+              "core",
+              3,
+              4.5,
+            ],
+            "line-opacity": [
+              "match",
+              ["get", "severity"],
+              "core",
+              0.72,
+              0.92,
+            ],
+            "line-blur": [
+              "match",
+              ["get", "severity"],
+              "core",
+              0.4,
+              0.8,
+            ],
+          },
+        });
+      }
+
+      const incidentAreaVisibility =
+        wildfireDemo && showEvent ? "visible" : "none";
+      map.setLayoutProperty(
+        "wildfire-incident-area-fill",
+        "visibility",
+        incidentAreaVisibility,
+      );
+      map.setLayoutProperty(
+        "wildfire-incident-area-outline",
+        "visibility",
+        incidentAreaVisibility,
+      );
 
       const topologyData = topologyFeatureCollection(locations, topology, topologyFocusKey, referenceTimeMs);
       const topologySource = map.getSource("communication-topology-source") as GeoJSONSource | undefined;
@@ -746,19 +1292,53 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           "circle-stroke-width": wildfireDemo ? 4 : 3,
         },
       });
-      if (!map.hasImage("event-origin-label")) {
-        const image = createLabelImage(wildfireDemo ? "산불 발생지점" : "재난 발생지점");
-        if (image) map.addImage("event-origin-label", image, { pixelRatio: 2 });
+      if (!map.getLayer("event-origin-label")) {
+        map.addLayer({
+          id: "event-origin-label",
+          type: "symbol",
+          source: "event-origin-source",
+          layout: {
+            "text-field": ["get", "label"],
+            "text-size": wildfireDemo ? 22 : 18,
+            "text-anchor": "left",
+            "text-offset": [2.25, -0.35],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": "#b52d1f",
+            "text-halo-color": "rgba(255,255,255,.98)",
+            "text-halo-width": 3.5,
+            "text-halo-blur": 0.5,
+          },
+        });
       }
-      if (!map.getLayer("event-origin-label")) map.addLayer({
-        id: "event-origin-label", type: "symbol", source: "event-origin-source",
-        layout: { "icon-image": "event-origin-label", "icon-anchor": "left", "icon-offset": [13, 0], "icon-allow-overlap": true, "icon-ignore-placement": true, "icon-padding": 3 },
-      });
+
+      const sharedResourceIcons: Array<[
+        string,
+        ResourceIconKind,
+      ]> = [
+        ["field-icon-personnel", "personnel"],
+        ["field-icon-uav", "uav"],
+        ["field-icon-vehicle", "vehicle"],
+        ["field-icon-communication", "communication"],
+        ["field-icon-asset", "asset"],
+      ];
+      for (const [imageId, kind] of sharedResourceIcons) {
+        if (map.hasImage(imageId)) continue;
+        const image = createResourceIconImage(kind);
+        if (image) {
+          map.addImage(imageId, image, { pixelRatio: 2 });
+        }
+      }
 
       for (const location of locations) {
         const imageId = `field-label-${keyOf(location)}`;
         if (!map.hasImage(imageId)) {
-          const image = createLabelImage(compactLabel(location));
+          const image = createLabelImage(
+            compactLabel(location),
+            "resource",
+          );
           if (image) map.addImage(imageId, image, { pixelRatio: 2 });
         }
       }
@@ -792,7 +1372,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       if (!map.getLayer("field-resource-point")) map.addLayer({
         id: "field-resource-point", type: "circle", source: "field-resource-source",
         paint: {
-          "circle-radius": ["case", ["==", ["get", "kind"], "personnel"], 8, 9],
+          "circle-radius": ["case", ["==", ["get", "kind"], "personnel"], 11, 12.5],
           "circle-color": ["case",
             ["!", ["boolean", ["get", "registeredToEvent"], true]], "#d86f31",
             ["match", ["get", "category"],
@@ -806,33 +1386,89 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           "circle-stroke-width": ["case", ["boolean", ["get", "selected"], false], 4, 2],
         },
       });
+      if (!map.getLayer("field-resource-icon")) {
+        map.addLayer({
+          id: "field-resource-icon",
+          type: "symbol",
+          source: "field-resource-source",
+          layout: {
+            "icon-image": ["get", "resourceIcon"],
+            "icon-size": wildfireDemo ? 1.08 : 0.92,
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+          },
+        });
+      }
       if (!map.getLayer("field-resource-label")) map.addLayer({
         id: "field-resource-label", type: "symbol", source: "field-resource-source",
         layout: {
           "icon-image": ["get", "labelIcon"],
           "icon-anchor": "left",
-          "icon-offset": [13, 0],
-          "icon-allow-overlap": false,
-          "icon-ignore-placement": false,
+          "icon-offset": [
+            "match",
+            ["get", "labelSlot"],
+            "uav-up", ["literal", [22, -34]],
+            "crew-up", ["literal", [24, -22]],
+            "crew-down", ["literal", [24, 24]],
+            "vehicle-down", ["literal", [20, 26]],
+            "rtk-down", ["literal", [20, 30]],
+            "relay-up", ["literal", [20, -28]],
+            "fire-engine-down", ["literal", [22, 30]],
+            ["literal", [21, 0]],
+          ],
+          "icon-allow-overlap": wildfireDemo,
+          "icon-ignore-placement": wildfireDemo,
           "icon-padding": 4,
         },
       });
 
-      for (const layerId of ["event-origin-halo", "event-origin-ring", "event-origin-point", "event-origin-label"]) {
-        map.setLayoutProperty(layerId, "visibility", showEvent ? "visible" : "none");
-      }
-      for (const layerId of ["field-resource-halo", "field-resource-pulse-1", "field-resource-pulse-2", "field-resource-pulse-3", "field-resource-point", "field-resource-label"]) {
-        map.setLayoutProperty(layerId, "visibility", showResources ? "visible" : "none");
-      }
-      // 고정 순서: 배경지도 → AI 분석 결과 → 발생지점 → 수신 펄스 → 자산·인원.
-      for (const layerId of Object.keys(domainLayerStyle).map((id) => `domain-layer-${id}`)) {
-        if (map.getLayer(layerId)) map.moveLayer(layerId);
+      for (const layerId of [
+        "event-origin-halo",
+        "event-origin-ring",
+        "event-origin-point",
+        "event-origin-label",
+      ]) {
+        map.setLayoutProperty(
+          layerId,
+          "visibility",
+          showEvent ? "visible" : "none",
+        );
       }
       for (const layerId of [
+        "field-resource-halo",
+        "field-resource-pulse-1",
+        "field-resource-pulse-2",
+        "field-resource-pulse-3",
+        "field-resource-point",
+        "field-resource-icon",
+        "field-resource-label",
+      ]) {
+        map.setLayoutProperty(
+          layerId,
+          "visibility",
+          showResources ? "visible" : "none",
+        );
+      }
+      // 고정 순서: 배경지도 → AI 분석 결과 → 발생지점 → 수신 펄스 → 자산·인원.
+      for (const id of Object.keys(domainLayerStyle)) {
+        const layerId = `domain-layer-${id}`;
+        const outlineLayerId = `domain-outline-${id}`;
+        if (map.getLayer(layerId)) map.moveLayer(layerId);
+        if (map.getLayer(outlineLayerId)) map.moveLayer(outlineLayerId);
+
+        const labelLayerId = `${layerId}-label`;
+        if (map.getLayer(labelLayerId)) {
+          map.moveLayer(labelLayerId);
+        }
+      }
+      for (const layerId of [
+        "wildfire-incident-area-fill",
+        "wildfire-incident-area-outline",
         "communication-topology-active", "communication-topology-delayed", "communication-topology-disconnected", "communication-topology-label",
-        "event-origin-halo", "event-origin-ring", "event-origin-point", "event-origin-label",
+        "event-origin-halo", "event-origin-ring", "event-origin-point",
         "field-resource-halo", "field-resource-pulse-1", "field-resource-pulse-2", "field-resource-pulse-3",
-        "field-resource-point", "field-resource-label",
+        "field-resource-point", "field-resource-icon", "field-resource-label",
+        "event-origin-label",
       ]) {
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
@@ -901,6 +1537,55 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !wildfireDemo || !showEvent || !eventCenter) return;
+
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    let frame = 0;
+
+    const animate = (now: number) => {
+      const phase = reduceMotion
+        ? 0.35
+        : (now % 1_800) / 1_800;
+
+      if (map.getLayer("event-origin-halo")) {
+        map.setPaintProperty(
+          "event-origin-halo",
+          "circle-radius",
+          64 + phase * 46,
+        );
+        map.setPaintProperty(
+          "event-origin-halo",
+          "circle-opacity",
+          0.26 - phase * 0.20,
+        );
+      }
+
+      if (map.getLayer("event-origin-ring")) {
+        map.setPaintProperty(
+          "event-origin-ring",
+          "circle-radius",
+          31 + phase * 13,
+        );
+        map.setPaintProperty(
+          "event-origin-ring",
+          "circle-stroke-opacity",
+          0.95 - phase * 0.45,
+        );
+      }
+
+      if (!reduceMotion) {
+        frame = requestAnimationFrame(animate);
+      }
+    };
+
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [eventCenter, showEvent, wildfireDemo]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     const hasActivePulse = Object.values(changedUntil).some((until) => until > Date.now());
     if (!map || !showResources) return;
     if (!hasActivePulse) {
@@ -965,6 +1650,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
       <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
         <strong>지도 범례</strong>
+        {wildfireDemo && <span><i className="incident" />산불 발생</span>}
         <span><i className="fireline" />화선</span>
         <span><i className="spread" />확산예측</span>
         <span><i className="risk" />위험지역</span>
