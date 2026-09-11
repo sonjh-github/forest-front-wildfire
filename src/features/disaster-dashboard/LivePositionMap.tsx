@@ -780,14 +780,15 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
       map.setTerrain(
         terrain3d
-          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 1.45 : 1.35 }
+          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 2.2 : 1.8 }
           : null,
       );
 
       map.easeTo({
-        pitch: terrain3d ? (wildfireDemo ? 64 : 58) : 0,
-        bearing: terrain3d ? (wildfireDemo ? -24 : -18) : 0,
-        duration: terrain3d ? 420 : 280,
+        pitch: terrain3d ? 72 : 0,
+        bearing: terrain3d ? -28 : 0,
+        zoom: terrain3d ? Math.max(map.getZoom(), 13.6) : map.getZoom(),
+        duration: 650,
       });
     };
 
@@ -1644,7 +1645,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         <button type="button" className={!mutedBasemap && !terrain3d ? "active" : ""} aria-pressed={!mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(false); }}>2D 지도</button>
         <button type="button" className={mutedBasemap && !terrain3d ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(true); }}>현장 강조</button>
         {wildfireDemo && <button type="button" className={riskHeatmap ? "active heatmap" : "heatmap"} aria-pressed={riskHeatmap} onClick={() => setRiskHeatmap((value) => !value)}>열원 참고</button>}
-        <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(false); setTerrain3d((value) => !value); }}>3D 지형</button>
+        <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(true); setTerrain3d((value) => !value); }}>3D 지형</button>
       </div>
       {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
       <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
