@@ -83,7 +83,11 @@ export function createDemoOverview(now = new Date(), scenario: DemoScenario = de
     domainLayers: {
       firelines: [{ id: "fireline-1", observedAt, fireline: line([[126.610667,36.668667],[126.615667,36.670667],[126.620667,36.668667],[126.623667,36.665667]]) }],
       "spread-predictions": [{ id: "spread-1", baseTime: observedAt, modelName: "ForestSpread AI", modelVersion: "2.4", confidence: 0.86, predictedArea: polygon([[126.608667,36.663667],[126.611667,36.674667],[126.624667,36.676667],[126.630667,36.666667],[126.620667,36.658667]]) }],
-      "wildfire-risk-zones": [{ id: "risk-1", observedAt, resultGeometry: polygon(wildfireRiskBoundary) }],
+      "communication-coverages": [
+        { id: "coverage-command", observedAt, coverageArea: polygon([[126.592667,36.654667],[126.594667,36.668667],[126.605667,36.676667],[126.619667,36.674667],[126.626667,36.664667],[126.617667,36.654667],[126.602667,36.651667]]) },
+        { id: "coverage-relay", observedAt, coverageArea: polygon([[126.608667,36.661667],[126.613667,36.679667],[126.629667,36.684667],[126.643667,36.675667],[126.640667,36.660667],[126.624667,36.655667]]) },
+        { id: "coverage-rtk", observedAt, coverageArea: polygon([[126.596667,36.656667],[126.599667,36.669667],[126.611667,36.674667],[126.621667,36.666667],[126.616667,36.656667],[126.604667,36.653667]]) },
+      ],      "wildfire-risk-zones": [{ id: "risk-1", observedAt, resultGeometry: polygon(wildfireRiskBoundary) }],
       "evacuation-routes": [{ id: "evac-1", observedAt, resultGeometry: line([[126.624667,36.668667],[126.616667,36.662667],[126.606667,36.658667],[126.597667,36.655667]]) }],
       "suppression-resources": [{ id: "sup-1", observedAt, resultGeometry: point([126.602667,36.658667]) }, { id: "sup-2", observedAt, resultGeometry: point([126.626667,36.660667]) }],
       "water-sources": [{ id: "water-1", observedAt, resultGeometry: point([126.594667,36.661667]) }, { id: "water-2", observedAt, resultGeometry: point([126.633667,36.656667]) }],

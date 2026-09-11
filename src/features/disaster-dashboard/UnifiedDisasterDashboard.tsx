@@ -634,9 +634,9 @@ export default function UnifiedDisasterDashboard() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [visibleLayerIds, setVisibleLayerIds] = useState(() => new Set([
     "resources",
+    "topology",
     "event",
-    "firelines",
-    "wildfire-risk-zones",
+    "communication-coverages",
   ]));
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 

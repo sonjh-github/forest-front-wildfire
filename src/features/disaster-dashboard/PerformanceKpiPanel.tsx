@@ -688,7 +688,7 @@ export default function PerformanceKpiPanel({
     >
       <header className="performance-kpi-heading">
         <div>
-          <strong>성능기준 4종 실시간 평가</strong>
+          <strong>현장 통신 KPI 4종</strong>
           <small>
             {sessionMode
               ? `${session.runId} · 측정 세션 기반`
@@ -1109,9 +1109,9 @@ export default function PerformanceKpiPanel({
       >
         <header>
           <div>
-            <strong>Packet Loss Sequence</strong>
+            <strong>장비별 100 SEQ 통신품질</strong>
             <small>
-              선택 장비의 최근 100개 sequence를 10×10으로 표시
+              최근 100 SEQ 기준 수신·유실·성공률을 10×10으로 확인
             </small>
           </div>
 
