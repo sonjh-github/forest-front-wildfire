@@ -112,13 +112,13 @@ function createLabelImage(
 
   const incident = variant === "incident";
   // pixelRatio: 2로 등록되므로 실제 지도 표시 크기를 고려해 캔버스 글꼴을 넉넉하게 잡는다.
-  const fontSize = incident ? 42 : 32;
+  const fontSize = incident ? 40 : 36;
   const height = incident ? 74 : 60;
   const paddingX = incident ? 24 : 18;
 
   context.font = `800 ${fontSize}px sans-serif`;
   const width = Math.min(
-    incident ? 520 : 420,
+    incident ? 500 : 460,
     Math.ceil(context.measureText(text).width) + paddingX * 2,
   );
 
@@ -412,8 +412,8 @@ function wildfireIncidentAreaFeatureCollection(
 
 const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color: string; opacity?: number }> = {
   firelines: { type: "line", color: "#d9271c" },
-  "spread-predictions": { type: "fill", color: "#f36b21", opacity: 0.36 },
-  "communication-coverages": { type: "fill", color: "#158bcb", opacity: 0.14 },
+  "spread-predictions": { type: "fill", color: "#d79048", opacity: 0.08 },
+  "communication-coverages": { type: "fill", color: "#1689d6", opacity: 0.22 },
   "slope-assessments": { type: "fill", color: "#8a52c7", opacity: 0.12 },
   "debris-flow-paths": { type: "line", color: "#70451f" },
   "debris-flow-areas": { type: "fill", color: "#b36a32", opacity: 0.16 },
@@ -441,7 +441,7 @@ const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color
   "external-wildfire-risk": { type: "fill", color: "#f05c2f", opacity: 0.29 },
   "external-landslide-forecast": { type: "fill", color: "#d39a28", opacity: 0.18 },
   "external-landslide-regional-risk": { type: "fill", color: "#8550b6", opacity: 0.2 },
-  "wildfire-risk-zones": { type: "fill", color: "#d92d20", opacity: 0.34 },
+  "wildfire-risk-zones": { type: "fill", color: "#b38a57", opacity: 0.08 },
   "evacuation-routes": { type: "line", color: "#16a36d", opacity: 1 },
   "suppression-resources": { type: "circle", color: "#1678c8", opacity: 0.9 },
   "water-sources": { type: "circle", color: "#13a9d6", opacity: 0.9 },
@@ -684,7 +684,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const wildfireDemo = isWildfireDemoMode();
   const [mutedBasemap, setMutedBasemap] = useState(false);
   const [terrain3d, setTerrain3d] = useState(false);
-  const [riskHeatmap, setRiskHeatmap] = useState(wildfireDemo);
+  const [riskHeatmap, setRiskHeatmap] = useState(false);
   const [terrainElevationM, setTerrainElevationM] = useState<number | null>(null);
   const fallbackTerrainConfig = resolveTerrainConfig(import.meta.env);
   const terrainConfig = wildfireDemo ? DEOKSUNG_DEM : fallbackTerrainConfig;
@@ -780,14 +780,15 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
       map.setTerrain(
         terrain3d
-          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 1.45 : 1.35 }
+          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 2.2 : 1.8 }
           : null,
       );
 
       map.easeTo({
-        pitch: terrain3d ? (wildfireDemo ? 64 : 58) : 0,
-        bearing: terrain3d ? (wildfireDemo ? -24 : -18) : 0,
-        duration: terrain3d ? 420 : 280,
+        pitch: terrain3d ? 72 : 0,
+        bearing: terrain3d ? -28 : 0,
+        zoom: terrain3d ? Math.max(map.getZoom(), 13.6) : map.getZoom(),
+        duration: 650,
       });
     };
 
@@ -1206,8 +1207,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         });
       }
 
-      const incidentAreaVisibility =
-        wildfireDemo && showEvent ? "visible" : "none";
+      const incidentAreaVisibility = "none";
       map.setLayoutProperty(
         "wildfire-incident-area-fill",
         "visibility",
@@ -1393,7 +1393,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           source: "field-resource-source",
           layout: {
             "icon-image": ["get", "resourceIcon"],
-            "icon-size": wildfireDemo ? 1.08 : 0.92,
+            "icon-size": wildfireDemo ? 1.16 : 0.96,
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
           },
@@ -1643,19 +1643,19 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       <div ref={containerRef} className="live-basemap" aria-label="실시간 현장 지도" />
       <div className="basemap-switch" aria-label="지도 표현 전환">
         <button type="button" className={!mutedBasemap && !terrain3d ? "active" : ""} aria-pressed={!mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(false); }}>2D 지도</button>
-        <button type="button" className={mutedBasemap && !terrain3d ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(true); }}>재난 강조</button>
-        {wildfireDemo && <button type="button" className={riskHeatmap ? "active heatmap" : "heatmap"} aria-pressed={riskHeatmap} onClick={() => setRiskHeatmap((value) => !value)}>위험도</button>}
-        <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(false); setTerrain3d((value) => !value); }}>3D 지형</button>
+        <button type="button" className={mutedBasemap && !terrain3d ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(true); }}>현장 강조</button>
+        {wildfireDemo && <button type="button" className={riskHeatmap ? "active heatmap" : "heatmap"} aria-pressed={riskHeatmap} onClick={() => setRiskHeatmap((value) => !value)}>열원 참고</button>}
+        <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(true); setTerrain3d((value) => !value); }}>3D 지형</button>
       </div>
       {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
       <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
         <strong>지도 범례</strong>
-        {wildfireDemo && <span><i className="incident" />산불 발생</span>}
-        <span><i className="fireline" />화선</span>
-        <span><i className="spread" />확산예측</span>
-        <span><i className="risk" />위험지역</span>
+        {wildfireDemo && <span><i className="incident" />산불 발생지점</span>}
+        <span><i className="coverage" />통신 운용범위</span><span><i className="fireline" />관측 화선</span>
+        <span><i className="spread" />확산 참고</span>
+        <span><i className="risk" />산불 위험예보</span>
         <span><i className="evacuation" />대피로</span>
-        {wildfireDemo && <span><i className="heat" />위험도</span>}
+        {wildfireDemo && <span><i className="heat" />위성 열원</span>}
         <span><i className="personnel" />인원</span>
         <span><i className="asset" />자원</span>
       </section>

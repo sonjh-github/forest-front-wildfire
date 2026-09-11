@@ -158,8 +158,8 @@ export default function NetworkSequenceQualityPanel({
     >
       <header className="network-seq-card-header">
         <div>
-          <strong>장비별 SEQ 통신 품질</strong>
-          <small>최근 100 SEQ · 누락 번호 = Packet Loss</small>
+          <strong>장비별 통신품질</strong>
+          <small>최근 100 SEQ · 수신/유실/Packet Loss</small>
         </div>
         <b>
           {measuredRows.length > 0

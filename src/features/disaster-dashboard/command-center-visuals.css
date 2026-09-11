@@ -297,3 +297,11 @@
   }
 }
 
+
+.command-center-legend i.coverage {
+  width: 18px;
+  height: 9px;
+  border: 2px dashed #1689d6;
+  border-radius: 0;
+  background: rgba(22, 137, 214, .22);
+}

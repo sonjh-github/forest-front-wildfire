@@ -74,7 +74,7 @@ const tabs: Array<{ id: PanelTab; label: string; icon: string }> = [
   { id: "alerts", label: "현장 경보", icon: "!" },
   { id: "networks", label: "통신망", icon: "⌁" },
   { id: "reports", label: "상황 보고", icon: "≡" },
-  { id: "kpis", label: "실증 KPI", icon: "✓" },
+  { id: "kpis", label: "현장 KPI", icon: "✓" },
   { id: "integrations", label: "연계 상태", icon: "↔" },
 ];
 
@@ -202,14 +202,14 @@ export function OperationsPanel({
     ]
     : [
       { id: "firelines", label: "관측 화선", description: "실측·관측 결과(실선)" },
-      { id: "spread-predictions", label: "확산 예측", description: "AI 예측 결과(투명면)" },
-      { id: "communication-coverages", label: "통신 커버리지", description: "TVWS·백홀 가용범위" },
+      { id: "spread-predictions", label: "확산 참고", description: "시나리오 참고 레이어 · 기본 비표시" },
+      { id: "communication-coverages", label: "통신 운용범위", description: "시나리오 기반 현장망 운용범위" },
       { id: "ai-ran-coverages", label: "AI-RAN 커버리지", description: "AI 통신 가용범위 분석" },
       { id: "relay-placement-candidates", label: "중계기 배치 후보", description: "AI 최적 배치 지점" },
       { id: "ignition-detections", label: "발화지점 탐지", description: "영상 AI 발화 후보" },
       { id: "vehicle-detections", label: "차량 탐지", description: "현장 차량 인식 결과" },
       { id: "road-segmentations", label: "도로 분할", description: "진입 가능 도로 분석" },
-      { id: "wildfire-risk-zones", label: "산불 위험지역", description: "산림청 위험예보 기반 위험면" },
+      { id: "wildfire-risk-zones", label: "산림청 위험예보", description: "외부 위험예보 참고 레이어" },
       { id: "evacuation-routes", label: "안전 대피로", description: "현장 지휘 승인 대피경로" },
       { id: "suppression-resources", label: "진화자원", description: "진화차·방어선 배치 지점" },
       { id: "water-sources", label: "소화용수", description: "취수 가능 지점" },
