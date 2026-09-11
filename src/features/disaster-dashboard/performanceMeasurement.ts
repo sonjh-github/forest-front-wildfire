@@ -42,6 +42,7 @@ export type PositionUpdateStatistics = {
   assetCount: number;
   intervalCount: number;
   averageGapSec: number | null;
+  p95GapSec: number | null;
   maxGapSec: number | null;
 };
 
@@ -217,6 +218,12 @@ export function calculatePositionUpdateStatistics(
     }
   }
 
+  const sortedGapsSec = [...gapsSec].sort((a, b) => a - b);
+  const p95Index =
+    sortedGapsSec.length > 0
+      ? Math.max(0, Math.ceil(sortedGapsSec.length * 0.95) - 1)
+      : -1;
+
   return {
     sampleCount,
     assetCount: grouped.size,
@@ -229,6 +236,10 @@ export function calculatePositionUpdateStatistics(
               gapsSec.length
             ).toFixed(3),
           )
+        : null,
+    p95GapSec:
+      p95Index >= 0
+        ? Number(sortedGapsSec[p95Index].toFixed(3))
         : null,
     maxGapSec:
       gapsSec.length > 0
@@ -254,6 +265,27 @@ export function calculateInformationSharingSuccess(
         ? Number(((successes / attempts.length) * 100).toFixed(2))
         : null,
   };
+}
+
+export function calculateInformationSharingByPayload(
+  attempts: InformationSharingAttempt[],
+) {
+  const payloadTypes: SharingPayloadType[] = [
+    "MESSAGE",
+    "POSITION",
+    "VIDEO",
+  ];
+
+  return Object.fromEntries(
+    payloadTypes.map((payloadType) => [
+      payloadType,
+      calculateInformationSharingSuccess(
+        attempts.filter(
+          (attempt) => (attempt.payloadType ?? "MESSAGE") === payloadType,
+        ),
+      ),
+    ]),
+  ) as Record<SharingPayloadType, InformationSharingStatistics>;
 }
 
 export function calculateOfficialAvailability(

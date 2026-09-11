@@ -9,6 +9,7 @@ import {
   type TelemetrySample,
 } from "./operationalEvidence";
 import {
+  calculateInformationSharingByPayload,
   calculateInformationSharingSuccess,
   calculateNetworkDeploymentMinutes,
   calculateOfficialAvailability,
@@ -266,6 +267,20 @@ export default function PerformanceKpiPanel({
     [session],
   );
 
+  const sessionSharingByPayload = useMemo(
+    () =>
+      calculateInformationSharingByPayload(
+        session?.sharingAttempts ?? [],
+      ),
+    [session],
+  );
+
+  const sessionSharingBreakdown = [
+    `메시지 ${sessionSharingByPayload.MESSAGE.successes}/${sessionSharingByPayload.MESSAGE.attempts}`,
+    `위치 ${sessionSharingByPayload.POSITION.successes}/${sessionSharingByPayload.POSITION.attempts}`,
+    `영상 ${sessionSharingByPayload.VIDEO.successes}/${sessionSharingByPayload.VIDEO.attempts}`,
+  ].join(" · " );
+
   const sessionAvailability = useMemo(
     () =>
       session && effectiveEndAt && session.networkReadyAt
@@ -347,7 +362,7 @@ export default function PerformanceKpiPanel({
       : "차량 도착·구축팀 투입 시 측정 시작",
     location:
       sessionMode && sessionPositionStats.intervalCount > 0
-        ? `AVG ${sessionPositionStats.averageGapSec}초 · MAX ${sessionPositionStats.maxGapSec}초`
+        ? `AVG ${sessionPositionStats.averageGapSec}초 · P95 ${sessionPositionStats.p95GapSec}초 · MAX ${sessionPositionStats.maxGapSec}초`
         : locationFallback != null
           ? `MAX ${locationFallback}초`
           : "위치 갱신 이벤트 대기",
@@ -399,7 +414,7 @@ export default function PerformanceKpiPanel({
       officialTarget: OFFICIAL_RFP_BASELINE.locationUpdateSeconds,
       source: sessionMode
         ? sessionLocationMeasured != null
-          ? `${session.runId} · 대원·차량 평균 ${sessionPositionStats.averageGapSec}초 · 최대 ${sessionPositionStats.maxGapSec}초 · ${sessionPositionStats.intervalCount}구간`
+          ? `${session.runId} · 대원·차량 AVG ${sessionPositionStats.averageGapSec}초 · P95 ${sessionPositionStats.p95GapSec}초 · MAX ${sessionPositionStats.maxGapSec}초 · ${sessionPositionStats.intervalCount}구간`
           : `${session.runId} · 연속 위치 갱신 이벤트 수신 대기`
         : location
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
@@ -408,7 +423,7 @@ export default function PerformanceKpiPanel({
           : locationFallback != null
             ? "브라우저 수신표본 최대 갱신 간격"
             : "위치 텔레메트리 수신 대기",
-      note: "공식 방법: 대원·차량 위치 갱신 이벤트의 평균·최대 갱신주기 산출; PASS는 최대값 기준",
+      note: "공식 방법: 대원·차량 위치 갱신 이벤트의 평균·P95·최대 갱신주기 산출; PASS는 최대값 기준",
     },
     {
       id: "sharing",
@@ -422,7 +437,7 @@ export default function PerformanceKpiPanel({
       officialTarget: OFFICIAL_RFP_BASELINE.sharingSuccessPct,
       source: sessionMode
         ? sessionSharingStats.attempts > 0
-          ? `${session.runId} · 전송시도 ${sessionSharingStats.attempts}건 · 성공수신 ${sessionSharingStats.successes}건 · 실패 ${sessionSharingStats.failures}건`
+          ? `${session.runId} · 전송 ${sessionSharingStats.attempts}건 · 성공 ${sessionSharingStats.successes}건 · ${sessionSharingBreakdown}`
           : `${session.runId} · 전송 시도/성공 수신 이벤트 대기`
         : sharing
           ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
@@ -620,6 +635,7 @@ export default function PerformanceKpiPanel({
         ...evidence.metrics,
         networkDeploymentMinutes: deploymentMeasured,
         averageGapSec: sessionPositionStats.averageGapSec,
+        p95GapSec: sessionPositionStats.p95GapSec,
         maxGapSec: sessionPositionStats.maxGapSec,
         positionIntervalCount: sessionPositionStats.intervalCount,
         positionMeasurementSubject: "PERSONNEL_OR_VEHICLE",
@@ -628,6 +644,7 @@ export default function PerformanceKpiPanel({
         sharingAttemptCount: sessionSharingStats.attempts,
         sharingSuccessCount: sessionSharingStats.successes,
         sharingFailureCount: sessionSharingStats.failures,
+        sharingByPayload: sessionSharingByPayload,
         packetLossPct: sessionPacketMetrics.lossPct,
         sequenceReceived: sessionPacketMetrics.received,
         sequenceLost: sessionPacketMetrics.lost,

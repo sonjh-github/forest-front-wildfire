@@ -3,7 +3,7 @@ import { OFFICIAL_RFP_BASELINE, PROJECT_ENHANCED_TARGET } from "./officialRfpGap
 import { useMemo, useState } from "react";
 import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
-import { buildOperationalEvidence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import { buildOperationalEvidence, buildPacketLossQualityAlerts, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import type { TelemetryStreamStatus } from "./telemetryStream";
 import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
 import PerformanceKpiPanel from "./PerformanceKpiPanel";
@@ -144,15 +144,31 @@ export function OperationsPanel({
   const externalIntegrationLoading = Object.values(
     externalIntegrationStatus,
   ).some((state) => state.status === "loading");
+  const sequenceQualityAlerts = useMemo(
+    () =>
+      buildPacketLossQualityAlerts(telemetrySamples, {
+        maxSlots: 100,
+        minExpected: 8,
+        warningLossPct: 3,
+        severeLossPct: 8,
+      }),
+    [telemetrySamples],
+  );
+
   const activeAlerts = useMemo(() => {
     const rank: Record<string, number> = { CRITICAL: 0, SEVERE: 1, WARNING: 2, CAUTION: 3, NORMAL: 4 };
-    return overview.alerts.map((alert) => ({ ...alert, status: alertOverrides[value(alert, ["alertId", "id"], "")] ?? alert.status }))
+    const rows: ApiRecord[] = [
+      ...sequenceQualityAlerts.map((alert) => ({ ...alert } as unknown as ApiRecord)),
+      ...overview.alerts,
+    ];
+
+    return rows.map((alert) => ({ ...alert, status: alertOverrides[value(alert, ["alertId", "id"], "")] ?? alert.status }))
       .filter((alert) => !["RESOLVED", "EXPIRED", "CANCELLED"].includes(value(alert, ["status"])))
       .sort((a, b) =>
         (rank[value(a, ["severity", "severityCode"])] ?? 5) - (rank[value(b, ["severity", "severityCode"])] ?? 5)
         || Date.parse(value(b, ["issuedAt", "createdAt"], "0")) - Date.parse(value(a, ["issuedAt", "createdAt"], "0")),
       );
-  }, [overview.alerts, alertOverrides]);
+  }, [overview.alerts, alertOverrides, sequenceQualityAlerts]);
   const demoAlertWorkflow = overview.domainDetail?.mode === "SIMULATION";
   const handleAlertAction = (alertId: string, currentStatus: string, action: AlertWorkflowAction) => {
     const normalized: AlertWorkflowStatus = ["ACKNOWLEDGED", "RESOLVED"].includes(currentStatus) ? currentStatus as AlertWorkflowStatus : "ACTIVE";

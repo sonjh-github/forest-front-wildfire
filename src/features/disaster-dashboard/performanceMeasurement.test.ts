@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateInformationSharingByPayload,
   calculateInformationSharingSuccess,
   calculateNetworkDeploymentMinutes,
   calculateOfficialAvailability,
@@ -73,6 +74,22 @@ describe("performance measurement session", () => {
     expect(stats.maxGapSec).toBe(3);
   });
 
+  it("위치 갱신 간격의 P95를 계산한다", () => {
+    let second = 0;
+    const samples = [row(second, 1)];
+
+    for (let gap = 1; gap <= 20; gap += 1) {
+      second += gap;
+      samples.push(row(second, gap + 1));
+    }
+
+    const stats = calculatePositionUpdateStatistics(samples);
+    expect(stats.intervalCount).toBe(20);
+    expect(stats.averageGapSec).toBe(10.5);
+    expect(stats.p95GapSec).toBe(19);
+    expect(stats.maxGapSec).toBe(20);
+  });
+
   it("정보공유 성공률을 전송 시도 대비 성공 수신 건수로 계산한다", () => {
     const attempts: InformationSharingAttempt[] = Array.from(
       { length: 100 },
@@ -89,6 +106,20 @@ describe("performance measurement session", () => {
     expect(stats.successes).toBe(99);
     expect(stats.failures).toBe(1);
     expect(stats.successPct).toBe(99);
+  });
+
+  it("정보공유 성공률을 메시지·위치·영상 유형별로 분리한다", () => {
+    const attempts: InformationSharingAttempt[] = [
+      { transmissionId: "M1", attemptedAt: "2026-09-09T00:00:00Z", receivedAt: "2026-09-09T00:00:01Z", status: "SUCCESS", payloadType: "MESSAGE" },
+      { transmissionId: "M2", attemptedAt: "2026-09-09T00:00:00Z", receivedAt: null, status: "FAILED", payloadType: "MESSAGE" },
+      { transmissionId: "P1", attemptedAt: "2026-09-09T00:00:00Z", receivedAt: "2026-09-09T00:00:01Z", status: "SUCCESS", payloadType: "POSITION" },
+      { transmissionId: "V1", attemptedAt: "2026-09-09T00:00:00Z", receivedAt: "2026-09-09T00:00:01Z", status: "SUCCESS", payloadType: "VIDEO" },
+    ];
+
+    const byPayload = calculateInformationSharingByPayload(attempts);
+    expect(byPayload.MESSAGE.successPct).toBe(50);
+    expect(byPayload.POSITION.successPct).toBe(100);
+    expect(byPayload.VIDEO.successPct).toBe(100);
   });
 
   it("통신망 가용률을 총 운영시간과 서비스 중단시간 공식으로 계산한다", () => {
