@@ -1650,7 +1650,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
         <strong>지도 범례</strong>
         {wildfireDemo && <span><i className="incident" />산불 발생지점</span>}
-        <span><i className="coverage" />통신 커버리지</span><span><i className="fireline" />관측 화선</span>
+        <span><i className="coverage" />통신 운용범위</span><span><i className="fireline" />관측 화선</span>
         <span><i className="spread" />확산 참고</span>
         <span><i className="risk" />산불 위험예보</span>
         <span><i className="evacuation" />대피로</span>

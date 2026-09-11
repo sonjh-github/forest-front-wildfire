@@ -203,7 +203,7 @@ export function OperationsPanel({
     : [
       { id: "firelines", label: "관측 화선", description: "실측·관측 결과(실선)" },
       { id: "spread-predictions", label: "확산 참고", description: "시나리오 참고 레이어 · 기본 비표시" },
-      { id: "communication-coverages", label: "통신 커버리지", description: "현장망·중계 가용범위" },
+      { id: "communication-coverages", label: "통신 운용범위", description: "시나리오 기반 현장망 운용범위" },
       { id: "ai-ran-coverages", label: "AI-RAN 커버리지", description: "AI 통신 가용범위 분석" },
       { id: "relay-placement-candidates", label: "중계기 배치 후보", description: "AI 최적 배치 지점" },
       { id: "ignition-detections", label: "발화지점 탐지", description: "영상 AI 발화 후보" },
