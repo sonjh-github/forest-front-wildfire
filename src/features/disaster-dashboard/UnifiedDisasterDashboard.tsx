@@ -654,6 +654,7 @@ export default function UnifiedDisasterDashboard() {
   const localE2EMode = FORCE_LOCAL_E2E_MODE;
   const localFieldMode = FORCE_LOCAL_FIELD_MODE;
   const fieldPreviewMode = FORCE_FIELD_PREVIEW_MODE;
+  const commandShellMode = true;
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
   const [telemetrySamples, setTelemetrySamples] = useState<TelemetrySample[]>([]);
@@ -666,7 +667,7 @@ export default function UnifiedDisasterDashboard() {
   const [visibleResourceGroups, setVisibleResourceGroups] = useState<Set<ResourceGroup>>(
     () => new Set(["PERSONNEL", "UAV", "COMMAND", "POSITIONING", "COMMUNICATION", "DETECTION", "UNASSIGNED"]),
   );
-  const [operationsTab, setOperationsTab] = useState<PanelTab>(FORCE_DEMO_MODE ? "kpis" : "layers");
+  const [operationsTab, setOperationsTab] = useState<PanelTab>("kpis");
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(null);
   const [topologyLocationKey, setTopologyLocationKey] = useState<string | null>(null);
   const [resourceDialogGroup, setResourceDialogGroup] = useState<ResourceGroup | "ALL" | "ALL_ASSETS" | null>(null);
@@ -1625,7 +1626,7 @@ export default function UnifiedDisasterDashboard() {
   }, [refreshEvents]);
 
   return (
-    <main className={`unified-disaster-board${localFieldMode || demoMode ? " is-field-mode" : ""}`} aria-label="산림 재난 통합 현황">
+    <main className={`unified-disaster-board${commandShellMode ? " is-field-mode" : ""}`} aria-label="산림 재난 통합 현황">
       {error && <p className="unified-disaster-error" role="status"><strong>데이터 갱신 지연</strong><span>{error}</span><small>{overview ? "마지막 정상 데이터를 유지합니다." : "연결을 다시 확인하고 있습니다."}</small></p>}
       {!overview && (
         <section className="dashboard-readiness" aria-live="polite">
@@ -1712,7 +1713,7 @@ export default function UnifiedDisasterDashboard() {
             <span>{localFieldMode ? (fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "MD1000 · MAVLink v2 · SYNTHETIC OFF") : localE2EMode ? "LOCAL E2E · 실기체 아님" : demoMode ? "DEMO · 모의 관제" : "LIVE · 운영 데이터"}</span>
           </aside>
         </section>
-        <section className={`dashboard-map-stage${localFieldMode || demoMode ? " field-command-stage" : " asset-panel-collapsed"}`} aria-label="지도 중심 통합 상황판">
+        <section className={`dashboard-map-stage${commandShellMode ? " field-command-stage" : " asset-panel-collapsed"}`} aria-label="지도 중심 통합 상황판">
           <section className="live-location-panel" aria-label="실시간 현장 위치">
             {!demoMode && overview.liveDroneTelemetry && <div
               className="telemetry-connection-status"
@@ -1792,9 +1793,9 @@ export default function UnifiedDisasterDashboard() {
                 onOpenDroneVideo={(location) => setVideoDrone(location)}
                 telemetrySamples={telemetrySamples}
               />
-              {(localFieldMode || demoMode) && <aside className="field-command-inspector" aria-label="MD1000 장비 상세 정보">
+              {commandShellMode && <aside className="field-command-inspector" aria-label="MD1000 장비 상세 정보">
                 <header>
-                  <div><small>장비 상세 정보</small><strong>{fieldPrimaryDrone?.label ?? "MD1000 실기체"}</strong></div>
+                  <div><small>장비 상세 정보</small><strong>{fieldPrimaryDrone?.label ?? (fieldPreviewMode ? "MD1000 미리보기" : "주 기체 수신 대기")}</strong></div>
                   <em
                     className="field-freshness-chip"
                     data-state={fieldFreshnessState.toLowerCase()}
@@ -1817,7 +1818,7 @@ export default function UnifiedDisasterDashboard() {
                   <header>
                     <div>
                       <small>FIELD SUCCESS GATE</small>
-                      <strong>MD1000 실기체 연동</strong>
+                      <strong>{fieldPrimaryDrone ? "MD1000 실기체 연동" : fieldPreviewMode ? "MD1000 미리보기 연동" : "실기체 연동 대기"}</strong>
                     </div>
                     <em data-state={fieldPipelineMapState.toLowerCase()}>
                       {fieldPipelineMapState}
@@ -1843,7 +1844,7 @@ export default function UnifiedDisasterDashboard() {
                 </section>
 
                 <div className="field-inspector-identity">
-                  <span>무인기 · MD1000</span>
+                  <span>{fieldPrimaryDrone ? `무인기 · ${fieldPrimaryDrone.label}` : fieldPreviewMode ? "무인기 · MD1000 PREVIEW" : "무인기 · 미수신"}</span>
                   <b>{fieldPrimaryDrone?.status ?? "실기체 위치 수신 대기"}</b>
                   <small>{fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "GLOBAL_POSITION_INT(33) 기반 현재 위치"}</small>
                 </div>
@@ -1853,9 +1854,9 @@ export default function UnifiedDisasterDashboard() {
                     <strong>{fieldTwinLabel}</strong>
                   </header>
                   <div className="field-twin-grid">
-                    <article><small>Physical Asset</small><b>MD1000</b></article>
+                    <article><small>Physical Asset</small><b>{fieldPrimaryDrone?.label ?? (fieldPreviewMode ? "MD1000 PREVIEW" : "-")}</b></article>
                     <article><small>Twin State</small><b>{fieldTwinState}</b></article>
-                    <article><small>Position Source</small><b>{fieldPreviewMode ? "PREVIEW" : "MAVLink MSG 33"}</b></article>
+                    <article><small>Position Source</small><b>{fieldPreviewMode ? "PREVIEW" : fieldPrimaryDrone ? "MAVLink MSG 33" : "-"}</b></article>
                     <article
                       className="field-freshness-cell"
                       data-state={fieldFreshnessState.toLowerCase()}
@@ -2092,7 +2093,7 @@ export default function UnifiedDisasterDashboard() {
             data-active-pulses={Object.values(changedUntil).filter((until) => until > Date.now()).length}
           ><i /> 사건 데이터 변화 감지 · 갱신 주기의 30% 동안 테두리 강조</div>
         </section>
-        {(localFieldMode || demoMode) && <section className="field-command-footer" aria-label="현장 영상 및 이벤트 타임라인">
+        {commandShellMode && <section className="field-command-footer" aria-label="현장 영상 및 이벤트 타임라인">
           <div className="field-video-deck">
             <header><strong>실시간 영상</strong><small>{fieldPreviewMode ? "미리보기 4채널" : "RTSP 연결 상태"}</small></header>
             <div>
