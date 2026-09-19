@@ -3272,3 +3272,81 @@ body,
   opacity: 1 !important;
   white-space: nowrap !important;
 }
+
+/* =========================================================
+   2026-09-19 OPERATIONAL POLISH
+   Keep the GIS surface primary while fixing production
+   readability issues. Do not alter the three-column geometry.
+   ========================================================= */
+
+/* KPI context:
+   prevent the operational mode label from being clipped. */
+.unified-disaster-board.is-field-mode .field-kpi-context {
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.unified-disaster-board.is-field-mode .field-kpi-context b,
+.unified-disaster-board.is-field-mode .field-kpi-context span {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.unified-disaster-board.is-field-mode .field-kpi-context b {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.unified-disaster-board.is-field-mode .field-kpi-context span {
+  margin-top: 2px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  font-size: 8px !important;
+  line-height: 1.1 !important;
+}
+
+/* Video deck:
+   give the four operational channels enough visual weight
+   without competing with the primary GIS surface. */
+.unified-disaster-board.is-field-mode {
+  --cc-footer-h: 124px !important;
+}
+
+.unified-disaster-board.is-field-mode .field-command-footer {
+  height: var(--cc-footer-h) !important;
+  min-height: var(--cc-footer-h) !important;
+  max-height: var(--cc-footer-h) !important;
+}
+
+.unified-disaster-board.is-field-mode .field-video-deck > div {
+  height: calc(100% - 22px) !important;
+  min-height: 0 !important;
+  max-height: calc(100% - 22px) !important;
+}
+
+.unified-disaster-board.is-field-mode .field-video-channel {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+.unified-disaster-board.is-field-mode .field-video-preview {
+  min-height: 52px !important;
+}
+
+.unified-disaster-board.is-field-mode .field-video-caption {
+  min-width: 0 !important;
+  padding: 4px 6px !important;
+}
+
+.unified-disaster-board.is-field-mode .field-video-caption strong,
+.unified-disaster-board.is-field-mode .field-video-caption small {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}

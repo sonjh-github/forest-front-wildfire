@@ -695,7 +695,7 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
                   : location.category === "COMMAND_VEHICLE"
                     ? "vehicle-down"
                     : location.category === "RTK_BASE_LPWA_GATEWAY"
-                      ? "rtk-down"
+                      ? "rtk-left-down"
                       : location.category === "FIXED_RELAY"
                         ? "relay-up"
                         : location.id === "FIRE-ENG-03"
@@ -1703,7 +1703,12 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         id: "field-resource-label", type: "symbol", source: "field-resource-source",
         layout: {
           "icon-image": ["get", "labelIcon"],
-          "icon-anchor": "left",
+          "icon-anchor": [
+            "match",
+            ["get", "labelSlot"],
+            "rtk-left-down", "right",
+            "left",
+          ],
           "icon-offset": [
             "match",
             ["get", "labelSlot"],
@@ -1711,7 +1716,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
             "crew-up", ["literal", [24, -22]],
             "crew-down", ["literal", [24, 24]],
             "vehicle-down", ["literal", [20, 26]],
-            "rtk-down", ["literal", [20, 30]],
+            "rtk-left-down", ["literal", [-20, 30]],
             "relay-up", ["literal", [20, -28]],
             "fire-engine-down", ["literal", [22, 30]],
             ["literal", [21, 0]],
