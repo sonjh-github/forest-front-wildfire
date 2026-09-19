@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { forestApi, type ApiRecord } from "../../http-api";
 import type { LiveLocation } from "./UnifiedDisasterDashboard";
+import VideoPlayback from "./VideoPlayback";
 
 function label(value: unknown, fallback = "-") {
   return value == null || value === "" ? fallback : String(value);
@@ -104,10 +105,24 @@ export default function DroneVideoModal({ drone, onClose }: { drone: LiveLocatio
         <div><small>DRONE CONNECTION</small><h2 id="drone-video-title">{drone.label}</h2><span>장비·MAVLink·영상 채널 설정</span></div>
         <button type="button" onClick={onClose} aria-label="드론 연결 설정 닫기">×</button>
       </header>
-      <div className="drone-video-view" data-state={loading ? "loading" : primary ? verification.toLowerCase() : "empty"}>
-        {loading && <><i className="drone-video-spinner" /><strong>연결 설정 확인 중</strong></>}
-        {!loading && !primary && <><i className="drone-video-empty">◉</i><strong>영상 채널 사용 대기</strong><span>아래에서 RTSP 주소를 등록하면 영상 채널 정보가 생성됩니다.</span></>}
-        {!loading && primary && <><i className="drone-video-camera">●</i><strong>{channelEnabled ? "영상 채널 사용" : "영상 채널 대기"}</strong><span>{verificationLabel} · RTSP는 스트리밍 변환 모듈 연결 후 이 영역에서 재생됩니다.</span></>}
+      <div
+        className="drone-video-view"
+        data-state={loading ? "loading" : primary ? verification.toLowerCase() : "empty"}
+      >
+        {loading ? (
+          <>
+            <i className="drone-video-spinner" />
+            <strong>연결 설정 확인 중</strong>
+          </>
+        ) : (
+          <VideoPlayback
+            streamUri={streamUri}
+            enabled={channelEnabled}
+            verificationStatus={verification}
+            label={drone.label}
+            className="drone-video-playback"
+          />
+        )}
       </div>
       {!loading && <form className="drone-connection-form" onSubmit={save}>
         <fieldset><legend>장비 네트워크</legend><div>

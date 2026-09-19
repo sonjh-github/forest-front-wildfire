@@ -13,6 +13,7 @@ import {
 } from "./OperationsPanel";
 
 import DroneVideoModal from "./DroneVideoModal";
+import VideoPlayback from "./VideoPlayback";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
 import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
@@ -2133,9 +2134,25 @@ export default function UnifiedDisasterDashboard() {
                   data-preview={fieldPreviewMode ? "true" : undefined}
                   data-stream-ready={reachable ? "true" : undefined}
                 >
-                  <div className="field-video-preview" aria-hidden="true">
-                    <span className="field-video-badge">{`CH${index + 1}`}</span>
-                    <span className="field-video-live">{stateLabel}</span>
+                  <div className="field-video-preview">
+                    {fieldPreviewMode ? (
+                      <>
+                        <span className="field-video-badge">{`CH${index + 1}`}</span>
+                        <span className="field-video-live">{stateLabel}</span>
+                      </>
+                    ) : (
+                      <>
+                        <VideoPlayback
+                          streamUri={streamUri}
+                          enabled={enabled}
+                          verificationStatus={verification}
+                          label={label}
+                          className="field-video-playback"
+                        />
+                        <span className="field-video-badge">{`CH${index + 1}`}</span>
+                        <span className="field-video-live">{stateLabel}</span>
+                      </>
+                    )}
                   </div>
                   <div className="field-video-caption">
                     <strong>{label}</strong>
