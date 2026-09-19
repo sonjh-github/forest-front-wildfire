@@ -356,8 +356,8 @@ export async function loadEventTimeline(
       assetStatuses,
       personnelPositions,
     ] = await Promise.all([
-      forestApi.latestAssetStatuses(eventId),
-      forestApi.latestPersonnelPositions(eventId),
+      forestApi.latestAssetStatuses(eventId).catch(() => ({ data: [] })),
+      forestApi.latestPersonnelPositions(eventId).catch(() => ({ data: [] })),
     ]);
 
     return {

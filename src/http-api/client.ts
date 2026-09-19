@@ -13,6 +13,15 @@ const DASHBOARD_API_BASE_URL = (
   "https://api.forest.tobeunicorn.kr"
 ).replace(/\/+$/, "");
 
+const API_REQUEST_TIMEOUT_MS = 10_000;
+
+function requestSignal(signal?: AbortSignal | null): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(API_REQUEST_TIMEOUT_MS);
+
+  return signal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : timeoutSignal;
+}
 export class HttpApiError extends Error {
   constructor(
     readonly status: number,
@@ -59,6 +68,7 @@ export async function httpApi<T>(
     {
       ...init,
       headers,
+      signal: requestSignal(init.signal),
     },
   );
 
@@ -100,6 +110,7 @@ export async function dashboardApi<T>(
     {
       ...init,
       headers,
+      signal: requestSignal(init.signal),
     },
   );
 
