@@ -110,11 +110,14 @@ export interface IntegrationCapability {
 }
 
 const DASHBOARD_ASSET_CACHE_TTL_MS = 10_000;
+const DASHBOARD_ASSET_STALE_TTL_MS = 30_000;
 const DASHBOARD_ASSET_ONLY_MODE = true;
 
 type DashboardAssetCacheEntry = {
   expiresAt: number;
   request: Promise<DashboardDisasterAssetsResponse>;
+  snapshot?: DashboardDisasterAssetsResponse;
+  snapshotExpiresAt?: number;
 };
 
 const dashboardAssetCache = new Map<string, DashboardAssetCacheEntry>();
@@ -129,24 +132,51 @@ export function loadDashboardDisasterAssetsCached(
     return cached.request;
   }
 
-  const request = forestApi.dashboardDisasterAssets(disasterId);
+  const sourceRequest = forestApi.dashboardDisasterAssets(disasterId);
 
-  dashboardAssetCache.set(disasterId, {
+  const entry: DashboardAssetCacheEntry = {
     expiresAt: now + DASHBOARD_ASSET_CACHE_TTL_MS,
-    request,
-  });
+    request: sourceRequest,
+    snapshot: cached?.snapshot,
+    snapshotExpiresAt: cached?.snapshotExpiresAt,
+  };
 
-  void request.catch(() => {
-    const current = dashboardAssetCache.get(disasterId);
+  const request: Promise<DashboardDisasterAssetsResponse> = sourceRequest
+    .then((response) => {
+      if (dashboardAssetCache.get(disasterId) === entry) {
+        entry.snapshot = response;
+        entry.snapshotExpiresAt =
+          Date.now() +
+          DASHBOARD_ASSET_CACHE_TTL_MS +
+          DASHBOARD_ASSET_STALE_TTL_MS;
+      }
 
-    if (current?.request === request) {
-      dashboardAssetCache.delete(disasterId);
-    }
-  });
+      return response;
+    })
+    .catch((error: unknown) => {
+      if (
+        dashboardAssetCache.get(disasterId) === entry &&
+        entry.snapshot &&
+        entry.snapshotExpiresAt &&
+        entry.snapshotExpiresAt > Date.now()
+      ) {
+        entry.expiresAt = Date.now() + DASHBOARD_ASSET_CACHE_TTL_MS;
+        entry.request = Promise.resolve(entry.snapshot);
+        return entry.snapshot;
+      }
+
+      if (dashboardAssetCache.get(disasterId) === entry) {
+        dashboardAssetCache.delete(disasterId);
+      }
+
+      throw error;
+    });
+
+  entry.request = request;
+  dashboardAssetCache.set(disasterId, entry);
 
   return request;
 }
-
 export const forestApi = {
   health: () =>
     httpApi<{
