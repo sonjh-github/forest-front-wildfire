@@ -17,6 +17,7 @@ import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
 import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
 import { calculatePacketSequence, calculateTelemetryMetrics, type TelemetrySample } from "./operationalEvidence";
+import { evaluateFieldApiHealth, fieldApiHealthLabel, formatLastSuccessAge } from "./fieldApiHealth";
 import { PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
 import "./unified-disaster-dashboard.css";
 import "./field-header-hotfix.css";
@@ -1383,6 +1384,23 @@ export default function UnifiedDisasterDashboard() {
   const topologyDataStatus = overview?.topology.nodes.length
     ? `${overview.topology.nodes.length}개 노드 · ${overview.topology.links.length}개 연결`
     : "운용 기준 구성";
+  const externalIntegrationItems = Object.values(externalIntegrationStatus);
+  const failedExternalIntegrations = externalIntegrationItems.filter(
+    (item) => item.status === "error",
+  ).length;
+
+  const fieldApiHealth = evaluateFieldApiHealth({
+    lastSuccessAt: lastUpdatedAt,
+    failedIntegrations: failedExternalIntegrations,
+    totalIntegrations: externalIntegrationItems.length,
+    retrying,
+    staleAfterMs: POLL_INTERVAL_MS * 5,
+    offlineAfterMs: POLL_INTERVAL_MS * 15,
+  });
+
+  const fieldApiHealthText = fieldApiHealthLabel(fieldApiHealth);
+  const fieldApiLastSuccessText = formatLastSuccessAge(lastUpdatedAt);
+
   const communicationKpis = useMemo(() => {
     if (!overview) return [];
     const telemetryMetrics = telemetrySamples.length ? calculateTelemetryMetrics(telemetrySamples, PROJECT_ENHANCED_TARGET.locationUpdateSeconds) : null;
@@ -1693,6 +1711,7 @@ export default function UnifiedDisasterDashboard() {
             <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>
           </div>
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
+
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
         <section className="field-kpi-strip" aria-label="현장 통신 KPI 4종">
@@ -1710,6 +1729,20 @@ export default function UnifiedDisasterDashboard() {
           <aside className="field-kpi-context">
             <b>{localFieldMode ? (fieldPreviewMode ? "FIELD 화면 미리보기" : "실기체 통신 감시") : "현장 통신 우선"}</b>
             <span>{localFieldMode ? (fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "MD1000 · MAVLink v2 · SYNTHETIC OFF") : localE2EMode ? "LOCAL E2E · 실기체 아님" : demoMode ? "DEMO · 모의 관제" : "LIVE · 운영 데이터"}</span>
+            {!demoMode && (
+              <div
+                className="field-api-health"
+                data-state={fieldApiHealth.toLowerCase()}
+                title={fieldApiLastSuccessText}
+                role="status"
+              >
+                <i />
+                <span>{fieldApiHealthText}</span>
+                {fieldApiHealth !== "ONLINE" && (
+                  <small>{fieldApiLastSuccessText}</small>
+                )}
+              </div>
+            )}
           </aside>
         </section>
         <section className={`dashboard-map-stage${localFieldMode || demoMode ? " field-command-stage" : " asset-panel-collapsed"}`} aria-label="지도 중심 통합 상황판">
