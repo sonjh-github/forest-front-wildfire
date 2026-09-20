@@ -1964,17 +1964,23 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(true); setTerrain3d((value) => !value); }}>3D 지형</button>
       </div>
       {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
-      <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
-        <strong>지도 범례</strong>
-        {wildfireDemo && <span><i className="incident" />산불 발생지점</span>}
-        <span><i className="coverage" />통신 운용범위</span><span><i className="fireline" />관측 화선</span>
-        <span><i className="spread" />확산 참고</span>
-        <span><i className="risk" />산불 위험예보</span>
-        <span><i className="evacuation" />대피로</span>
-        {wildfireDemo && <span><i className="heat" />위성 열원</span>}
-        <span><i className="personnel" />인원</span>
-        <span><i className="asset" />자원</span>
-      </section>
+      <details className="map-meaning-legend command-center-legend" aria-label="지도 범례">
+        <summary>
+          <strong>지도 범례</strong>
+          <span className="command-center-legend__hint">펼치기</span>
+        </summary>
+        <div className="command-center-legend__items">
+          {wildfireDemo && <span><i className="incident" />산불 발생지점</span>}
+          <span><i className="coverage" />통신 운용범위</span>
+          <span><i className="fireline" />관측 화선</span>
+          <span><i className="spread" />확산 참고</span>
+          <span><i className="risk" />산불 위험예보</span>
+          <span><i className="evacuation" />대피로</span>
+          {wildfireDemo && <span><i className="heat" />위성 열원</span>}
+          <span><i className="personnel" />인원</span>
+          <span><i className="asset" />자원</span>
+        </div>
+      </details>
       {showTopology && <section className="map-topology-hint" aria-label="통신 토폴로지 상태 범례">
         <strong>{topologyFocusKey ? "선택 마커 연결 강조" : "통신 토폴로지"}</strong>
         <span><i data-state="active" />정상</span>

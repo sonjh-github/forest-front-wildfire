@@ -3418,4 +3418,135 @@ body,
 
 .field-api-health[data-state="recovering"] > i {
   background: #2563eb;
+
+/* 2026-09-20 field map HUD collision fix
+   Keep playback and legend visually separated without changing map semantics. */
+.unified-disaster-board.is-field-mode .location-map .map-timeline-player {
+  left: 50% !important;
+  right: auto !important;
+  bottom: 10px !important;
+
+  width: min(560px, calc(100% - 180px)) !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+
+  transform: translateX(-50%) !important;
+  z-index: 31 !important;
+}
+
+.unified-disaster-board.is-field-mode .location-map .map-timeline-player .timeline-play {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+.unified-disaster-board.is-field-mode .live-map-shell .command-center-legend {
+  left: 50% !important;
+  right: auto !important;
+  bottom: 60px !important;
+
+  width: max-content !important;
+  max-width: min(760px, calc(100% - 180px)) !important;
+  min-height: 0 !important;
+
+  padding: 5px 9px !important;
+  gap: 5px 9px !important;
+
+  transform: translateX(-50%) !important;
+  z-index: 30 !important;
+
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, .90) !important;
+  box-shadow: 0 4px 14px rgba(24, 55, 46, .10) !important;
+  backdrop-filter: blur(7px);
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend strong {
+  font-size: 9px !important;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend span {
+  font-size: 8px !important;
+  line-height: 1 !important;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend i {
+  transform: scale(.72) !important;
+}
+
+@media (max-width: 1400px) {
+  .unified-disaster-board.is-field-mode .location-map .map-timeline-player {
+    width: min(500px, calc(100% - 120px)) !important;
+  }
+
+  .unified-disaster-board.is-field-mode .live-map-shell .command-center-legend {
+    max-width: calc(100% - 120px) !important;
+    overflow: hidden !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .unified-disaster-board.is-field-mode .location-map .map-timeline-player {
+    width: calc(100% - 90px) !important;
+  }
+
+  .unified-disaster-board.is-field-mode .live-map-shell .command-center-legend {
+    display: none !important;
+  }
+}
+/* Collapsible map legend / 2026-09-20 */
+.unified-disaster-board.is-field-mode .live-map-shell .command-center-legend {
+  display: block !important;
+  width: auto !important;
+  max-width: min(760px, calc(100% - 180px)) !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 5px 9px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend > summary::-webkit-details-marker {
+  display: none;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend__hint {
+  font-size: 8px !important;
+  color: #60746d;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend[open] .command-center-legend__hint {
+  font-size: 0 !important;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend[open] .command-center-legend__hint::after {
+  content: "접기";
+  font-size: 8px;
+}
+
+.unified-disaster-board.is-field-mode .command-center-legend__items {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  padding: 0 9px 7px;
+  border-top: 1px solid rgba(96, 125, 118, .16);
+}
+
+@media (max-width: 900px) {
+  .unified-disaster-board.is-field-mode .live-map-shell .command-center-legend {
+    display: block !important;
+    max-width: calc(100% - 90px) !important;
+  }
+
+  .unified-disaster-board.is-field-mode .command-center-legend__items {
+    max-width: 420px;
+  }
 }
