@@ -3418,6 +3418,7 @@ body,
 
 .field-api-health[data-state="recovering"] > i {
   background: #2563eb;
+}
 
 /* 2026-09-20 field map HUD collision fix
    Keep playback and legend visually separated without changing map semantics. */
