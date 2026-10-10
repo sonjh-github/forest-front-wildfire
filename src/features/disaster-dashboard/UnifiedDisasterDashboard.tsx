@@ -1,7 +1,10 @@
+import { rtkPositionFetchStatus } from "./rtkPositionFreshness";
 import { DroneTwinDetail } from "./DroneTwinDetail";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { externalDisasterApi, loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
 import { forestApi } from "../../http-api/forest-api";
+import { HttpApiError } from "../../http-api/client";
+import SlenoNetworkQualityPanel from "./SlenoNetworkQualityPanel";
 import { isLocalE2EMode, LOCAL_E2E_EVENT } from "../../http-api/local-e2e";
 import { fieldCoreStatusLabel, fieldEvent, isFieldPreviewMode, isLocalFieldMode } from "../../http-api/field-mode";
 import SemanticMissionPocPanel from "./SemanticMissionPocPanel";
@@ -25,7 +28,6 @@ import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamS
 import { calculatePacketSequence, calculateTelemetryMetrics, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import { evaluateFieldApiHealth, fieldApiHealthLabel, formatLastSuccessAge } from "./fieldApiHealth";
 import { PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
-import { pickSlenoRtkFocusCenter } from "./slenoMapFocus";
 import {
   displayProfileClassName,
   getDisplayProfileConfig,
@@ -171,6 +173,7 @@ export type LiveLocation = {
   positioningMethod: string | null;
   horizontalAccuracyM: number | null;
   qualityStatus: string;
+  positionFetchStatus: string;
   sourceAssetId: string;
   reportedByAssetId: string;
   reportingRole: string;
@@ -296,6 +299,7 @@ function locationFrom(item: Record<string, unknown>, kind: LiveLocation["kind"])
       : null,
     horizontalAccuracyM: Number.isFinite(horizontalAccuracyM) ? horizontalAccuracyM : null,
     qualityStatus: String(item.qualityStatus ?? ""),
+    positionFetchStatus: String(item.positionFetchStatus ?? ""),
     sourceAssetId: String(item.sourceAssetId ?? ""),
     reportedByAssetId: String(item.reportedByAssetId ?? ""),
     reportingRole: String(item.reportingRole ?? ""),
@@ -756,6 +760,7 @@ function demoRtkAssetsFromTelemetry(
           row.operationalStatus ??
           ""
         ),
+      positionFetchStatus: rtkPositionFetchStatus(observedAt, false, true),
 
       sourceSystem:
         String(
@@ -905,6 +910,7 @@ export default function UnifiedDisasterDashboard() {
   const [overview, setOverview] = useState<EventOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [disasterNotFound, setDisasterNotFound] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const demoMode =
     FORCE_DEMO_MODE ||
@@ -975,18 +981,41 @@ export default function UnifiedDisasterDashboard() {
   const refreshEvents = useCallback(async () => {
     if (localFieldMode) {
       const event = fieldEvent();
+      setDisasterNotFound(false);
       setEvents([event]);
       setSelectedId(event.eventId);
       setError(null);
       return;
     }
     if (localE2EMode) {
+      setDisasterNotFound(false);
       setEvents([LOCAL_E2E_EVENT]);
       setSelectedId(LOCAL_E2E_EVENT.eventId);
       setError(null);
       return;
     }
-    const result = await loadDashboardDisasterAssetsCached(DEFAULT_EVENT_ID);
+    let result;
+    try {
+      result = await loadDashboardDisasterAssetsCached(DEFAULT_EVENT_ID);
+    } catch (caught) {
+      const missingDisaster =
+        caught instanceof HttpApiError &&
+        caught.status === 404 &&
+        typeof caught.payload === "object" &&
+        caught.payload !== null &&
+        "error" in caught.payload &&
+        (caught.payload as { error?: { code?: string } }).error?.code ===
+          "DISASTER_NOT_FOUND";
+      if (!missingDisaster) throw caught;
+      // 등록되지 않은 재난은 API 장애나 재난이 없다는 확정 증거가 아니다.
+      setDisasterNotFound(true);
+      setEvents([]);
+      setSelectedId("");
+      setOverview(null);
+      setError(null);
+      return;
+    }
+    setDisasterNotFound(false);
     const disaster = result.data.disaster;
     const rawDisasterType = String(disaster.disasterType ?? "WILDFIRE").toUpperCase();
     const disasterType: ForestEvent["disasterType"] =
@@ -1335,6 +1364,7 @@ export default function UnifiedDisasterDashboard() {
     let active = true;
     if (demoMode) {
       const demo = createDemoOverview();
+      setDisasterNotFound(false);
       setEvents([demo.event]);
       setSelectedId(demo.event.eventId);
       setOverview(demo);
@@ -1362,55 +1392,77 @@ export default function UnifiedDisasterDashboard() {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
+    // 20261010 DEMO 갱신과 RTK Core 조회를 분리한다.
+    // API 장애는 단말 자체의 OFFLINE 판정과 구분한다.
+    let lastRtkAssets: ReturnType<typeof demoRtkAssetsFromTelemetry> = [];
+    let rtkRequestPending = false;
+    let rtkRequestFailed = false;
+    let lastRtkRequestAt = 0;
+    const RTK_FETCH_INTERVAL_MS = 5_000;
+
     const refresh = () => demoMode
-      ? (async () => {
+      ? (() => {
+          if (!active) return;
+
+          const now = Date.now();
+
+          // RTK 요청은 중첩하지 않는다. DEMO 애니메이션은 계속 갱신한다.
+          if (
+            !rtkRequestPending &&
+            now - lastRtkRequestAt >= RTK_FETCH_INTERVAL_MS
+          ) {
+            rtkRequestPending = true;
+            lastRtkRequestAt = now;
+
+            void forestApi.dashboardDroneTelemetry(DEFAULT_EVENT_ID)
+              .then((response) => {
+                if (!active) return;
+
+                lastRtkAssets = demoRtkAssetsFromTelemetry(response.data);
+                rtkRequestFailed = false;
+              })
+              .catch((caught: unknown) => {
+                if (!active) return;
+
+                rtkRequestFailed = true;
+                console.warn(
+                  "[demo] Sleno RTK 조회 실패: 마지막 확인 위치 사용",
+                  caught
+                );
+              })
+              .finally(() => {
+                rtkRequestPending = false;
+              });
+          }
+
           const next = createDemoOverview();
 
-          /*
-           * 운영 WILDFIRE demo 화면은 유지하되
-           * 실제 Core에 들어온 Sleno RTK 위치만
-           * live overlay 한다.
-           */
-          try {
-            const response =
-              await forestApi
-                .dashboardDroneTelemetry(
-                  selectedId
-                );
-
-            const slenoAssets =
-              demoRtkAssetsFromTelemetry(
-                response.data
-              );
-
-            if (slenoAssets.length > 0) {
-              const liveAssetIds =
-                new Set(
-                  slenoAssets.map(
-                    (asset) =>
-                      String(
-                        asset.assetId
-                      )
-                  )
-                );
-
-              next.assets = [
-                ...next.assets.filter(
-                  (asset) =>
-                    !liveAssetIds.has(
-                      String(
-                        asset.assetId
-                      )
-                    )
+          const overlayAssets = rtkRequestFailed
+            ? lastRtkAssets.map((asset) => ({
+                ...asset,
+                // 표시 전용 상태. 장비 OFFLINE을 뜻하지 않는다.
+                positionFetchStatus: "조회 실패 · 마지막 확인 위치",
+              }))
+            : lastRtkAssets.map((asset) => ({
+                ...asset,
+                positionFetchStatus: rtkPositionFetchStatus(
+                  String(asset.observedAt ?? ""),
+                  false,
+                  true,
                 ),
-                ...slenoAssets,
-              ];
-            }
-          } catch (caught) {
-            console.warn(
-              "[demo] Sleno RTK live overlay unavailable",
-              caught
+              }));
+
+          if (overlayAssets.length > 0) {
+            const ids = new Set(
+              lastRtkAssets.map((asset) => String(asset.assetId))
             );
+
+            next.assets = [
+              ...next.assets.filter(
+                (asset) => !ids.has(String(asset.assetId))
+              ),
+              ...overlayAssets,
+            ];
           }
 
           setOverview(next);
@@ -1424,7 +1476,9 @@ export default function UnifiedDisasterDashboard() {
               entityType: "ASSET",
               assetType: String(asset.assetType ?? "ASSET"),
               observedAt: String(asset.observedAt),
-              receivedAt: new Date().toISOString(),
+              // 실제 API 관측값의 수신 시각을 시연 타이머로 덮어쓰지 않는다.
+              // 값이 없다면 수신 시각을 추정하지 않는다.
+              receivedAt: typeof asset.receivedAt === "string" ? asset.receivedAt : "",
               sequence,
               latitude: Number(coordinates?.[1]),
               longitude: Number(coordinates?.[0]),
@@ -1666,18 +1720,31 @@ export default function UnifiedDisasterDashboard() {
    * WILDFIRE demo에서 실제 Sleno RTK가 들어오면
    * 데모 사건 좌표로 옮겨 그리지 않고 실제 좌표를 지도 중심으로 사용한다.
    */
-  const slenoRtkFocusCenter =
-    demoMode
-      ? pickSlenoRtkFocusCenter(mapLocations)
+  // 20261010 DEMO 지도 중심 제어
+  // 실제 RTK 데이터 수신만으로는 산불 현장에서 이동하지 않는다.
+  // RTK 자산을 명시적으로 선택했을 때만 실제 좌표로 이동한다.
+  const selectedDemoRtk =
+    demoMode && selectedLocationKey
+      ? mapLocations.find(
+          (item) =>
+            item.category === "RTK_TERMINAL" &&
+            locationKey(item) === selectedLocationKey
+        )
       : null;
 
-  const mapFocusCenter =
-    slenoRtkFocusCenter
-    ?? (!eventCenter
-      ? liveCenter
-      : eventToLiveDistance > 0.08
+  const mapFocusCenter: [number, number] | null =
+    demoMode
+      ? selectedDemoRtk
+        ? [
+            selectedDemoRtk.longitude,
+            selectedDemoRtk.latitude,
+          ]
+        : eventCenter ?? liveCenter
+      : !eventCenter
         ? liveCenter
-        : eventCenter);
+        : eventToLiveDistance > 0.08
+          ? liveCenter
+          : eventCenter;
   const coordinateOutlierKeys = new Set(
     liveCenter
       ? mapLocations
@@ -2076,12 +2143,17 @@ export default function UnifiedDisasterDashboard() {
           <div className="readiness-body">
             <div className="readiness-symbol" aria-hidden="true"><span /><i /><b /></div>
             <div>
-              <p>{error ? "통합 데이터 연결을 확인해 주세요" : eventsLoaded ? "현재 진행 중인 재난이 없습니다" : "산림재난 운영 정보를 불러오고 있습니다"}</p>
-              <h1>{error ? "상황판을 준비하지 못했습니다" : eventsLoaded ? "정상 대기 상태" : "상황판 준비 중"}</h1>
-              <span>{error ? "기존 데이터는 변경되지 않았습니다. 연결 복구 후 최신 상황을 다시 불러옵니다." : eventsLoaded ? "재난 사건이 접수되면 지도·자원·통신망·경보 현황이 자동으로 표시됩니다." : "사건, 현장 자원, 통신망과 경보 상태를 확인하는 중입니다."}</span>
+              <p>{error ? "통합 데이터 연결을 확인해 주세요" : disasterNotFound ? "기본 재난 ID에 대응하는 등록 정보가 없습니다" : eventsLoaded ? "조회된 재난 정보가 없습니다" : "산림재난 운영 정보를 불러오고 있습니다"}</p>
+              <h1>{error ? "상황판을 준비하지 못했습니다" : disasterNotFound ? "재난 미등록 · 장비 정보 별도 조회" : eventsLoaded ? "재난 조회 대기" : "상황판 준비 중"}</h1>
+              <span>{error ? "기존 데이터는 변경되지 않았습니다. 연결 복구 후 최신 상황을 다시 불러옵니다." : disasterNotFound ? "설정된 기본 재난 ID를 찾지 못했습니다. 실제 재난 발생 여부는 확인되지 않았으며, 아래 Sleno 통신 품질 정보는 별도 운영 API로 조회합니다." : eventsLoaded ? "실제 재난 목록 연동 상태를 확인해 주세요." : "사건, 현장 자원, 통신망과 경보 상태를 확인하는 중입니다."}</span>
               {error && <button type="button" onClick={handleRetry} disabled={retrying}>{retrying ? "다시 연결 중…" : "연결 다시 확인"}</button>}
             </div>
           </div>
+          {disasterNotFound && !error && (
+            <section aria-label="재난 미등록 상태의 독립 Sleno 품질 조회">
+              <SlenoNetworkQualityPanel />
+            </section>
+          )}
           <footer>
             <span><i /> 사건 정보</span><span><i /> 현장 자원</span><span><i /> 통신망 상태</span><span><i /> 위험 경보</span>
           </footer>
@@ -2110,7 +2182,7 @@ export default function UnifiedDisasterDashboard() {
             <span>{korean(overview.event.severityCode)}</span>
             <small>{text(overview.event.locationName)}</small>
           </div>
-          {SHOW_VALIDATION_UI && demoMode && <div className="demo-mode-badge" title="실제 API 연결 전 화면 검증용 데이터입니다"><b>DEMO</b><span>모의 관제 데이터</span></div>}
+          {demoMode && <div className="demo-mode-badge" title="모의 시나리오 데이터입니다. 별도 API 관측값이 포함될 수 있으며, 실제 비행이나 통신 품질을 검증한 결과는 아닙니다."><b>DEMO</b><span>모의 시나리오 · 별도 API 관측값 포함 가능</span></div>}
           {localE2EMode && <div className="demo-mode-badge" title="실기체가 아닌 로컬 synthetic MAVLink 브라우저 E2E입니다"><b>E2E</b><span>SYNTHETIC · NOT FLIGHT</span></div>}
           {localFieldMode && <div className={`demo-mode-badge field-mode-badge${fieldPreviewMode ? " field-preview-badge" : ""}`} title={fieldPreviewMode ? "화면 확인을 위한 명시적 미리보기 데이터입니다. 실제 비행 증거가 아닙니다." : "실제 MD1000 MAVLink만 수신하는 로컬 현장 모드입니다. Synthetic feed는 사용하지 않습니다."}><b>{fieldPreviewMode ? "미리보기" : "현장"}</b><span>{fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "MD1000 실기체 · MAVLink 연동"}</span></div>}
           {SHOW_VALIDATION_UI && demoMode && <label className="demo-scenario-selector"><span>검증 시나리오</span><select aria-label="DEMO 검증 시나리오" value={demoScenario} onChange={(event) => { const params = new URLSearchParams(window.location.search); params.set("demo", "1"); params.set("scenario", event.target.value); window.location.search = params.toString(); }}>{DEMO_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label>}
@@ -2192,7 +2264,7 @@ export default function UnifiedDisasterDashboard() {
                     ? "SYNTHETIC E2E"
                     : demoMode || fieldPreviewMode
                       ? "DEMO DATA"
-                      : "LIVE DATA"}
+                      : "API DATA · 실측 여부 개별 확인"}
               </small>
               {!demoMode && (
                 <div
@@ -2577,7 +2649,7 @@ export default function UnifiedDisasterDashboard() {
                       <li><i data-tone="bad" /><time>14:27:32</time><span>패킷 손실 감지</span><em>SEQ 3284</em></li>
                       <li><i data-tone="ok" /><time>14:27:31</time><span>데이터 수신 성공</span><em>SEQ 3283</em></li>
                     </>}
-                    {!fieldPreviewMode && telemetrySamples.slice(-4).reverse().map((sample, index) => <li key={`${sample.receivedAt}-${index}`}><i data-tone="ok" /><time>{new Date(sample.receivedAt).toLocaleTimeString("ko-KR", { hour12: false })}</time><span>텔레메트리 수신</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}
+                    {!fieldPreviewMode && telemetrySamples.slice(-4).reverse().map((sample, index) => <li key={`${sample.receivedAt}-${index}`}><i data-tone="ok" /><time>{(sample.receivedAt && Number.isFinite(Date.parse(sample.receivedAt)) ? new Date(sample.receivedAt).toLocaleTimeString("ko-KR", { hour12: false }) : "시각 확인 불가")}</time><span>텔레메트리 수신</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}
                     {!fieldPreviewMode && telemetrySamples.length === 0 && <li className="empty"><span>실기체 텔레메트리 수신 대기</span></li>}
                   </ol>
                 </section>
@@ -2664,6 +2736,9 @@ export default function UnifiedDisasterDashboard() {
                 <div><dt>데이터 발생 장비</dt><dd>{selectedLocation.sourceAssetId || selectedLocation.id}</dd></div>
                 <div><dt>API 전달 주체</dt><dd>{selectedLocation.reportedByAssetId ? `${korean(selectedLocation.reportingRole || "GATEWAY")} · ${selectedLocation.reportedByAssetId}` : "직접 보고 또는 정보 미수신"}</dd></div>
               {isPositioningLocation(selectedLocation) && <>
+                  {selectedLocation.category === "RTK_TERMINAL" && (
+                    <div><dt>위치 조회 상태</dt><dd>{selectedLocation.positionFetchStatus || "조회 상태 미확인"}</dd></div>
+                  )}
                   <div><dt>측위 상태</dt><dd>{selectedLocation.positioningMethod ? korean(selectedLocation.positioningMethod) : "측위정보 수신 전"}</dd></div>
                   <div><dt>예상 오차</dt><dd>{selectedLocation.horizontalAccuracyM == null ? "측정값 없음" : `±${selectedLocation.horizontalAccuracyM.toFixed(2)}m`}</dd></div>
                   <div><dt>기준국 보정</dt><dd>{correctionStatus(selectedLocation)}</dd></div>

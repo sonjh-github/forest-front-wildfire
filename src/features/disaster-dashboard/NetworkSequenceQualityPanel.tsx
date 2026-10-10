@@ -159,7 +159,7 @@ export default function NetworkSequenceQualityPanel({
       <header className="network-seq-card-header">
         <div>
           <strong>MAVLink/GCS 통신품질</strong>
-          <small>MAVLink 최근 100 SEQ · 보조 품질지표</small>
+          <small>MAVLink 최근 최대 100 SEQ · 보조 품질지표</small>
         </div>
         <b>
           {measuredRows.length > 0
@@ -222,7 +222,7 @@ export default function NetworkSequenceQualityPanel({
 
             <small>
               {row.hasSequence
-                ? `수신 ${row.summary.received} · 유실 ${row.summary.lost} · 성공 ${row.summary.successPct ?? "-"}%`
+                ? `수신 ${row.summary.received} · 유실 ${row.summary.lost} · 측정 ${row.summary.expected} · 성공 ${row.summary.successPct ?? "-"}%`
                 : "sequence 필드 수신 대기"}
             </small>
           </button>
@@ -232,7 +232,9 @@ export default function NetworkSequenceQualityPanel({
       {selected && selected.summary.expected > 0 && (
         <details className="network-seq-details">
           <summary>
-            <span>선택 장비 100 SEQ 상세</span>
+            <span>
+              선택 장비 SEQ 상세 · 측정 {selected.summary.expected} / 최대 100
+            </span>
             <b>{selectedAssetId}</b>
           </summary>
 

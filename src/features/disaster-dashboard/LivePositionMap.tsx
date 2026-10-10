@@ -86,6 +86,9 @@ function resourceQualityPopupContent(location: LiveLocation) {
       "통신 상태",
       location.qualityStatus || location.status || "확인 중",
     ],
+    ...(location.category === "RTK_TERMINAL"
+      ? [["위치 조회 상태", location.positionFetchStatus || "조회 상태 미확인"] as [string, string]]
+      : []),
     [
       "신호",
       location.signalStrengthDbm == null
@@ -2595,7 +2598,22 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       resourcePopupRef.current?.remove();
       resourcePopupRef.current = null;
     };
-    if (map.isStyleLoaded()) render(); else map.once("load", render);
+    // 20261010 RTK 위치 갱신: 최초 load 이후에도 스타일 준비 상태를 재확인
+    const renderWhenReady = () => {
+      if (!map.isStyleLoaded()) return;
+
+      map.off("styledata", renderWhenReady);
+      map.off("idle", renderWhenReady);
+      render();
+    };
+
+    if (map.isStyleLoaded()) {
+      render();
+    } else {
+      map.on("styledata", renderWhenReady);
+      map.on("idle", renderWhenReady);
+    }
+
     map.on("click", "field-resource-point", selectResource);
     map.on("click", "field-resource-label", selectResource);
     map.on("dblclick", "field-resource-point", openDroneVideo);
@@ -2611,7 +2629,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         window.clearTimeout(singleClickTimerRef.current);
         singleClickTimerRef.current = null;
       }
-      map.off("load", render);
+      map.off("styledata", renderWhenReady);
+      map.off("idle", renderWhenReady);
       map.off("click", "field-resource-point", selectResource);
       map.off("click", "field-resource-label", selectResource);
       map.off("dblclick", "field-resource-point", openDroneVideo);

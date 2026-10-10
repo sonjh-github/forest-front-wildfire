@@ -104,7 +104,10 @@
 
 .sleno-device-list {
   display: grid;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
+  gap: 8px;
 }
 
 .sleno-device-list > p {
@@ -116,6 +119,9 @@
 }
 
 .sleno-device {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #dce7e3;
   border-radius: 7px;
 
@@ -128,6 +134,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
 
   gap: 6px;
 
@@ -144,6 +152,7 @@
 
 .sleno-device > summary span {
   min-width: 0;
+  flex: 1 1 110px;
 }
 
 .sleno-device > summary strong,
@@ -156,7 +165,7 @@
 }
 
 .sleno-device > summary strong {
-  font-size: 9px;
+  font-size: 10px;
   color: #204e42;
 }
 
@@ -188,8 +197,7 @@
 .sleno-device-kpis {
   display: grid;
 
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 
   gap: 4px;
 
@@ -215,4 +223,46 @@
   color: #b53e39;
   font-size: 8px;
   line-height: 1.35;
+}
+
+/*
+ * 20261010
+ * Sleno 장비 카드 레이아웃 최종 보정
+ * 관제 사이드바에서는 장비를 세로로 배치
+ */
+.sleno-quality-card .sleno-device-list {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.sleno-quality-card .sleno-device-list > details.sleno-device {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.sleno-quality-card .sleno-device-kpis {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 6px;
+}
+
+.sleno-quality-card .sleno-device-kpis > span {
+  min-width: 0;
+  width: auto;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: normal;
+  font-size: 10px;
+}
+
+.sleno-quality-card .sleno-device-kpis b {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

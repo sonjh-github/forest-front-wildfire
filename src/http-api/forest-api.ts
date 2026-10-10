@@ -213,7 +213,7 @@ export const forestApi = {
     ),
 
   dashboardDroneTelemetry: (eventId: string) =>
-    dashboardApi<DataResponse<ApiRecord[]>>(`/api/v1/dashboard/telemetry/drones?eventId=${encodeURIComponent(eventId)}`, {signal: AbortSignal.timeout(2500)}),
+    dashboardApi<DataResponse<ApiRecord[]>>(`/api/v1/dashboard/telemetry/drones?eventId=${encodeURIComponent(eventId)}`, {signal: AbortSignal.timeout(10000)}),
 
   slenoNetworkQuality: (limit = 1000) =>
     dashboardApi<DataResponse<SlenoNetworkQuality>>(
