@@ -79,6 +79,12 @@ export interface DataResponse<T> {
 
 export type ApiRecord = Record<string, unknown>;
 
+export type KpiApiStatus = {
+  state: "FRESH" | "EMPTY" | "ERROR";
+  checkedAt: string;
+  message?: string;
+};
+
 export interface DeviceCredential extends ApiRecord {
   credentialId: string;
   assetId: string;
@@ -487,6 +493,7 @@ export interface EventOverview {
   alerts: ApiRecord[];
   reports: ApiRecord[];
   kpis: ApiRecord[];
+  kpiApiStatus?: KpiApiStatus;
   integrations: IntegrationCapability[];
   domainDetail: ApiRecord | null;
   domainLayers: Record<string, ApiRecord[]>;
@@ -584,10 +591,23 @@ export async function loadEventOverview(
   }
 
   if (DASHBOARD_ASSET_ONLY_MODE) {
-    const [dashboardAssets, telemetry] = await Promise.all([
+    const [dashboardAssets, telemetry, kpiResult] = await Promise.all([
       loadDashboardDisasterAssetsCached(eventId),
       liveDroneReader.read(eventId, typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1',
         async () => (await forestApi.dashboardDroneTelemetry(eventId)).data),
+      forestApi
+        .resources(eventId, "kpis", 100)
+        .then((response) => ({
+          rows: response.data,
+          error: null as string | null,
+        }))
+        .catch((error: unknown) => ({
+          rows: [] as ApiRecord[],
+          error:
+            error instanceof Error
+              ? error.message
+              : "KPI_API_ERROR",
+        })),
     ]);
     const disaster = dashboardAssets.data.disaster;
     const rawDisasterType = String(
@@ -640,7 +660,16 @@ export async function loadEventOverview(
       topology: { networks: [], nodes: [], links: [] },
       alerts: [],
       reports: [],
-      kpis: [],
+      kpis: kpiResult.rows,
+      kpiApiStatus: {
+        state: kpiResult.error
+          ? "ERROR"
+          : kpiResult.rows.length > 0
+            ? "FRESH"
+            : "EMPTY",
+        checkedAt: new Date().toISOString(),
+        ...(kpiResult.error ? { message: kpiResult.error } : {}),
+      },
       integrations: [],
       domainDetail: null,
       domainLayers: {},
@@ -955,6 +984,10 @@ export async function loadEventOverview(
     reports: reports.data,
 
     kpis: kpis.data,
+    kpiApiStatus: {
+      state: kpis.data.length > 0 ? "FRESH" : "EMPTY",
+      checkedAt: new Date().toISOString(),
+    },
 
     integrations: integrations.data,
 

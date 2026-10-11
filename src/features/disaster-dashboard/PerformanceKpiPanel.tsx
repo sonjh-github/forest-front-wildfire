@@ -27,6 +27,12 @@ import {
   OFFICIAL_RFP_BASELINE,
   PROJECT_ENHANCED_TARGET,
 } from "./officialRfpGaps";
+import {
+  assessKpiMeasurement,
+  KPI_MEASUREMENT_INTERFACE_REQUIREMENTS,
+  referenceKpiMeasurement,
+  type KpiEvidenceAssessment,
+} from "./kpiMeasurementEvidence";
 import "./performance-kpi-panel.css";
 
 type Props = {
@@ -46,13 +52,8 @@ type MetricCard = {
   officialTarget: number;
   source: string;
   note: string;
+  assessment: KpiEvidenceAssessment;
 };
-
-function measuredNumber(row: ApiRecord | undefined) {
-  if (!row) return null;
-  const value = Number(row.measuredValue);
-  return Number.isFinite(value) ? value : null;
-}
 
 function metricByCode(overview: EventOverview, code: string) {
   return overview.kpis.find(
@@ -60,16 +61,34 @@ function metricByCode(overview: EventOverview, code: string) {
   ) as ApiRecord | undefined;
 }
 
-function evaluate(value: number | null, operator: Operator, target: number) {
-  if (value == null) return null;
-  return operator === "≤" ? value <= target : value >= target;
-}
-
 function displayValue(value: number | null, unit: string) {
   if (value == null) return "측정 대기";
   return `${value.toLocaleString("ko-KR", {
     maximumFractionDigits: 2,
   })}${unit}`;
+}
+
+function proofValue(
+  assessment: KpiEvidenceAssessment,
+  unit: string,
+) {
+  if (assessment.value == null) {
+    return assessment.state === "STALE"
+      ? "STALE · 현재값 숨김"
+      : assessment.state === "ERROR"
+        ? "API 오류 · 현재값 숨김"
+        : "측정 대기";
+  }
+
+  const prefix =
+    assessment.state === "DEMO"
+      ? "DEMO"
+      : assessment.state === "REFERENCE"
+        ? "참고"
+        : assessment.state === "UNVERIFIED"
+          ? "미검증"
+          : "검증";
+  return `${prefix} ${displayValue(assessment.value, unit)}`;
 }
 
 function displayTime(value: string | null) {
@@ -121,7 +140,9 @@ export default function PerformanceKpiPanel({
   overview,
   telemetrySamples,
 }: Props) {
-  const demoMode = overview.domainDetail?.mode === "SIMULATION";
+  const demoMode =
+    overview.domainDetail?.mode === "SIMULATION" ||
+    overview.domainDetail?.mode === "FIELD_PREVIEW";
   const eventId = String(overview.event.eventId);
   const storageKey = `forest-performance-session:${eventId}`;
 
@@ -311,13 +332,6 @@ export default function PerformanceKpiPanel({
   const deploymentTargetSec =
     PROJECT_ENHANCED_TARGET.networkDeploymentMinutes * 60;
 
-  const deploymentTimerResult =
-    session?.networkReadyAt
-      ? deploymentTimerSec <= deploymentTargetSec
-        ? "PASS"
-        : "FAIL"
-      : null;
-
   const deploymentMeasured = calculateNetworkDeploymentMinutes(
     session?.startedAt,
     session?.networkReadyAt,
@@ -343,71 +357,77 @@ export default function PerformanceKpiPanel({
   const availabilityFallback =
     telemetrySamples.length > 0 ? telemetryMetrics.availabilityPct : null;
 
-  // 세션 시작 전 proof는 카드와 동일한 KPI 소스를 사용한다.
-  // 브라우저 수신표본 기반 fallback은 KPI 원본이 없을 때만 참고값으로 사용한다.
-  const overviewDeploymentValue = measuredNumber(deployment);
-  const overviewLocationValue = measuredNumber(location);
-  const overviewSharingValue = measuredNumber(sharing);
-  const overviewAvailabilityValue = measuredNumber(availability);
-
+  // 브라우저 수신표본 계산값은 proof 영역의 참고값으로만 사용하며
+  // 카드의 공식 PASS/FAIL 판정에는 포함하지 않는다.
   const sessionMode = session != null;
 
-  const metricEvidence: Record<string, string> = {
-    deployment: session
-      ? `투입 ${displayTime(session.startedAt)} → ${
-          session.networkReadyAt
-            ? `준비 ${displayTime(session.networkReadyAt)}`
-            : "구축 중"
-        }`
-      : "차량 도착·구축팀 투입 시 측정 시작",
-    location:
-      sessionMode && sessionPositionStats.intervalCount > 0
-        ? `AVG ${sessionPositionStats.averageGapSec}초 · P95 ${sessionPositionStats.p95GapSec}초 · MAX ${sessionPositionStats.maxGapSec}초`
-        : locationFallback != null
-          ? `MAX ${locationFallback}초`
-          : "위치 갱신 이벤트 대기",
-    sharing:
-      sessionMode && sessionSharingStats.attempts > 0
-        ? `${sessionSharingStats.successes}/${sessionSharingStats.attempts} 성공 수신`
-        : sharingFallback != null
-          ? `참고 Sequence ${packetMetrics.received}/${packetMetrics.expected}`
-          : "전송/수신 이벤트 대기",
-    availability:
-      sessionMode && session?.networkReadyAt
-        ? `운영 ${sessionAvailability.totalOperationSec}초 · 장애 ${sessionAvailability.downtimeSec}초`
-        : availabilityFallback != null
-          ? "브라우저 수신표본 참고"
-          : "망 준비 완료 후 측정",
-  };
+  const assessmentFor = (
+    row: ApiRecord | undefined,
+    operator: Operator,
+    target: number,
+    referenceValue: number | null,
+    referenceSource: string,
+  ) =>
+    sessionMode
+      ? referenceKpiMeasurement(referenceValue, referenceSource)
+      : assessKpiMeasurement({
+          row,
+          operator,
+          target,
+          demoMode,
+          apiStatus: overview.kpiApiStatus,
+        });
+
+  const deploymentAssessment = assessmentFor(
+    deployment,
+    "≤",
+    PROJECT_ENHANCED_TARGET.networkDeploymentMinutes,
+    deploymentMeasured,
+    "브라우저 측정 제어 입력",
+  );
+  const locationAssessment = assessmentFor(
+    location,
+    "≤",
+    PROJECT_ENHANCED_TARGET.locationUpdateSeconds,
+    sessionLocationMeasured,
+    "브라우저 수신 대원·차량 표본",
+  );
+  const sharingAssessment = assessmentFor(
+    sharing,
+    "≥",
+    PROJECT_ENHANCED_TARGET.sharingSuccessPct,
+    sessionSharingMeasured,
+    "브라우저 수동 전송·수신 이벤트",
+  );
+  const availabilityAssessment = assessmentFor(
+    availability,
+    "≥",
+    PROJECT_ENHANCED_TARGET.availabilityPct,
+    sessionAvailabilityMeasured,
+    "브라우저 수동 서비스 중단 이벤트",
+  );
 
   const cards: MetricCard[] = [
     {
       id: "deployment",
       label: "통신망 구축시간",
-      value: sessionMode
-        ? deploymentMeasured
-        : measuredNumber(deployment),
+      value: deploymentAssessment.value,
       unit: "분",
       operator: "≤",
       target: PROJECT_ENHANCED_TARGET.networkDeploymentMinutes,
       officialTarget: OFFICIAL_RFP_BASELINE.networkDeploymentMinutes,
       source: sessionMode
         ? session.networkReadyAt
-          ? `${session.runId} · 차량 도착·구축팀 투입→망 준비 완료 실측`
+          ? `${session.runId} · 브라우저 입력 참고값`
           : `${session.runId} · 망 준비 완료 입력 대기`
-        : deployment
-          ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
-              deployment.sourceSystem ?? "출처 미상",
-            )}`
-          : "시작·망 준비 완료 시각 수신 대기",
+        : `${deploymentAssessment.source} · ${deploymentAssessment.reason}`,
       note: "공식 근거: RFP 차량도착→현장통신망 구축 완료 / 계획서 구축팀 투입시각 측정",
+      assessment: deploymentAssessment,
     },
     {
       id: "location",
       label: "위치정보 갱신",
-      value: sessionMode
-        ? sessionLocationMeasured
-        : measuredNumber(location) ?? locationFallback,
+      value: locationAssessment.value,
       unit: "초",
       operator: "≤",
       target: PROJECT_ENHANCED_TARGET.locationUpdateSeconds,
@@ -416,21 +436,14 @@ export default function PerformanceKpiPanel({
         ? sessionLocationMeasured != null
           ? `${session.runId} · 대원·차량 AVG ${sessionPositionStats.averageGapSec}초 · P95 ${sessionPositionStats.p95GapSec}초 · MAX ${sessionPositionStats.maxGapSec}초 · ${sessionPositionStats.intervalCount}구간`
           : `${session.runId} · 연속 위치 갱신 이벤트 수신 대기`
-        : location
-          ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
-              location.sourceSystem ?? "출처 미상",
-            )}`
-          : locationFallback != null
-            ? "브라우저 수신표본 최대 갱신 간격"
-            : "위치 텔레메트리 수신 대기",
+        : `${locationAssessment.source} · ${locationAssessment.reason}`,
       note: "공식 방법: 대원·차량 위치 갱신 이벤트의 평균·P95·최대 갱신주기 산출; PASS는 최대값 기준",
+      assessment: locationAssessment,
     },
     {
       id: "sharing",
       label: "정보공유 성공률",
-      value: sessionMode
-        ? sessionSharingMeasured
-        : measuredNumber(sharing) ?? sharingFallback,
+      value: sharingAssessment.value,
       unit: "%",
       operator: "≥",
       target: PROJECT_ENHANCED_TARGET.sharingSuccessPct,
@@ -439,21 +452,14 @@ export default function PerformanceKpiPanel({
         ? sessionSharingStats.attempts > 0
           ? `${session.runId} · 전송 ${sessionSharingStats.attempts}건 · 성공 ${sessionSharingStats.successes}건 · ${sessionSharingBreakdown}`
           : `${session.runId} · 전송 시도/성공 수신 이벤트 대기`
-        : sharing
-          ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
-              sharing.sourceSystem ?? "출처 미상",
-            )}`
-          : sharingFallback != null
-            ? `Sequence ${packetMetrics.received}/${packetMetrics.expected}`
-            : "Sequence 수신 대기",
+        : `${sharingAssessment.source} · ${sharingAssessment.reason}`,
       note: "공식 방법: 성공 수신 건수 ÷ 전송 시도 건수 × 100; Sequence Loss는 별도 진단",
+      assessment: sharingAssessment,
     },
     {
       id: "availability",
       label: "네트워크 가용률",
-      value: sessionMode
-        ? sessionAvailabilityMeasured
-        : measuredNumber(availability) ?? availabilityFallback,
+      value: availabilityAssessment.value,
       unit: "%",
       operator: "≥",
       target: PROJECT_ENHANCED_TARGET.availabilityPct,
@@ -462,18 +468,20 @@ export default function PerformanceKpiPanel({
         ? session.networkReadyAt
           ? `${session.runId} · 총 운영 ${sessionAvailability.totalOperationSec}초 · 중단 ${sessionAvailability.downtimeSec}초`
           : `${session.runId} · 망 준비 완료 입력 대기`
-        : availability
-          ? `${demoMode ? "DEMO" : "수신 KPI"} · ${String(
-              availability.sourceSystem ?? "출처 미상",
-            )}`
-          : availabilityFallback != null
-            ? "브라우저 수신표본 기준 참고값"
-            : "NMS/텔레메트리 수신 대기",
+        : `${availabilityAssessment.source} · ${availabilityAssessment.reason}`,
       note: sessionMode
         ? "공식 방법: (총 운영시간-총 서비스 중단시간) ÷ 총 운영시간 × 100"
         : "측정 세션 시작 시 공식 운영시간·중단시간 방식으로 전환",
+      assessment: availabilityAssessment,
     },
   ];
+
+  const hasOfficialMeasurement = cards.some(
+    (card) => card.assessment.official,
+  );
+  const hasApiError = cards.some(
+    (card) => card.assessment.state === "ERROR",
+  );
 
   const startSession = () => {
     const now = new Date();
@@ -626,6 +634,7 @@ export default function PerformanceKpiPanel({
     const payload = {
       ...evidence,
       schemaVersion: "forest-kpi-evidence/v3",
+      evidenceClass: "BROWSER_REFERENCE_NOT_OFFICIAL",
       mode: overview.domainDetail?.mode ?? "UNKNOWN",
       session: {
         ...session,
@@ -668,7 +677,7 @@ export default function PerformanceKpiPanel({
       limitations: [
         demoMode
           ? "DEMO 데이터는 공식 성능시험 결과가 아님"
-          : "브라우저 측정값은 실장비 원시로그와 대조 필요",
+          : "브라우저 참고값은 실장비 원시로그가 아니며 공식 성능시험 결과로 사용할 수 없음",
         "정보공유 성공률은 전송시도/성공수신 이벤트 기준이며 Packet Loss Sequence는 별도 진단 지표",
         "통신망 가용률은 망 준비 완료 이후 총 운영시간과 서비스 중단 이벤트 기준",
         "공식 판정은 실제 시험실행 ID와 송신/ACK/NMS 원시로그가 연결된 측정값만 사용",
@@ -691,14 +700,24 @@ export default function PerformanceKpiPanel({
           <strong>현장 통신 KPI 4종</strong>
           <small>
             {sessionMode
-              ? `${session.runId} · 측정 세션 기반`
+              ? `${session.runId} · 브라우저 참고 측정 · 공식 판정 아님`
               : demoMode
-                ? "DEMO 기준값 · 측정 시작 시 실측값으로 전환"
-                : "측정 시작 시 수신 데이터 기반 실측값으로 전환"}
+                ? "DEMO 기준값 · 공식 PASS 판정 제외"
+                : hasApiError
+                  ? "KPI API 오류 · 현재 실측값 숨김"
+                  : hasOfficialMeasurement
+                    ? "Core 검증 실측 · 원시로그 증빙 연결"
+                    : "Core 검증 측정값 수신 대기"}
           </small>
         </div>
-        <span className={demoMode ? "demo" : "live"}>
-          {demoMode ? "DEMO" : "LIVE"}
+        <span className={demoMode ? "demo" : hasOfficialMeasurement ? "live" : ""}>
+          {demoMode
+            ? "DEMO"
+            : hasOfficialMeasurement
+              ? "VERIFIED"
+              : hasApiError
+                ? "API 오류"
+                : "측정 대기"}
         </span>
       </header>
 
@@ -724,8 +743,8 @@ export default function PerformanceKpiPanel({
             {!session
               ? "대기"
               : !session.networkReadyAt
-                ? "측정 중"
-                : deploymentTimerResult}
+                ? "참고 측정 중"
+                : "참고 기록"}
           </span>
         </header>
 
@@ -826,9 +845,9 @@ export default function PerformanceKpiPanel({
 
         <section className="performance-official-events">
           <header>
-            <strong>공식 평가 이벤트 입력</strong>
+            <strong>브라우저 참고 이벤트 입력</strong>
             <small>
-              실제 연동 시 송신/ACK 및 NMS linkStatus 이벤트로 자동 대체
+              수동 입력은 공식 판정에 사용하지 않으며 Core 송신/ACK·NMS 원시로그 연동이 필요
             </small>
           </header>
 
@@ -941,7 +960,7 @@ export default function PerformanceKpiPanel({
               : undefined
           }
         >
-          측정 세션·KPI JSON 증적 내보내기
+          브라우저 참고 측정 JSON 내보내기
         </button>
           </div>
         </details>
@@ -949,23 +968,7 @@ export default function PerformanceKpiPanel({
 
       <div className="performance-kpi-grid">
         {cards.map((card) => {
-          const deploymentRunning =
-            card.id === "deployment" &&
-            Boolean(session) &&
-            !session?.networkReadyAt;
-
-          const passed = deploymentRunning
-            ? null
-            : evaluate(card.value, card.operator, card.target);
-
-          const status =
-            deploymentRunning
-              ? "RUNNING"
-              : passed == null
-                ? "WAITING"
-                : passed
-                  ? "PASS"
-                  : "FAIL";
+          const status = card.assessment.state;
 
           const display =
             card.id === "deployment" && session
@@ -995,11 +998,15 @@ export default function PerformanceKpiPanel({
               <div className="performance-kpi-card-title">
                 <strong>{card.label}</strong>
                 <span>
-                  {status === "RUNNING"
-                    ? "LIVE"
-                    : status === "WAITING"
-                      ? "대기"
-                      : status}
+                  {status === "WAITING"
+                    ? "대기"
+                    : status === "REFERENCE"
+                      ? "참고"
+                      : status === "UNVERIFIED"
+                        ? "미검증"
+                        : status === "ERROR"
+                          ? "API 오류"
+                          : status}
                 </span>
               </div>
 
@@ -1014,6 +1021,9 @@ export default function PerformanceKpiPanel({
                 <span style={{ width: `${progressPct}%` }} />
                 <i />
               </div>
+              <small className="performance-kpi-source">
+                {card.source}
+              </small>
             </article>
           );
         })}
@@ -1034,10 +1044,8 @@ export default function PerformanceKpiPanel({
             </div>
             <em>
               {sessionMode
-                ? `LIVE ${displayDuration(deploymentTimerSec)}`
-                : overviewDeploymentValue != null
-                  ? `${demoMode ? "DEMO " : ""}${overviewDeploymentValue}분`
-                  : "대기"}
+                ? `참고 ${displayDuration(deploymentTimerSec)}`
+                : proofValue(deploymentAssessment, "분")}
             </em>
           </article>
 
@@ -1051,13 +1059,13 @@ export default function PerformanceKpiPanel({
               {sessionMode
                 ? sessionPositionStats.intervalCount > 0 &&
                   sessionPositionStats.maxGapSec != null
-                  ? `LIVE MAX ${sessionPositionStats.maxGapSec.toFixed(1)}초`
-                  : "LIVE 대기"
-                : overviewLocationValue != null
-                  ? `${demoMode ? "DEMO " : ""}${overviewLocationValue}초`
-                  : locationFallback != null
+                  ? `참고 MAX ${sessionPositionStats.maxGapSec.toFixed(1)}초`
+                  : "참고 측정 대기"
+                : locationAssessment.value != null
+                  ? proofValue(locationAssessment, "초")
+                  : locationFallback != null && locationAssessment.state !== "ERROR" && locationAssessment.state !== "STALE"
                     ? `참고 MAX ${locationFallback.toFixed(1)}초`
-                    : "-"}
+                    : proofValue(locationAssessment, "초")}
             </em>
           </article>
 
@@ -1070,15 +1078,15 @@ export default function PerformanceKpiPanel({
             <em>
               {sessionMode
                 ? sessionSharingStats.attempts > 0
-                  ? `LIVE ${sessionSharingStats.successes}/${sessionSharingStats.attempts} · ${
+                  ? `참고 ${sessionSharingStats.successes}/${sessionSharingStats.attempts} · ${
                       sessionSharingMeasured ?? "-"
                     }%`
-                  : "LIVE 대기"
-                : overviewSharingValue != null
-                  ? `${demoMode ? "DEMO " : ""}${overviewSharingValue}%`
-                  : sharingFallback != null
+                  : "참고 측정 대기"
+                : sharingAssessment.value != null
+                  ? proofValue(sharingAssessment, "%")
+                  : sharingFallback != null && sharingAssessment.state !== "ERROR" && sharingAssessment.state !== "STALE"
                     ? `참고 ${sharingFallback}%`
-                    : "-"}
+                    : proofValue(sharingAssessment, "%")}
             </em>
           </article>
 
@@ -1091,13 +1099,13 @@ export default function PerformanceKpiPanel({
             <em>
               {sessionMode
                 ? session?.networkReadyAt && sessionAvailabilityMeasured != null
-                  ? `LIVE ${sessionAvailabilityMeasured}%`
-                  : "LIVE 대기"
-                : overviewAvailabilityValue != null
-                  ? `${demoMode ? "DEMO " : ""}${overviewAvailabilityValue}%`
-                  : availabilityFallback != null
+                  ? `참고 ${sessionAvailabilityMeasured}%`
+                  : "참고 측정 대기"
+                : availabilityAssessment.value != null
+                  ? proofValue(availabilityAssessment, "%")
+                  : availabilityFallback != null && availabilityAssessment.state !== "ERROR" && availabilityAssessment.state !== "STALE"
                     ? `참고 ${availabilityFallback}%`
-                    : "-"}
+                    : proofValue(availabilityAssessment, "%")}
             </em>
           </article>
         </div>
@@ -1224,6 +1232,20 @@ export default function PerformanceKpiPanel({
 
       <details className="performance-interface-requirements">
         <summary>실장비 인터페이스 필요 필드</summary>
+        <div>
+          <span>공식 KPI 판정 필수</span>
+          <code>
+            {KPI_MEASUREMENT_INTERFACE_REQUIREMENTS.required.join(" / ")}
+          </code>
+        </div>
+        <div>
+          <span>현재값 최신성</span>
+          <code>{KPI_MEASUREMENT_INTERFACE_REQUIREMENTS.freshness}</code>
+        </div>
+        <div>
+          <span>원시로그 책임</span>
+          <code>{KPI_MEASUREMENT_INTERFACE_REQUIREMENTS.note}</code>
+        </div>
         <div>
           <span>텔레메트리 필수</span>
           <code>
