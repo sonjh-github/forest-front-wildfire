@@ -25,7 +25,8 @@ import type { VideoPlaybackState } from "./videoPlaybackState";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
 import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
 import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
-import { calculatePacketSequence, calculateTelemetryMetrics, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import { calculatePacketSequence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
+import { assessKpiMeasurement } from "./kpiMeasurementEvidence";
 import { evaluateFieldApiHealth, fieldApiHealthLabel, formatLastSuccessAge } from "./fieldApiHealth";
 import { PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
 import {
@@ -340,17 +341,6 @@ function locationFingerprint(item: LiveLocation) {
     item.positioningMethod, item.horizontalAccuracyM, item.rtcmStatus,
     item.pathEvidence?.coreReceivedAt,
   ].join("|");
-}
-
-function overviewKpiValue(overview: EventOverview, metricCode: string): number | null {
-  const row = overview.kpis.find((item) => String(item.metricCode ?? "") === metricCode);
-  const candidate = Number(row?.measuredValue);
-  return Number.isFinite(candidate) ? candidate : null;
-}
-
-function fieldKpiState(value: number | null, target: number, direction: "MAX" | "MIN") {
-  if (value == null) return "WAIT" as const;
-  return (direction === "MAX" ? value <= target : value >= target) ? "PASS" as const : "CHECK" as const;
 }
 
 function telemetrySampleFromLiveAsset(asset: ApiRecord): TelemetrySample | null {
@@ -1494,7 +1484,24 @@ export default function UnifiedDisasterDashboard() {
         })()
       : refreshOverview()
       .then(() => active && setError(null))
-      .catch((caught: unknown) => active && setError(caught instanceof Error ? caught.message : "현황 조회 실패"));
+      .catch((caught: unknown) => {
+        if (!active) return;
+        const message = caught instanceof Error ? caught.message : "현황 조회 실패";
+        setError(message);
+        setOverview((current) =>
+          current
+            ? {
+                ...current,
+                kpis: [],
+                kpiApiStatus: {
+                  state: "ERROR",
+                  checkedAt: new Date().toISOString(),
+                  message,
+                },
+              }
+            : current,
+        );
+      });
     void refresh();
     const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
     return () => { active = false; window.clearInterval(timer); };
@@ -1809,18 +1816,27 @@ export default function UnifiedDisasterDashboard() {
 
   const communicationKpis = useMemo(() => {
     if (!overview) return [];
-    const telemetryMetrics = telemetrySamples.length ? calculateTelemetryMetrics(telemetrySamples, PROJECT_ENHANCED_TARGET.locationUpdateSeconds) : null;
-    const deployment = overviewKpiValue(overview, "NETWORK_DEPLOYMENT_TIME");
-    const freshness = overviewKpiValue(overview, "LOCATION_LATENCY") ?? telemetryMetrics?.averageLatencySec ?? null;
-    const sharing = overviewKpiValue(overview, "SHARING_SUCCESS") ?? telemetryMetrics?.sharingSuccessPct ?? null;
-    const availability = overviewKpiValue(overview, "NETWORK_AVAILABILITY") ?? telemetryMetrics?.availabilityPct ?? null;
     return [
-      { id: "deployment", label: "통신망 구축시간", value: deployment, unit: "분", target: PROJECT_ENHANCED_TARGET.networkDeploymentMinutes, direction: "MAX" as const, icon: "NET" },
-      { id: "freshness", label: "위치정보 갱신", value: freshness, unit: "초", target: PROJECT_ENHANCED_TARGET.locationUpdateSeconds, direction: "MAX" as const, icon: "GPS" },
-      { id: "sharing", label: "정보공유 성공률", value: sharing, unit: "%", target: PROJECT_ENHANCED_TARGET.sharingSuccessPct, direction: "MIN" as const, icon: "SEQ" },
-      { id: "availability", label: "네트워크 가용률", value: availability, unit: "%", target: PROJECT_ENHANCED_TARGET.availabilityPct, direction: "MIN" as const, icon: "LINK" },
-    ].map((item) => ({ ...item, state: fieldKpiState(item.value, item.target, item.direction) }));
-  }, [overview, telemetrySamples]);
+      { id: "deployment", code: "NETWORK_DEPLOYMENT_TIME", label: "통신망 구축시간", unit: "분", target: PROJECT_ENHANCED_TARGET.networkDeploymentMinutes, operator: "≤" as const, icon: "NET" },
+      { id: "freshness", code: "LOCATION_LATENCY", label: "위치정보 갱신", unit: "초", target: PROJECT_ENHANCED_TARGET.locationUpdateSeconds, operator: "≤" as const, icon: "GPS" },
+      { id: "sharing", code: "SHARING_SUCCESS", label: "정보공유 성공률", unit: "%", target: PROJECT_ENHANCED_TARGET.sharingSuccessPct, operator: "≥" as const, icon: "SEQ" },
+      { id: "availability", code: "NETWORK_AVAILABILITY", label: "네트워크 가용률", unit: "%", target: PROJECT_ENHANCED_TARGET.availabilityPct, operator: "≥" as const, icon: "LINK" },
+    ].map((item) => {
+      const row = overview.kpis.find(
+        (candidate) => String(candidate.metricCode ?? "") === item.code,
+      );
+      const assessment = assessKpiMeasurement({
+        row,
+        expectedMetricCode: item.code,
+        expectedUnit: item.unit,
+        operator: item.operator,
+        target: item.target,
+        demoMode: demoMode || fieldPreviewMode,
+        apiStatus: overview.kpiApiStatus,
+      });
+      return { ...item, value: assessment.value, state: assessment.state };
+    });
+  }, [demoMode, fieldPreviewMode, overview]);
   const fieldPrimaryDrone = (localFieldMode || localE2EMode)
     ? (localFieldMode && fieldPreviewMode ? fieldScenarioLocations : liveLocations)
         .find((location) => resourceGroupOf(location) === "UAV") ?? null
@@ -2289,10 +2305,10 @@ export default function UnifiedDisasterDashboard() {
               <span className="field-kpi-icon" aria-hidden="true">{item.icon}</span>
               <div>
                 <small>{item.label}</small>
-                <strong>{item.value == null ? "측정 대기" : `${item.value.toFixed(item.unit === "%" ? 1 : 1)}${item.unit}`}</strong>
+                <strong>{item.value == null ? "측정 대기" : `${item.value.toFixed(1)}${item.unit}`}</strong>
               </div>
-              <em>{item.state === "PASS" ? "PASS" : item.state === "CHECK" ? "CHECK" : "대기"}</em>
-              <p>기준 {item.direction === "MAX" ? "≤" : "≥"}{item.target}{item.unit}</p>
+              <em>{item.state === "PASS" || item.state === "FAIL" ? item.state : item.state === "DEMO" ? "DEMO" : item.state === "UNVERIFIED" ? "미검증" : item.state === "ERROR" ? "API 오류" : item.state === "STALE" ? "STALE" : "대기"}</em>
+              <p>기준 {item.operator}{item.target}{item.unit}</p>
             </article>
           ))}
           <aside className="field-kpi-context">

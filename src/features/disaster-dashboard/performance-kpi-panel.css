@@ -844,6 +844,25 @@
   display: none;
 }
 
+.performance-vital-card > .performance-kpi-source {
+  display: block;
+  margin-top: 6px;
+  color: #667085;
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.performance-vital-card[data-status="DEMO"],
+.performance-vital-card[data-status="REFERENCE"],
+.performance-vital-card[data-status="UNVERIFIED"] {
+  border-color: #d6b76a;
+}
+
+.performance-vital-card[data-status="STALE"],
+.performance-vital-card[data-status="ERROR"] {
+  border-color: #d99a9a;
+}
+
 .performance-measurement-details {
   border-top: 1px solid #e4ebe8;
   padding-top: 5px;
