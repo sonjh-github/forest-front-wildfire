@@ -104,10 +104,10 @@ const tabs: Array<{ id: PanelTab; label: string; icon: string }> = [
   { id: "integrations", label: "연계 상태", icon: "↔" },
 ];
 
-const visibleTabs =
-  SHOW_VALIDATION_UI
-    ? tabs
-    : tabs.filter((tab) => tab.id !== "kpis");
+// 20261011 이영준
+// 현장 KPI는 운영 및 DEMO 화면에서 모두 접근 가능하도록 유지
+// 실측 여부는 PerformanceKpiPanel 내부에서 별도 구분
+const visibleTabs = tabs;
 
 
 const statusLabels: Record<string, string> = {
