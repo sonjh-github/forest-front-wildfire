@@ -14,11 +14,16 @@ import {
   type FieldLinkChatMessage,
   type FieldLinkDeliveredAlert,
 } from "../../http-api/fieldlink-api";
+import {
+  getFieldLinkConfig,
+  type FieldLinkStatus,
+} from "../../http-api/fieldlink-config";
 
 import "./fieldlink-chat.css";
 
 type Props = {
   eventId: string;
+  embedded?: boolean;
 };
 
 type AlertRow =
@@ -73,11 +78,12 @@ function timeLabel(value: string) {
 
 export default function FieldLinkChatWidget({
   eventId,
+  embedded = false,
 }: Props) {
-  const baseUrl =
-    typeof window === "undefined"
-      ? "http://127.0.0.1:18080"
-      : `${window.location.protocol}//${window.location.hostname}:18080`;
+  const baseUrl = useMemo(
+    () => getFieldLinkConfig().apiUrl,
+    [],
+  );
 
   const roomId = useMemo(
     () =>
@@ -88,7 +94,7 @@ export default function FieldLinkChatWidget({
   );
 
   const [clientId] = useState(loadClientId);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(embedded);
 
   const [pin, setPin] = useState(
     () =>
@@ -116,9 +122,7 @@ export default function FieldLinkChatWidget({
     useState<AlertRow[]>([]);
 
   const [status, setStatus] =
-    useState<
-      "checking" | "online" | "offline"
-    >("checking");
+    useState<FieldLinkStatus>("checking");
 
   const [error, setError] = useState("");
   const [sending, setSending] =
@@ -140,6 +144,8 @@ export default function FieldLinkChatWidget({
 
   useEffect(() => {
     let disposed = false;
+
+    setStatus("checking");
 
     const refresh = async () => {
       try {
@@ -309,7 +315,7 @@ export default function FieldLinkChatWidget({
 
   return (
     <aside
-      className="fieldlink-chat-widget"
+      className={`fieldlink-chat-widget${embedded ? " is-embedded" : ""}`}
       aria-label="FieldLink 현장 LAN 채팅"
     >
       <button

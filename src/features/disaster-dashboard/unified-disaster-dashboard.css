@@ -4520,3 +4520,395 @@
   object-position: left center !important;
   flex: 0 0 auto !important;
 }
+
+
+/* FIELD RIGHT DOCK 20261011 */
+/* The left operations rail stays untouched; dock never occupies map hit targets outside itself. */
+.dashboard-map-stage .field-right-dock {
+  position: absolute;
+  z-index: 11;
+  top: 12px;
+  right: 12px;
+  width: clamp(276px, 23vw, 350px);
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(117,150,173,.55);
+  border-radius: 12px;
+  background: rgba(248,252,255,.97);
+  color: #172c40;
+  box-shadow: 0 10px 28px rgba(0,0,0,.20);
+}
+.field-right-dock-tabs { display:flex; flex:0 0 auto; gap:3px; padding:5px; background:#e8f0f6; }
+.field-right-dock-tabs button { flex:1; min-width:0; padding:9px 3px; border:0; border-radius:7px; background:transparent; color:#3b566d; font-size:11px; font-weight:800; cursor:pointer; }
+.field-right-dock-tabs button.is-active { background:#fff; color:#125b8d; box-shadow:0 1px 5px #bacbd999; }
+.field-right-dock-body { padding:15px; overflow:auto; font-size:12px; }
+.field-right-dock-body p { margin:9px 0; line-height:1.5; }
+.field-right-dock-body > button { padding:8px 12px; border:1px solid #9cbbc9; border-radius:6px; background:#f2faff; color:#164e70; cursor:pointer; }
+.field-right-dock-semantic { padding:7px; overflow:auto; min-height:0; }
+.field-right-dock-fieldlink { padding:5px; min-height:0; overflow:auto; }
+.field-right-dock [hidden] { display:none !important; }
+.field-right-dock .semantic-mission-poc { width:100%; }
+@media (max-width: 760px) {
+  .dashboard-map-stage .field-right-dock { top:auto; bottom:10px; right:10px; width:min(330px,calc(100% - 20px)); max-height:min(68%,470px); }
+}
+
+
+/* FIELD LEFT DRAWER 20261011 */
+/* Closed by default; preserves existing right-side telemetry panel. */
+.dashboard-map-stage .field-right-dock.field-left-drawer {
+  position: absolute;
+  z-index: 24;
+  top: auto;
+  bottom: 48px;
+  left: 118px;
+  right: auto;
+  flex-direction: column-reverse;
+  width: auto;
+  max-width: min(350px, calc(100% - 20px));
+  max-height: min(72%, 570px);
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  align-items: flex-start;
+}
+.field-left-drawer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px solid #8caeba;
+  border-radius: 9px;
+  color: #184d67;
+  background: #f6fbff;
+  box-shadow: 0 3px 12px #1a354033;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.field-left-drawer-toggle:focus-visible { outline: 3px solid #3d91c8; outline-offset: 2px; }
+.field-left-drawer-toggle > span:first-child { font-size: 17px; line-height: 1; }
+.field-left-drawer-content {
+  display: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: clamp(276px, 23vw, 350px);
+  max-width: calc(100vw - 30px);
+  max-height: min(60dvh, 530px);
+  margin-bottom: 6px;
+  overflow: hidden;
+  background: rgba(248,252,255,.98);
+  border: 1px solid rgba(117,150,173,.55);
+  border-radius: 12px;
+  box-shadow: 0 12px 34px #102a3c40;
+}
+.field-left-drawer.is-open .field-left-drawer-content { display: flex; }
+.field-left-drawer-content > .field-right-dock-body,
+.field-left-drawer-content > .field-right-dock-semantic,
+.field-left-drawer-content > .field-right-dock-fieldlink {
+  overflow-y: auto;
+  min-height: 0;
+}
+.field-left-drawer-content > .field-right-dock-fieldlink { flex: 1 1 auto; }
+.field-left-drawer-content .fieldlink-chat-widget.is-embedded .fieldlink-chat-panel {
+  height: min(380px, 48dvh);
+}
+@media (max-width: 760px) {
+  .dashboard-map-stage .field-right-dock.field-left-drawer {
+    top: auto;
+    bottom: 45px;
+    left: 62px;
+    right: auto;
+    max-height: 68%;
+  }
+  .field-left-drawer-content { width: min(320px, calc(100vw - 26px)); }
+}
+
+
+/* FIELD TOOL RAIL POSITION FIX 20261011 */
+/* Use the unused lower portion of the vertical tool rail, not the KPI card. */
+.dashboard-map-stage .field-right-dock.field-left-drawer {
+  position: static;
+  width: 0;
+  height: 0;
+  max-height: none;
+  max-width: none;
+}
+.dashboard-map-stage .field-left-drawer-toggle {
+  position: fixed;
+  z-index: 90;
+  left: 70px;
+  bottom: 176px;
+  width: 44px;
+  min-height: 50px;
+  padding: 6px 3px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: none;
+}
+.dashboard-map-stage .field-left-drawer-toggle > span:first-child {
+  font-size: 15px;
+}
+.dashboard-map-stage .field-left-drawer-content {
+  position: fixed;
+  z-index: 89;
+  left: 126px;
+  bottom: 176px;
+  margin: 0;
+  max-height: min(58dvh, 530px);
+  width: min(340px, calc(100vw - 148px));
+}
+@media (max-height: 800px) {
+  .dashboard-map-stage .field-left-drawer-toggle,
+  .dashboard-map-stage .field-left-drawer-content {
+    bottom: 118px;
+  }
+}
+@media (max-width: 760px) {
+  .dashboard-map-stage .field-left-drawer-toggle {
+    left: 18px;
+    bottom: 118px;
+  }
+  .dashboard-map-stage .field-left-drawer-content {
+    left: 72px;
+    bottom: 118px;
+    width: min(300px, calc(100vw - 90px));
+  }
+}
+
+/* 2026-10-11: header entry for existing field tools drawer */
+.map-command-header .field-header-tool-toggle {
+  position: static;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid #b9d3ca;
+  border-radius: 8px;
+  background: #f4faf7;
+  color: #175a4c;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.map-command-header .field-header-tool-toggle:hover {
+  background: #e7f4ee;
+}
+.map-command-header .field-header-tool-toggle[aria-expanded="true"] {
+  border-color: #178165;
+  background: #def1e8;
+}
+@media (max-width: 1100px) {
+  .map-command-header .field-header-tool-toggle {
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+}
+
+/* field-header-nav-20261011: header actions and non-obstructing details popover */
+.map-command-header .field-header-tools-nav {
+  display: flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  min-width: 0;
+}
+.map-command-header .field-header-tools-nav button {
+  position: static; min-height: 35px; padding: 6px 10px;
+  border-radius: 8px; border: 1px solid #cadbd8;
+  background: #ffffff; color: #28554e;
+  font-size: 11px; font-weight: 750; white-space: nowrap; cursor: pointer;
+}
+.map-command-header .field-header-tools-nav button:hover { background: #eef8f4; }
+.map-command-header .field-header-tools-nav button.is-active {
+  border-color: #15836a; background: #dff2e9; color: #135a49;
+}
+/* The existing panel stays mounted (preserving FieldLink state); only its tab bar moves. */
+.field-left-drawer.field-right-dock {
+  position: fixed !important;
+  top: 180px !important;
+  left: min(50vw, calc(100vw - 370px)) !important;
+  right: auto !important; bottom: auto !important;
+  width: min(340px, calc(100vw - 24px)) !important;
+  max-height: min(550px, calc(100dvh - 195px)) !important;
+  transform: none !important; z-index: 1250 !important;
+  margin: 0 !important;
+}
+.field-left-drawer.field-right-dock:not(.is-open) {
+  display: none !important;
+}
+.field-left-drawer.field-right-dock .field-left-drawer-content {
+  max-height: min(540px, calc(100dvh - 205px));
+  overflow: auto;
+}
+@media (max-width: 1100px) {
+  .map-command-header .field-header-tools-nav { gap: 3px; }
+  .map-command-header .field-header-tools-nav button { min-height: 31px; padding: 5px 7px; font-size: 10px; }
+  .field-left-drawer.field-right-dock { left: 12px !important; top: 175px !important; }
+}
+@media (max-width: 640px) {
+  .map-command-header .field-header-tools-nav { flex-wrap: wrap; }
+  .field-left-drawer.field-right-dock {
+    top: 200px !important;
+    max-height: calc(100dvh - 215px) !important;
+  }
+}
+
+/* MAP LEGEND TOP-LEFT 20261011 */
+/* Keep the legend clear of the bottom live timeline and right-side map controls. */
+.map-meaning-legend.command-center-legend {
+  position: absolute !important;
+  top: 12px !important;
+  left: 12px !important;
+  right: auto !important;
+  bottom: auto !important;
+  inset-inline-start: 12px !important;
+  inset-inline-end: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  max-width: min(340px, calc(100% - 24px));
+  z-index: 15;
+}
+@media (max-width: 760px) {
+  .map-meaning-legend.command-center-legend {
+    top: 52px !important;
+    max-width: min(280px, calc(100% - 24px));
+  }
+}
+
+
+/* legend-compact-top-left-fix-20261011 */
+/* Override prior right-side overlay sizing without touching map or timeline logic. */
+.location-map .map-meaning-legend.command-center-legend,
+.map-meaning-legend.command-center-legend {
+  position: absolute !important;
+  inset: 10px auto auto 10px !important;
+  top: 10px !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 10px !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: min(294px, calc(100% - 20px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 7px 9px !important;
+  display: flex !important;
+  flex-flow: row wrap !important;
+  align-items: center !important;
+  align-content: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 4px 7px !important;
+  overflow: visible !important;
+  border: 1px solid #cbded7 !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 9px rgba(22, 65, 50, 0.1) !important;
+  z-index: 35 !important;
+  transform: none !important;
+  grid-area: auto !important;
+  flex: 0 0 auto !important;
+}
+.map-meaning-legend.command-center-legend > strong {
+  display: inline-block !important;
+  flex: 0 0 100% !important;
+  margin: 0 0 1px !important;
+  font-size: 10px !important;
+  line-height: 14px !important;
+}
+.map-meaning-legend.command-center-legend > span {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-items: center !important;
+  gap: 3px !important;
+  white-space: nowrap !important;
+  font-size: 9px !important;
+  line-height: 14px !important;
+}
+@media (max-width: 760px) {
+  .location-map .map-meaning-legend.command-center-legend,
+  .map-meaning-legend.command-center-legend {
+    inset: 8px auto auto 8px !important;
+    max-width: min(252px, calc(100% - 16px)) !important;
+    padding: 5px 7px !important;
+  }
+}
+
+
+/* legend-geometry-repair-20261011-v3 */
+/* The element itself was 369px wide and map-height tall, so override ALL
+   physical/logical geometry. Use direct-child selector to outrank prior rules. */
+.location-map .live-map-shell > section.map-meaning-legend.command-center-legend,
+.live-map-shell > section.map-meaning-legend.command-center-legend {
+  position: absolute !important;
+  inset: 9px auto auto 9px !important;
+  top: 9px !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 9px !important;
+  inset-inline-start: 9px !important;
+  inset-inline-end: auto !important;
+  inset-block-start: 9px !important;
+  inset-block-end: auto !important;
+  width: 294px !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 18px) !important;
+  height: max-content !important;
+  min-height: 0 !important;
+  max-height: 90px !important;
+  inline-size: 294px !important;
+  min-inline-size: 0 !important;
+  max-inline-size: calc(100% - 18px) !important;
+  block-size: max-content !important;
+  min-block-size: 0 !important;
+  max-block-size: 90px !important;
+  aspect-ratio: auto !important;
+  transform: none !important;
+  translate: none !important;
+  margin: 0 !important;
+  padding: 6px 8px !important;
+  display: flex !important;
+  flex-flow: row wrap !important;
+  align-content: flex-start !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 3px 7px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  background: rgba(255,255,255,.95) !important;
+  border: 1px solid #cbded7 !important;
+  border-radius: 7px !important;
+  box-shadow: 0 2px 8px rgba(22,65,50,.12) !important;
+  z-index: 35 !important;
+  flex: none !important;
+  grid-area: auto !important;
+}
+@media (max-width: 760px) {
+  .live-map-shell > section.map-meaning-legend.command-center-legend {
+    width: 260px !important;
+    inline-size: 260px !important;
+    max-width: calc(100% - 16px) !important;
+    max-inline-size: calc(100% - 16px) !important;
+    top: 8px !important;
+    left: 8px !important;
+    inset: 8px auto auto 8px !important;
+  }
+}
