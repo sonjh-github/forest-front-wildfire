@@ -247,3 +247,93 @@
     width: calc(100vw - 16px);
   }
 }
+
+
+/* FIELDLINK RESPONSIVE LAYOUT FIX 20261011 */
+
+/* Flexible panel: preserve real chat space when alerts exist. */
+.fieldlink-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: min(470px, 65dvh);
+  min-height: 0;
+}
+
+.fieldlink-chat-panel > header,
+.fieldlink-chat-config,
+.fieldlink-chat-panel > form,
+.fieldlink-chat-error {
+  flex: 0 0 auto;
+}
+
+.fieldlink-chat-alert-list {
+  flex: 0 1 auto;
+  max-height: 110px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fieldlink-chat-alert-list article::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+.fieldlink-chat-message-list {
+  flex: 1 1 0;
+  min-height: 110px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fieldlink-chat-widget {
+  right: 12px;
+  bottom: 12px;
+}
+
+/* Smaller screens: reduce alert space before chat space. */
+@media (max-height: 650px) {
+  .fieldlink-chat-panel {
+    height: min(390px, 65dvh);
+  }
+
+  .fieldlink-chat-alert-list {
+    max-height: 75px;
+  }
+
+  .fieldlink-chat-message-list {
+    min-height: 65px;
+  }
+}
+
+@media (max-width: 640px) {
+  .fieldlink-chat-widget {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+
+  .fieldlink-chat-panel {
+    height: min(440px, 65dvh);
+  }
+}
+
+
+/* Embedded FieldLink: preserve polling and ACK state even when dock tab is hidden. */
+.field-right-dock .fieldlink-chat-widget.is-embedded {
+  position:relative;
+  z-index:auto;
+  inset:auto;
+  right:auto;
+  bottom:auto;
+  width:100%;
+}
+.field-right-dock .fieldlink-chat-widget.is-embedded .fieldlink-chat-toggle { display:none; }
+.field-right-dock .fieldlink-chat-widget.is-embedded .fieldlink-chat-panel {
+  width:100%;
+  height:min(420px,52dvh);
+  max-height:100%;
+  margin:0;
+  box-shadow:none;
+}

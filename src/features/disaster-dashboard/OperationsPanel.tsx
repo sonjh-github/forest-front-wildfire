@@ -15,6 +15,12 @@ import {
   type FieldLinkAlertSummary,
 } from "../../http-api/fieldlink-api";
 import {
+  canLaunchFieldLinkWebUi,
+  getFieldLinkConfig,
+  probeFieldLinkHealth,
+  type FieldLinkStatus,
+} from "../../http-api/fieldlink-config";
+import {
   appendAlertDeliveryTrace,
   createDeliveredAlertTrace,
   createFailedAlertTrace,
@@ -163,18 +169,26 @@ export function OperationsPanel({
   const nms = nmsSummary(overview.networks, overview.assets);
   const [collapsed, setCollapsed] = useState(false);
 
-  const fieldLinkUrl =
-    typeof window === "undefined"
-      ? "http://127.0.0.1:18080"
-      : `${window.location.protocol}//${window.location.hostname}:18080`;
+  const fieldLinkConfig = useMemo(
+    () => getFieldLinkConfig(),
+    [],
+  );
+  const fieldLinkUrl = fieldLinkConfig.apiUrl;
 
   const [fieldLinkStatus, setFieldLinkStatus] =
-    useState<"checking" | "online" | "offline">("checking");
+    useState<FieldLinkStatus>("checking");
+  const [fieldLinkStatusReason, setFieldLinkStatusReason] =
+    useState("FieldLink 상태 확인 중");
 
   useEffect(() => {
     let disposed = false;
 
     const checkFieldLink = async () => {
+      if (!disposed) {
+        setFieldLinkStatus("checking");
+        setFieldLinkStatusReason("FieldLink 상태 확인 중");
+      }
+
       const controller = new AbortController();
       const timeout = window.setTimeout(
         () => controller.abort(),
@@ -182,19 +196,18 @@ export function OperationsPanel({
       );
 
       try {
-        await fetch(`${fieldLinkUrl}/health`, {
-          method: "GET",
-          mode: "no-cors",
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const result = await probeFieldLinkHealth(
+          fieldLinkUrl,
+          controller.signal,
+        );
 
         if (!disposed) {
-          setFieldLinkStatus("online");
-        }
-      } catch {
-        if (!disposed) {
-          setFieldLinkStatus("offline");
+          setFieldLinkStatus(result.status);
+          setFieldLinkStatusReason(
+            fieldLinkConfig.apiConfigurationIssue
+              ? `${result.reason} ${fieldLinkConfig.apiConfigurationIssue}`
+              : result.reason,
+          );
         }
       } finally {
         window.clearTimeout(timeout);
@@ -212,7 +225,15 @@ export function OperationsPanel({
       disposed = true;
       window.clearInterval(interval);
     };
-  }, [fieldLinkUrl]);
+  }, [fieldLinkConfig.apiConfigurationIssue, fieldLinkUrl]);
+  const fieldLinkLaunchReason =
+    fieldLinkStatus !== "online"
+      ? fieldLinkStatusReason
+      : fieldLinkConfig.webConfigurationIssue;
+  const canLaunchFieldLink = canLaunchFieldLinkWebUi(
+    fieldLinkStatus,
+    fieldLinkConfig,
+  );
   const [fieldLinkPin, setFieldLinkPin] = useState("");
   const [fieldLinkAlertSummary, setFieldLinkAlertSummary] =
     useState<FieldLinkAlertSummary | null>(null);
@@ -919,14 +940,25 @@ export function OperationsPanel({
         <button
           type="button"
           className="fieldlink-launch-button"
-          aria-label="현장 메신저 새 창으로 열기"
-          title={`FieldLink · ${fieldLinkUrl}`}
+          aria-label={
+            canLaunchFieldLink
+              ? "현장 메신저 새 창으로 열기"
+              : `현장 메신저 실행 불가: ${fieldLinkLaunchReason}`
+          }
+          title={
+            canLaunchFieldLink
+              ? `FieldLink 메신저 · ${fieldLinkConfig.webUrl}`
+              : fieldLinkLaunchReason ?? "FieldLink 메신저 실행 불가"
+          }
+          disabled={!canLaunchFieldLink}
           onClick={() => {
-            window.open(
-              fieldLinkUrl,
-              "fieldlink-lan-messenger",
-              "noopener,noreferrer",
-            );
+            if (fieldLinkConfig.webUrl) {
+              window.open(
+                fieldLinkConfig.webUrl,
+                "fieldlink-lan-messenger",
+                "noopener,noreferrer",
+              );
+            }
           }}
         >
           <i aria-hidden="true">✉</i>
@@ -936,16 +968,22 @@ export function OperationsPanel({
             className={`fieldlink-status fieldlink-status-${fieldLinkStatus}`}
             aria-label={
               fieldLinkStatus === "online"
-                ? "FieldLink 온라인"
+                ? fieldLinkConfig.webUrl
+                  ? "FieldLink API 온라인, 메신저 웹 UI 실행 가능"
+                  : `FieldLink API 온라인, ${fieldLinkConfig.webConfigurationIssue}`
                 : fieldLinkStatus === "offline"
-                  ? "FieldLink 오프라인"
+                  ? `FieldLink 오프라인: ${fieldLinkStatusReason}`
                   : "FieldLink 상태 확인 중"
             }
+            role="status"
+            aria-live="polite"
             title={
               fieldLinkStatus === "online"
-                ? "FieldLink 온라인"
+                ? fieldLinkConfig.webUrl
+                  ? "FieldLink API 온라인 · 메신저 실행 가능"
+                  : fieldLinkConfig.webConfigurationIssue ?? "FieldLink API 온라인"
                 : fieldLinkStatus === "offline"
-                  ? "FieldLink 오프라인"
+                  ? fieldLinkStatusReason
                   : "상태 확인 중"
             }
           />

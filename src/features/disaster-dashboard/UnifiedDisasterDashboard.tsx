@@ -935,6 +935,9 @@ export default function UnifiedDisasterDashboard() {
   const [operationsTab, setOperationsTab] = useState<PanelTab>(
     SHOW_VALIDATION_UI ? "kpis" : "networks",
   );
+  // Keep the existing left operation rail mounted; only dock content changes.
+  const [rightDockTab, setRightDockTab] = useState<"status" | "semantic" | "fieldlink">("status");
+  const [toolDrawerOpen, setToolDrawerOpen] = useState(false);
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(null);
   const [topologyLocationKey, setTopologyLocationKey] = useState<string | null>(null);
   const [resourceDialogGroup, setResourceDialogGroup] = useState<ResourceGroup | "ALL" | "ALL_ASSETS" | null>(null);
@@ -2135,7 +2138,7 @@ export default function UnifiedDisasterDashboard() {
           <header>
             <div className="readiness-brand"><span>산림청</span><strong>산림재난 통합상황판</strong><small>FOREST DISASTER COMMON OPERATIONAL PICTURE</small></div>
             <div className="readiness-actions">
-              {SHOW_VALIDATION_UI && <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>}
+              {SHOW_VALIDATION_UI && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("qa") === "1" && <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>}
               <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
               <div className={`readiness-connection ${error ? "is-error" : eventsLoaded ? "is-ready" : "is-loading"}`}><i />{error ? "연결 점검 필요" : eventsLoaded ? "연결 정상" : "데이터 연결 중"}</div>
             </div>
@@ -2187,6 +2190,12 @@ export default function UnifiedDisasterDashboard() {
           {localFieldMode && <div className={`demo-mode-badge field-mode-badge${fieldPreviewMode ? " field-preview-badge" : ""}`} title={fieldPreviewMode ? "화면 확인을 위한 명시적 미리보기 데이터입니다. 실제 비행 증거가 아닙니다." : "실제 MD1000 MAVLink만 수신하는 로컬 현장 모드입니다. Synthetic feed는 사용하지 않습니다."}><b>{fieldPreviewMode ? "미리보기" : "현장"}</b><span>{fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "MD1000 실기체 · MAVLink 연동"}</span></div>}
           {SHOW_VALIDATION_UI && demoMode && <label className="demo-scenario-selector"><span>검증 시나리오</span><select aria-label="DEMO 검증 시나리오" value={demoScenario} onChange={(event) => { const params = new URLSearchParams(window.location.search); params.set("demo", "1"); params.set("scenario", event.target.value); window.location.search = params.toString(); }}>{DEMO_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label>}
           {localFieldMode && <button type="button" className="field-preview-toggle" onClick={() => { const params = new URLSearchParams(window.location.search); params.set("field", "1"); if (fieldPreviewMode) params.delete("preview"); else params.set("preview", "1"); window.location.search = params.toString(); }}>{fieldPreviewMode ? "실데이터 보기" : "미리보기 데이터"}</button>}
+{/* restore-field-header-nav-20261011: existing field tools in header */}
+          <nav className="field-header-tools-nav" aria-label="현장 도구 선택">
+            <button type="button" className={toolDrawerOpen && rightDockTab === "status" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "status"} aria-controls="field-left-drawer-content" onClick={() => { setRightDockTab("status"); setToolDrawerOpen(value => rightDockTab === "status" ? !value : true); }}>현장 상태</button>
+            <button type="button" className={toolDrawerOpen && rightDockTab === "semantic" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "semantic"} aria-controls="field-left-drawer-content" title={SHOW_VALIDATION_UI && demoMode ? "Semantic AI 검증 패널" : "Semantic AI 상세정보는 디버그·시연 모드에서만 제공됩니다"} onClick={() => { setRightDockTab("semantic"); setToolDrawerOpen(value => rightDockTab === "semantic" ? !value : true); }}>Semantic AI</button>
+            <button type="button" className={toolDrawerOpen && rightDockTab === "fieldlink" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "fieldlink"} aria-controls="field-left-drawer-content" onClick={() => { setRightDockTab("fieldlink"); setToolDrawerOpen(value => rightDockTab === "fieldlink" ? !value : true); }}>FieldLink</button>
+          </nav>
           <nav className="header-summary" aria-label="운영 현황">
             <button
   type="button"
@@ -2204,7 +2213,7 @@ export default function UnifiedDisasterDashboard() {
           </nav>
           <div className="command-primary-actions">
             <button type="button" className="asset-registry-open" onClick={() => { window.location.href = "/device"; }}>자산 등록·관리</button>
-            {SHOW_VALIDATION_UI && <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>}
+            {SHOW_VALIDATION_UI && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("qa") === "1" && <button type="button" className="requirements-open" onClick={() => setRequirementsOpen(true)}>기능 검증 현황</button>}
           </div>
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
@@ -2281,11 +2290,6 @@ export default function UnifiedDisasterDashboard() {
           </aside>
         </section>}
 <section className={`dashboard-map-stage${commandShellMode ? " field-command-stage" : " asset-panel-collapsed"}`} aria-label="?? ?? ?? ???">
-          {SHOW_VALIDATION_UI && demoMode && (
-            <div className="semantic-mission-poc-overlay">
-              <SemanticMissionPocPanel />
-            </div>
-          )}
           <section className="live-location-panel" aria-label="실시간 현장 위치">
             {!demoMode && overview.liveDroneTelemetry && <div
               className="telemetry-connection-status"
@@ -2366,12 +2370,28 @@ export default function UnifiedDisasterDashboard() {
                 telemetrySamples={telemetrySamples}
               />
 
-              <FieldLinkChatWidget
-                eventId={String(
-                  overview.event.eventId ??
-                  DEFAULT_EVENT_ID
+              {/* Right-side tools do not cover the central map while inactive. */}
+              <aside className={`field-right-dock field-left-drawer${toolDrawerOpen ? " is-open" : ""}`} aria-label="현장 지원 도구">
+<div id="field-left-drawer-content" className="field-left-drawer-content" inert={!toolDrawerOpen}>
+<div className="field-right-dock-body" hidden={rightDockTab !== "status"}>
+                  <strong>관제 현장 상태</strong>
+                  <p>{fieldPreviewMode ? "DEMO · 실제 장비 운용 데이터가 아닙니다." : fieldApiHealthText}</p>
+                  <p>지도 왼쪽 관제 메뉴에서 통신망·경보·연계 상태를 확인할 수 있습니다.</p>
+                  <button type="button" onClick={() => { setOperationsTab("networks"); setRightDockTab("status"); }}>통신망 정보 보기</button>
+                </div>
+                {SHOW_VALIDATION_UI && demoMode && (
+                  <div className="field-right-dock-semantic" hidden={rightDockTab !== "semantic"}>
+                    <SemanticMissionPocPanel />
+                  </div>
                 )}
-              />
+                <div className="field-right-dock-fieldlink" hidden={rightDockTab !== "fieldlink"}>
+                  <FieldLinkChatWidget
+                    embedded
+                    eventId={String(overview.event.eventId ?? DEFAULT_EVENT_ID)}
+                  />
+                </div>
+                </div>
+              </aside>
 
               {(localFieldMode || localE2EMode || SHOW_VALIDATION_UI) && <aside className="field-command-inspector" aria-label="MD1000 장비 상세 정보">
                 <header>
