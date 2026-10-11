@@ -1827,6 +1827,8 @@ export default function UnifiedDisasterDashboard() {
       );
       const assessment = assessKpiMeasurement({
         row,
+        expectedMetricCode: item.code,
+        expectedUnit: item.unit,
         operator: item.operator,
         target: item.target,
         demoMode: demoMode || fieldPreviewMode,

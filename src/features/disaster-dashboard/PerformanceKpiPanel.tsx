@@ -363,6 +363,8 @@ export default function PerformanceKpiPanel({
 
   const assessmentFor = (
     row: ApiRecord | undefined,
+    expectedMetricCode: string,
+    expectedUnit: string,
     operator: Operator,
     target: number,
     referenceValue: number | null,
@@ -372,6 +374,8 @@ export default function PerformanceKpiPanel({
       ? referenceKpiMeasurement(referenceValue, referenceSource)
       : assessKpiMeasurement({
           row,
+          expectedMetricCode,
+          expectedUnit,
           operator,
           target,
           demoMode,
@@ -380,6 +384,8 @@ export default function PerformanceKpiPanel({
 
   const deploymentAssessment = assessmentFor(
     deployment,
+    "NETWORK_DEPLOYMENT_TIME",
+    "분",
     "≤",
     PROJECT_ENHANCED_TARGET.networkDeploymentMinutes,
     deploymentMeasured,
@@ -387,6 +393,8 @@ export default function PerformanceKpiPanel({
   );
   const locationAssessment = assessmentFor(
     location,
+    "LOCATION_LATENCY",
+    "초",
     "≤",
     PROJECT_ENHANCED_TARGET.locationUpdateSeconds,
     sessionLocationMeasured,
@@ -394,6 +402,8 @@ export default function PerformanceKpiPanel({
   );
   const sharingAssessment = assessmentFor(
     sharing,
+    "SHARING_SUCCESS",
+    "%",
     "≥",
     PROJECT_ENHANCED_TARGET.sharingSuccessPct,
     sessionSharingMeasured,
@@ -401,6 +411,8 @@ export default function PerformanceKpiPanel({
   );
   const availabilityAssessment = assessmentFor(
     availability,
+    "NETWORK_AVAILABILITY",
+    "%",
     "≥",
     PROJECT_ENHANCED_TARGET.availabilityPct,
     sessionAvailabilityMeasured,

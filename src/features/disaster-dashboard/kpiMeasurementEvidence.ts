@@ -1,6 +1,7 @@
 import type { ApiRecord, KpiApiStatus } from "../../http-api";
 
 export type KpiOperator = "≤" | "≥";
+export type KpiTestRunState = "LIVE" | "COMPLETED";
 
 export type KpiEvidenceState =
   | "PASS"
@@ -33,9 +34,12 @@ export const KPI_MEASUREMENT_INTERFACE_REQUIREMENTS = {
     "measurementSource",
     "rawLogRefs[]",
     "verificationStatus=VERIFIED",
+    "evidenceVerificationStatus=VERIFIED",
     "receivedAt",
   ],
-  freshness: `receivedAt 기준 ${KPI_STALE_AFTER_MS / 1_000}초 이내`,
+  freshness: `진행 중 시험은 receivedAt 기준 ${KPI_STALE_AFTER_MS / 1_000}초 이내`,
+  completedResult:
+    "완료 시험은 testRunStatus=COMPLETED, completedAt 및 Core 검증 상태의 유효성을 사용",
   note:
     "프론트엔드는 원시로그를 생성하거나 검증하지 않습니다. Core가 원시로그 참조와 검증 상태를 제공해야 공식 판정이 가능합니다.",
 } as const;
@@ -48,7 +52,15 @@ function text(value: unknown) {
 
 function measuredValue(row: ApiRecord | undefined) {
   if (!row) return null;
-  const value = Number(row.measuredValue);
+  const raw = row.measuredValue;
+  if (
+    raw == null ||
+    (typeof raw === "string" && raw.trim() === "") ||
+    (typeof raw !== "number" && typeof raw !== "string")
+  ) {
+    return null;
+  }
+  const value = Number(raw);
   return Number.isFinite(value) ? value : null;
 }
 
@@ -66,12 +78,35 @@ function isExplicitDemo(row: ApiRecord | undefined) {
   );
 }
 
-function rawLogRefs(row: ApiRecord) {
-  if (Array.isArray(row.rawLogRefs)) {
-    return row.rawLogRefs.filter((value) => text(value) != null);
-  }
-  const single = text(row.rawLogEvidence);
-  return single ? [single] : [];
+function rawLogReferences(row: ApiRecord) {
+  return Array.isArray(row.rawLogRefs)
+    ? row.rawLogRefs.filter((value) => text(value) != null)
+    : [];
+}
+
+function normalizedStatus(value: unknown) {
+  return text(value)?.toUpperCase() ?? null;
+}
+
+function testRunState(row: ApiRecord): KpiTestRunState {
+  const status = normalizedStatus(
+    row.testRunStatus ?? row.runStatus ?? row.measurementStatus,
+  );
+  return status === "COMPLETED" ? "COMPLETED" : "LIVE";
+}
+
+function hasValidCompletedVerification(row: ApiRecord, nowMs: number) {
+  const completedAt = text(row.completedAt ?? row.testCompletedAt);
+  if (!completedAt) return false;
+  const completedMs = Date.parse(completedAt);
+  if (!Number.isFinite(completedMs) || completedMs > nowMs) return false;
+
+  const validUntil = text(
+    row.verificationValidUntil ?? row.evidenceValidUntil,
+  );
+  if (!validUntil) return true;
+  const validUntilMs = Date.parse(validUntil);
+  return Number.isFinite(validUntilMs) && nowMs <= validUntilMs;
 }
 
 function isFresh(row: ApiRecord, nowMs: number) {
@@ -95,6 +130,8 @@ export function assessKpiMeasurement({
   row,
   operator,
   target,
+  expectedMetricCode,
+  expectedUnit,
   demoMode,
   apiStatus,
   nowMs = Date.now(),
@@ -102,6 +139,8 @@ export function assessKpiMeasurement({
   row?: ApiRecord;
   operator: KpiOperator;
   target: number;
+  expectedMetricCode: string;
+  expectedUnit: string;
   demoMode: boolean;
   apiStatus?: KpiApiStatus;
   nowMs?: number;
@@ -160,14 +199,22 @@ export function assessKpiMeasurement({
 
   const testRunId = text(row.testRunId ?? row.testExecutionId ?? row.runId);
   const measurementSource = text(row.measurementSource);
-  const verificationStatus = text(row.verificationStatus)?.toUpperCase();
-  const logs = rawLogRefs(row);
+  const verificationStatus = normalizedStatus(row.verificationStatus);
+  const evidenceVerificationStatus = normalizedStatus(
+    row.evidenceVerificationStatus ?? row.rawLogVerificationStatus,
+  );
+  const logs = rawLogReferences(row);
+  const metricCode = text(row.metricCode);
+  const unit = text(row.unit);
 
   if (
+    metricCode !== expectedMetricCode ||
+    unit !== expectedUnit ||
     !testRunId ||
     !measurementSource ||
     logs.length === 0 ||
-    verificationStatus !== "VERIFIED"
+    verificationStatus !== "VERIFIED" ||
+    evidenceVerificationStatus !== "VERIFIED"
   ) {
     return {
       state: "UNVERIFIED",
@@ -175,17 +222,30 @@ export function assessKpiMeasurement({
       lastValue: value,
       source,
       reason:
-        "시험실행 ID·측정 출처·원시로그 참조·VERIFIED 상태가 모두 필요합니다.",
+        "지표 코드·단위·시험실행 ID·측정 출처·원시로그 참조와 Core의 측정/증빙 VERIFIED 상태가 모두 필요합니다.",
       testRunId,
       official: false,
     };
   }
 
-  if (
-    row.dataStatus === "STALE" ||
-    row.freshnessStatus === "STALE" ||
+  const runState = testRunState(row);
+  if (runState === "COMPLETED" && !hasValidCompletedVerification(row, nowMs)) {
+    return {
+      state: "UNVERIFIED",
+      value,
+      lastValue: value,
+      source: measurementSource,
+      reason: "완료 시험의 완료 시각 또는 Core 검증 유효성을 확인할 수 없습니다.",
+      testRunId,
+      official: false,
+    };
+  }
+
+  if (runState === "LIVE" && (
+    normalizedStatus(row.dataStatus) === "STALE" ||
+    normalizedStatus(row.freshnessStatus) === "STALE" ||
     !isFresh(row, nowMs)
-  ) {
+  )) {
     return {
       state: "STALE",
       value: null,
@@ -202,7 +262,9 @@ export function assessKpiMeasurement({
     value,
     lastValue: value,
     source: measurementSource,
-    reason: `Core 검증 완료 · 원시로그 ${logs.length}건`,
+    reason: runState === "COMPLETED"
+      ? `Core 완료 시험 검증 유효 · 원시로그 참조 ${logs.length}건`
+      : `Core 실시간 측정/증빙 검증 완료 · 원시로그 참조 ${logs.length}건`,
     testRunId,
     official: true,
   };
