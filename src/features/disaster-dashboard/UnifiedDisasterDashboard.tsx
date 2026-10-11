@@ -933,11 +933,13 @@ export default function UnifiedDisasterDashboard() {
     () => new Set(["PERSONNEL", "UAV", "COMMAND", "POSITIONING", "COMMUNICATION", "DETECTION", "UNASSIGNED"]),
   );
   const [operationsTab, setOperationsTab] = useState<PanelTab>(
-    SHOW_VALIDATION_UI ? "kpis" : "networks",
+    "weather",
   );
   // Keep the existing left operation rail mounted; only dock content changes.
   const [rightDockTab, setRightDockTab] = useState<"status" | "semantic" | "fieldlink">("status");
   const [toolDrawerOpen, setToolDrawerOpen] = useState(false);
+  const [capabilityMenu, setCapabilityMenu] = useState<null | "equipment" | "command" | "twin" | "response">(null);
+  const [responseSection, setResponseSection] = useState<"night" | "vehicle" | "hq">("night");
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(null);
   const [topologyLocationKey, setTopologyLocationKey] = useState<string | null>(null);
   const [resourceDialogGroup, setResourceDialogGroup] = useState<ResourceGroup | "ALL" | "ALL_ASSETS" | null>(null);
@@ -2196,6 +2198,22 @@ export default function UnifiedDisasterDashboard() {
             <button type="button" className={toolDrawerOpen && rightDockTab === "semantic" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "semantic"} aria-controls="field-left-drawer-content" title={SHOW_VALIDATION_UI && demoMode ? "Semantic AI 검증 패널" : "Semantic AI 상세정보는 디버그·시연 모드에서만 제공됩니다"} onClick={() => { setRightDockTab("semantic"); setToolDrawerOpen(value => rightDockTab === "semantic" ? !value : true); }}>Semantic AI</button>
             <button type="button" className={toolDrawerOpen && rightDockTab === "fieldlink" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "fieldlink"} aria-controls="field-left-drawer-content" onClick={() => { setRightDockTab("fieldlink"); setToolDrawerOpen(value => rightDockTab === "fieldlink" ? !value : true); }}>FieldLink</button>
           </nav>
+          {/* field-capability-shortcuts-20261011: 지원 메뉴는 기존 상태 표시와 분리 */}
+          <nav className="field-capability-shortcuts" aria-label="현장 지원 기능">
+            {([
+              ["equipment", "대원·장비"],
+              ["command", "통신 지휘차"],
+              ["twin", "AI·디지털트윈"],
+              ["response", "현장 대응"],
+            ] as const).map(([key, label]) => (
+              <button key={key} type="button" aria-haspopup="dialog"
+                aria-expanded={capabilityMenu === key}
+                className={capabilityMenu === key ? "is-active" : ""}
+                onClick={() => setCapabilityMenu(current => current === key ? null : key)}>
+                {label}{key === "response" ? " ▾" : ""}
+              </button>
+            ))}
+          </nav>
           <nav className="header-summary" aria-label="운영 현황">
             <button
   type="button"
@@ -2218,6 +2236,53 @@ export default function UnifiedDisasterDashboard() {
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
+        {capabilityMenu && (
+          <section className="field-capability-panel" role="dialog" aria-modal="false"
+            aria-label="현장 지원 기능 정보">
+            <header>
+              <strong>{capabilityMenu === "equipment" ? "대원·장비" : capabilityMenu === "command" ? "통신 지휘차" : capabilityMenu === "twin" ? "AI·디지털트윈" : "현장 대응"}</strong>
+              <button type="button" onClick={() => setCapabilityMenu(null)} aria-label="지원 메뉴 닫기">×</button>
+            </header>
+            {capabilityMenu === "equipment" && <div>
+              <p>대원 보호장비와 현장 진화장비 점검 항목</p>
+              <div className="field-capability-tiles">
+                <article><b>대원 보호장비</b><span>헬멧·조명·고글·마스크·장갑</span><small>지급·점검 기록 연동 대기</small></article>
+                <article><b>야간 시야 보조</b><span>헬멧 조명·휴대 조명</span><small>실장비 제어 연결 없음</small></article>
+                <article><b>진화 장비</b><span>불갈퀴·펌프·호스 등</span><small>재고·배치 데이터 연동 대기</small></article>
+              </div>
+              <button type="button" onClick={() => { setCapabilityMenu(null); setSelectedLocationKey(null); setResourceDialogGroup("ALL_ASSETS"); }}>등록 자산 목록 열기</button>
+            </div>}
+            {capabilityMenu === "command" && <div>
+              <p>통신 지휘차 탑재 시스템 확인</p>
+              <div className="field-capability-tiles">
+                <article><b>무전·현장 통신</b><span>VHF·PS-LTE·백홀 인터페이스</span><small>차량별 연결 검증 대기</small></article>
+                <article><b>현장 영상·방송</b><span>CCTV·현장 안내 방송</span><small>영상·방송 제어 연동 대기</small></article>
+                <article><b>전원 상태</b><span>UPS·배터리·발전기</span><small>운용 계측값 미수신</small></article>
+              </div>
+              <button type="button" onClick={() => { setOperationsTab("networks"); setCapabilityMenu(null); }}>통신망 현황 열기</button>
+            </div>}
+            {capabilityMenu === "twin" && <div>
+              <p>기존 관제 지도와 AI 분석 레이어를 활용합니다.</p>
+              <div className="field-capability-tiles">
+                <article><b>3D 지형</b><span>기존 지도 우측 3D 지형 모드 사용</span><small>지도 기능 재사용</small></article>
+                <article><b>AI 분석 후보</b><span>관측 화선·확산 참고·위험 구역</span><small>분석 출처·시연 여부 확인 필요</small></article>
+                <article><b>실기체 디지털트윈</b><span>실기체 위치 기반 표현</span><small>Core Position 데이터 수신 대기</small></article>
+              </div>
+              <button type="button" onClick={() => { setOperationsTab("layers"); setCapabilityMenu(null); }}>분석 레이어 열기</button>
+            </div>}
+            {capabilityMenu === "response" && <div>
+              <div className="field-capability-choice" role="group" aria-label="현장 대응 종류">
+                <button type="button" aria-pressed={responseSection === "night"} onClick={() => setResponseSection("night")}>야간 대응</button>
+                <button type="button" aria-pressed={responseSection === "vehicle"} onClick={() => setResponseSection("vehicle")}>진화 차량</button>
+                <button type="button" aria-pressed={responseSection === "hq"} onClick={() => setResponseSection("hq")}>통합지휘본부</button>
+              </div>
+              {responseSection === "night" && <article><b>야간 대응 검토</b><p>현장 조명·보호장비, 풍속·시정·기상 관측값을 확인합니다.</p><small>헬기 투입 가능 여부는 자동 판정하지 않으며 관계 지침과 지휘권자 판단이 필요합니다.</small></article>}
+              {responseSection === "vehicle" && <article><b>진화 차량</b><p>진화차·펌프차·지휘차의 장비 제원 및 투입 현황을 확인합니다.</p><small>차량별 제원·배치 원장 연동 대기</small></article>}
+              {responseSection === "hq" && <article><b>통합지휘본부</b><p>상황총괄 · 지상진화 · 공중진화 · 보급지원 · 홍보대책 · 유관기관 협조</p><small>조직별 담당자·지휘명령 데이터 연동 대기</small></article>}
+            </div>}
+            <footer>표시는 기능 안내 및 연동 현황입니다. 실제 현장 장비 상태를 검증한 결과가 아닙니다.</footer>
+          </section>
+        )}
         {SHOW_VALIDATION_UI && <section className="field-kpi-strip" aria-label="현장 통신 KPI 4종">
           {communicationKpis.map((item) => (
             <article key={item.id} data-state={item.state}>

@@ -4912,3 +4912,84 @@
     inset: 8px auto auto 8px !important;
   }
 }
+
+/* 20261011: attribution and measurement controls final adjustment */
+
+/* 2번: 지도 제공자 출처를 작고 단정하게 유지 */
+.live-basemap .maplibregl-ctrl-attrib {
+  margin: 0 5px 5px 0;
+  padding: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+  font-size: 9px;
+}
+
+.live-basemap .maplibregl-ctrl-attrib.maplibregl-compact {
+  min-height: 23px;
+  border-radius: 6px;
+}
+
+/* 3번: 측정 제어 버튼 네 개를 2행으로 안정적으로 배치 */
+.unified-disaster-board .operations-panel .performance-session-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 기존 강제 nowrap 규칙보다 우선하도록 처리 */
+.unified-disaster-board .operations-panel .performance-session-actions > button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 34px !important;
+  height: auto !important;
+  padding: 6px 5px !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  text-align: center !important;
+  line-height: 1.25 !important;
+  font-size: 10px !important;
+}
+
+/* 20261011: left weather tab and top capability shortcuts */
+.field-capability-shortcuts { display:flex; flex:0 1 auto; min-width:0; align-items:center; gap:5px; }
+.map-command-header .field-capability-shortcuts button { flex:0 0 auto; min-height:34px; padding:6px 9px; border:1px solid #b9d8cd; border-radius:7px; background:#f5faf7; color:#1a594a; font-size:10px; font-weight:800; white-space:nowrap; cursor:pointer; }
+.map-command-header .field-capability-shortcuts button:hover,
+.map-command-header .field-capability-shortcuts button.is-active { background:#e0f2e9; border-color:#378d73; }
+.field-capability-panel { position:fixed; z-index:1450; top:168px; left:50%; width:min(480px,calc(100vw - 24px)); max-height:min(620px,calc(100dvh - 190px)); transform:translateX(-50%); overflow:auto; padding:14px; border:1px solid #c9dcd5; border-radius:12px; background:#fff; box-shadow:0 12px 30px #103d302b; font-size:12px; }
+.field-capability-panel > header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:10px; border-bottom:1px solid #e3ece8; }
+.field-capability-panel > header strong { font-size:16px; }
+.field-capability-panel > header button { border:0; background:transparent; font-size:23px; cursor:pointer; }
+.field-capability-panel p { color:#556b61; line-height:1.6; }
+.field-capability-panel .field-capability-tiles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0; }
+.field-capability-panel article { display:grid; gap:5px; padding:12px; min-width:0; border:1px solid #dbe7e1; border-radius:8px; background:#f7fbf9; }
+.field-capability-panel article span { color:#49675c; }
+.field-capability-panel article small { color:#8c645a; }
+.field-capability-panel > div > button { padding:8px 12px; border:1px solid #90bcaa; border-radius:7px; background:#e7f4ed; color:#135a46; cursor:pointer; }
+.field-capability-panel footer { margin-top:12px; padding-top:9px; border-top:1px solid #e5efea; color:#6a8177; font-size:10px; }
+.field-capability-choice { display:flex; flex-wrap:wrap; gap:5px; margin:12px 0; }
+.field-capability-choice button { padding:7px 10px; border:1px solid #cbded5; border-radius:6px; background:#f7fbf9; cursor:pointer; }
+.field-capability-choice button[aria-pressed="true"] { background:#dff2e9; color:#12664d; border-color:#4a9d7e; }
+.weather-environment-panel { padding:12px; display:grid; gap:12px; }
+.weather-environment-panel header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.weather-environment-panel header strong { font-size:13px; }
+.weather-environment-panel header span { padding:4px 7px; border-radius:12px; background:#f2f4f3; color:#547066; font-size:10px; }
+.weather-environment-panel .weather-environment-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.weather-environment-panel .weather-environment-grid article { min-width:0; display:grid; gap:5px; padding:12px; border:1px solid #dce8e1; border-radius:8px; background:#f8fcfa; }
+.weather-environment-panel .weather-environment-grid article span { font-size:11px; color:#647b71; }
+.weather-environment-panel .weather-environment-grid article b { font-size:20px; color:#214d3e; }
+.weather-environment-panel .weather-environment-grid article small { font-size:9px; color:#81958c; }
+.weather-environment-panel > p { color:#647b71; font-size:11px; line-height:1.5; }
+@media (max-width:1450px) { .field-capability-shortcuts { max-width:360px; overflow-x:auto; scrollbar-width:thin; } .map-command-header .field-capability-shortcuts button { font-size:9px; padding:5px 7px; } }
+@media (max-width:760px) { .field-capability-panel { top:112px; max-height:calc(100dvh - 125px); } .field-capability-panel .field-capability-tiles { grid-template-columns:1fr; } }
