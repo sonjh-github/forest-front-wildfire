@@ -7,6 +7,7 @@ import { buildOperationalEvidence, buildPacketLossQualityAlerts, classifyLinkHea
 import type { TelemetryStreamStatus } from "./telemetryStream";
 import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
 import PerformanceKpiPanel from "./PerformanceKpiPanel";
+import WeatherEnvironmentPanel from "./WeatherEnvironmentPanel";
 import NetworkSequenceQualityPanel from "./NetworkSequenceQualityPanel";
 import SlenoNetworkQualityPanel from "./SlenoNetworkQualityPanel";
 import {
@@ -28,7 +29,7 @@ import {
   type AlertDeliveryTrace,
 } from "./alertDeliveryTrace";
 
-export type PanelTab = "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
+export type PanelTab = "weather" | "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
 export type ExternalSourceId =
   | "firms"
@@ -92,7 +93,9 @@ const SHOW_VALIDATION_UI =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("debug") === "1";
 
+/* weather-operations-navigation-20261011: 시작 화면은 현장 기상 */
 const tabs: Array<{ id: PanelTab; label: string; icon: string }> = [
+  { id: "weather", label: "현장 기상", icon: "☀" },
   { id: "layers", label: "지도 레이어", icon: "▱" },
   { id: "alerts", label: "현장 경보", icon: "!" },
   { id: "networks", label: "통신망", icon: "⌁" },
@@ -1006,6 +1009,7 @@ export function OperationsPanel({
           )}
         </header>
         <div className="operations-panel-body">
+          {activeTab === "weather" && <WeatherEnvironmentPanel />}
           {activeTab === "layers" && <section className="layer-control-list" aria-label="지도 레이어">
             <section className="layer-level-group" aria-labelledby="resource-layer-title">
               <header><strong id="resource-layer-title">현장 자산</strong></header>
