@@ -1,14 +1,5 @@
 import { LiveDroneTelemetryReader, mergeDroneTwins } from "./live-drone-twin";
 import type { SlenoNetworkQuality } from "./sleno-quality";
-import {
-  emptyE2EOverview,
-  isLocalE2EMode,
-  LOCAL_E2E_REGISTERED_ASSETS,
-  LOCAL_E2E_VIDEO_CHANNELS,
-  LOCAL_E2E_NETWORK_SETTINGS,
-  LOCAL_E2E_CONNECTION_PROBE,
-} from "./local-e2e";
-import { createFieldPreviewOverview, emptyFieldOverview, fieldRegisteredAssets, isFieldPreviewMode, isLocalFieldMode } from "./field-mode";
 const liveDroneReader = new LiveDroneTelemetryReader();
 import { dashboardApi, httpApi } from "./client";
 
@@ -295,13 +286,7 @@ export const forestApi = {
     ),
 
   videoChannels: (assetId: string) =>
-    isLocalE2EMode()
-      ? Promise.resolve<DataResponse<ApiRecord[]>>({
-          data: assetId === "e2e-md1000-canonical-uuid"
-            ? LOCAL_E2E_VIDEO_CHANNELS
-            : [],
-        })
-      : httpApi<DataResponse<ApiRecord[]>>(
+    httpApi<DataResponse<ApiRecord[]>>(
           `/api/v1/assets/${encodeURIComponent(assetId)}/video-channels`,
         ),
 
@@ -309,18 +294,7 @@ export const forestApi = {
     assetId: string,
     payload: ApiRecord,
   ) =>
-    isLocalE2EMode()
-      ? Promise.resolve<DataResponse<ApiRecord>>({
-          data: {
-            videoChannelId: "e2e-md1000-main-video",
-            assetId,
-            ...payload,
-            verificationStatus: "UNVERIFIED",
-            synthetic: true,
-            evidenceScope: "LOCAL_BROWSER_E2E",
-          },
-        })
-      : httpApi<DataResponse<ApiRecord>>(
+    httpApi<DataResponse<ApiRecord>>(
           `/api/v1/assets/${encodeURIComponent(assetId)}/video-channels`,
           {
             method: "POST",
@@ -333,18 +307,7 @@ export const forestApi = {
     videoChannelId: string,
     payload: ApiRecord,
   ) =>
-    isLocalE2EMode()
-      ? Promise.resolve<DataResponse<ApiRecord>>({
-          data: {
-            ...LOCAL_E2E_VIDEO_CHANNELS[0],
-            assetId,
-            videoChannelId,
-            ...payload,
-            synthetic: true,
-            evidenceScope: "LOCAL_BROWSER_E2E",
-          },
-        })
-      : httpApi<DataResponse<ApiRecord>>(
+    httpApi<DataResponse<ApiRecord>>(
           `/api/v1/assets/${encodeURIComponent(assetId)}/video-channels/${encodeURIComponent(videoChannelId)}`,
           {
             method: "PATCH",
@@ -353,14 +316,7 @@ export const forestApi = {
         ),
 
   assetNetworkSettings: (assetId: string) =>
-    isLocalE2EMode()
-      ? Promise.resolve<DataResponse<ApiRecord>>({
-          data: {
-            ...LOCAL_E2E_NETWORK_SETTINGS,
-            assetId,
-          },
-        })
-      : httpApi<DataResponse<ApiRecord>>(
+    httpApi<DataResponse<ApiRecord>>(
           `/api/v1/assets/${encodeURIComponent(assetId)}/network-settings`,
         ),
 
@@ -368,17 +324,7 @@ export const forestApi = {
     assetId: string,
     payload: ApiRecord,
   ) =>
-    isLocalE2EMode()
-      ? Promise.resolve<DataResponse<ApiRecord>>({
-          data: {
-            ...LOCAL_E2E_NETWORK_SETTINGS,
-            assetId,
-            ...payload,
-            synthetic: true,
-            evidenceScope: "LOCAL_BROWSER_E2E",
-          },
-        })
-      : httpApi<DataResponse<ApiRecord>>(
+    httpApi<DataResponse<ApiRecord>>(
           `/api/v1/assets/${encodeURIComponent(assetId)}/network-settings`,
           {
             method: "PATCH",
@@ -390,15 +336,7 @@ export const forestApi = {
     assetId: string,
     type: "MAVLINK_UDP" | "RTSP",
   ) =>
-    isLocalE2EMode()
-      ? Promise.resolve<DataResponse<ApiRecord>>({
-          data: {
-            ...LOCAL_E2E_CONNECTION_PROBE,
-            assetId,
-            type,
-          },
-        })
-      : httpApi<DataResponse<ApiRecord>>(
+    httpApi<DataResponse<ApiRecord>>(
           `/api/v1/assets/${encodeURIComponent(assetId)}/connection-probes`,
           {
             method: "POST",
@@ -545,55 +483,10 @@ export async function loadEventOverview(
 ): Promise<EventOverview> {
   const eventId = event.eventId;
 
-  if (isLocalFieldMode()) {
-    if (isFieldPreviewMode()) {
-      return createFieldPreviewOverview(event);
-    }
-    const telemetry = await liveDroneReader.read(
-      eventId,
-      false,
-      async () => (await forestApi.dashboardDroneTelemetry(eventId)).data,
-    );
-    const twins = mergeDroneTwins(fieldRegisteredAssets(), telemetry.rows, eventId);
-    return {
-      ...emptyFieldOverview(event),
-      assets: twins.assets,
-      liveDroneTelemetry: {
-        status: telemetry.status,
-        matched: twins.matched,
-        unmatched: twins.unmatched,
-        live: twins.states.LIVE,
-        stale: twins.states.STALE,
-        offline: twins.states.OFFLINE,
-      },
-    };
-  }
-
-  if (isLocalE2EMode()) {
-    const telemetry = await liveDroneReader.read(
-      eventId,
-      false,
-      async () => (await forestApi.dashboardDroneTelemetry(eventId)).data,
-    );
-    const twins = mergeDroneTwins(LOCAL_E2E_REGISTERED_ASSETS, telemetry.rows, eventId);
-    return {
-      ...emptyE2EOverview(event),
-      assets: twins.assets,
-      liveDroneTelemetry: {
-        status: telemetry.status,
-        matched: twins.matched,
-        unmatched: twins.unmatched,
-        live: twins.states.LIVE,
-        stale: twins.states.STALE,
-        offline: twins.states.OFFLINE,
-      },
-    };
-  }
-
   if (DASHBOARD_ASSET_ONLY_MODE) {
     const [dashboardAssets, telemetry, kpiResult] = await Promise.all([
       loadDashboardDisasterAssetsCached(eventId),
-      liveDroneReader.read(eventId, typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1',
+      liveDroneReader.read(eventId,
         async () => (await forestApi.dashboardDroneTelemetry(eventId)).data),
       forestApi
         .resources(eventId, "kpis", 100)

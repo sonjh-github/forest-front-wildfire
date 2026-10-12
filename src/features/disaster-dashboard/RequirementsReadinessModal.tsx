@@ -3,7 +3,6 @@ import { buildReadinessEvidence } from "./readinessEvidence";
 import { OFFICIAL_RFP_GAPS, officialRfpGapSummary } from "./officialRfpGaps";
 import "./readiness-review.css";
 import { REQUIREMENTS_READINESS, requirementSummary, implementationLabel, type RequirementValidation } from "./requirementsReadiness";
-import { runDemoAcceptance } from "./demoAcceptance";
 
 const validationLabel: Record<RequirementValidation, string> = {
   OPERATING: "운영 기능 분류",
@@ -34,7 +33,6 @@ export default function RequirementsReadinessModal({ onClose }: { onClose: () =>
   }, []);
   const summary = requirementSummary();
   const gaps = officialRfpGapSummary();
-  const acceptance = runDemoAcceptance();
   const categories = [...new Set(REQUIREMENTS_READINESS.map((item) => item.category))];
   const download = () => {
     const payload = JSON.stringify(buildReadinessEvidence(), null, 2);
@@ -57,10 +55,7 @@ export default function RequirementsReadinessModal({ onClose }: { onClose: () =>
         <span>구현 {summary.implemented}</span><span>부분구현 {summary.partial}</span><span>계약구현 {summary.contractOnly}</span><span>미구현 {summary.notImplemented}</span>
       </div>
       <p className="review-validation">검증 근거 분류: 운영 기능 {summary.operating} · DEMO {summary.demoVerified} · 기관 연계 대기 {summary.externalPending} · 현장 검증 대기 {summary.fieldPending} — 구현 상태와 별개이며 인증을 뜻하지 않습니다.</p>
-      <div className="demo-acceptance-summary" data-passed={acceptance.failed === 0}>
-        <div><small>DEMO DATA / UI CONTRACT CHECK</small><strong>{acceptance.label} · {acceptance.passed} / {acceptance.total} PASS</strong></div>
-        <em>모의 입력 검증 · 공식 인수/현장 성능시험 아님</em>
-      </div>
+
       <nav className="review-tabs" aria-label="요구사항 추적 범위">
         <button type="button" aria-pressed={view === "internal"} onClick={() => setView("internal")}>내부 SW 요구사항 47</button>
         <button type="button" aria-pressed={view === "official"} onClick={() => setView("official")}>공식 RFP Gap {gaps.total}</button>

@@ -4,7 +4,7 @@ import {
   type SemanticMissionPacket,
   type SemanticMissionState,
 } from "./semanticMission";
-import { createSemanticMissionSnapshot } from "./semanticMissionSimulator";
+import { createSemanticMissionSnapshot } from "./semanticMissionSnapshot";
 
 export type SemanticFallbackMode =
   | "LIVE"

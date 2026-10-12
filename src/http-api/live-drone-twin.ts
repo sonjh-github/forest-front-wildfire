@@ -257,16 +257,8 @@ export class LiveDroneTelemetryReader {
 
   async read(
     eventId: string,
-    demo: boolean,
     fetchRows: () => Promise<ApiRecord[]>,
   ) {
-    if (demo) {
-      return {
-        rows: [] as ApiRecord[],
-        status: "DEMO",
-      };
-    }
-
     try {
       const rows = await fetchRows();
 

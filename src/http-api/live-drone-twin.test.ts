@@ -329,21 +329,6 @@ describe("live drone twin", () => {
         (
           await reader.read(
             "flight",
-            true,
-            fetch,
-          )
-        ).rows,
-      ).toEqual([]);
-
-      expect(
-        fetch,
-      ).not.toHaveBeenCalled();
-
-      expect(
-        (
-          await reader.read(
-            "flight",
-            false,
             async () => {
               throw Error();
             },
@@ -353,14 +338,12 @@ describe("live drone twin", () => {
 
       await reader.read(
         "flight",
-        false,
         fetch,
       );
 
       const failed =
         await reader.read(
           "flight",
-          false,
           async () => {
             throw Error();
           },
@@ -378,7 +361,6 @@ describe("live drone twin", () => {
         (
           await reader.read(
             "other",
-            false,
             async () => {
               throw Error();
             },

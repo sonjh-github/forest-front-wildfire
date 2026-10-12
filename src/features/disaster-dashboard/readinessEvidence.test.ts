@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { requirementSummary, REQUIREMENTS_READINESS, type ImplementationStatus } from "./requirementsReadiness";
 import { buildReadinessEvidence } from "./readinessEvidence";
 import { DEOKSUNG_DEM } from "./terrainConfig";
-import { createDemoOverview } from "./demoOverview";
+import { createDemoOverview } from "./test-fixtures/overview";
 import { nmsSummary, receivedNumber } from "./nmsSummary";
 import { buildOperationalEvidence } from "./operationalEvidence";
 import { parseTelemetryMessage } from "./telemetryStream";
@@ -22,7 +22,7 @@ describe("truthful RFP evidence", () => {
     expect(report.generatedAt).toBe("2026-09-07T00:00:00.000Z");
     expect(report.officialRfpBaseline).toEqual({networkDeploymentMinutes:10, locationUpdateSeconds:5, sharingSuccessPct:98, availabilityPct:98});
     expect(report.projectEnhancedTarget).toEqual({networkDeploymentMinutes:7, locationUpdateSeconds:3, sharingSuccessPct:98, availabilityPct:98});
-    expect(report.demoDataContractCheck).toMatchObject({label:"DEMO 데이터·화면 계약 검증", total:40, failed:0});
+    expect(report).not.toHaveProperty("demoDataContractCheck");
     expect(report.officialRfpGaps.every(x => x.sourceRef.startsWith("RFP 인쇄 p.") && x.frontendEvidence && x.blocker)).toBe(true);
     expect(report.officialRfpGapSummary.notImplemented).toBeGreaterThan(0);
     expect(report.externalDependencies.length).toBeGreaterThan(0);

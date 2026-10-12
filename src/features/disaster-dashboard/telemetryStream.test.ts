@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDemoOverview } from "./demoOverview";
+import { createDemoOverview } from "./test-fixtures/overview";
 import { MavlinkTelemetryAccumulator, applyTelemetrySafetyRules, isTelemetryStreamStale, mergeTelemetryIntoOverview, parseTelemetryMessage } from "./telemetryStream";
 
 describe("Gateway telemetry stream", () => {

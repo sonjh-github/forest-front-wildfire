@@ -140,9 +140,7 @@ export default function PerformanceKpiPanel({
   overview,
   telemetrySamples,
 }: Props) {
-  const demoMode =
-    overview.domainDetail?.mode === "SIMULATION" ||
-    overview.domainDetail?.mode === "FIELD_PREVIEW";
+
   const eventId = String(overview.event.eventId);
   const storageKey = `forest-performance-session:${eventId}`;
 
@@ -378,7 +376,7 @@ export default function PerformanceKpiPanel({
           expectedUnit,
           operator,
           target,
-          demoMode,
+          demoMode: false,
           apiStatus: overview.kpiApiStatus,
         });
 
@@ -687,9 +685,7 @@ export default function PerformanceKpiPanel({
       projectEnhancedTarget: PROJECT_ENHANCED_TARGET,
       interfaceRequirements: PERFORMANCE_INTERFACE_REQUIREMENTS,
       limitations: [
-        demoMode
-          ? "DEMO 데이터는 공식 성능시험 결과가 아님"
-          : "브라우저 참고값은 실장비 원시로그가 아니며 공식 성능시험 결과로 사용할 수 없음",
+        "브라우저 참고값은 실장비 원시로그가 아니며 공식 성능시험 결과로 사용할 수 없음",
         "정보공유 성공률은 전송시도/성공수신 이벤트 기준이며 Packet Loss Sequence는 별도 진단 지표",
         "통신망 가용률은 망 준비 완료 이후 총 운영시간과 서비스 중단 이벤트 기준",
         "공식 판정은 실제 시험실행 ID와 송신/ACK/NMS 원시로그가 연결된 측정값만 사용",
@@ -713,19 +709,15 @@ export default function PerformanceKpiPanel({
           <small>
             {sessionMode
               ? `${session.runId} · 브라우저 참고 측정 · 공식 판정 아님`
-              : demoMode
-                ? "DEMO 기준값 · 공식 PASS 판정 제외"
-                : hasApiError
+              : hasApiError
                   ? "KPI API 오류 · 현재 실측값 숨김"
                   : hasOfficialMeasurement
                     ? "Core 검증 실측 · 원시로그 증빙 연결"
                     : "Core 검증 측정값 수신 대기"}
           </small>
         </div>
-        <span className={demoMode ? "demo" : hasOfficialMeasurement ? "live" : ""}>
-          {demoMode
-            ? "DEMO"
-            : hasOfficialMeasurement
+        <span className={hasOfficialMeasurement ? "live" : ""}>
+          {hasOfficialMeasurement
               ? "VERIFIED"
               : hasApiError
                 ? "API 오류"
@@ -906,18 +898,7 @@ export default function PerformanceKpiPanel({
                 >
                   메시지 실패 +1
                 </button>
-                {demoMode ? (
-                  <button
-                    type="button"
-                    onClick={() => addSharingAttempts(99, 1)}
-                    disabled={
-                      !session?.networkReadyAt ||
-                      Boolean(session?.endedAt)
-                    }
-                  >
-                    DEMO 100건(99성공)
-                  </button>
-                ) : null}
+                {null}
               </div>
             </div>
 

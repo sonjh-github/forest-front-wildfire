@@ -151,12 +151,6 @@ function resourceQualityPopupContent(location: LiveLocation) {
   return root;
 }
 
-function isWildfireDemoMode() {
-  if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
-  return params.get("demo") === "1" && (params.get("scenario") ?? "WILDFIRE") === "WILDFIRE";
-}
-
 function wildfireHeatFeatureCollection(
   eventCenter: [number, number] | null,
   domainLayers: Record<string, ApiRecord[]>,
@@ -454,82 +448,6 @@ function createIncidentIconImage() {
   return context.getImageData(0, 0, 72, 82);
 }
 
-function wildfireIncidentAreaFeatureCollection(
-  eventCenter: [number, number] | null,
-): GeoJSON.FeatureCollection {
-  if (!eventCenter) {
-    return { type: "FeatureCollection", features: [] };
-  }
-
-  // DEMO 시각 강조용 영향권.
-  // 공식 화선/위험경계/확산예측 데이터가 아니라 발생지점 인지를 돕기 위한 보조 표현이다.
-  const [longitude, latitude] = eventCenter;
-  const points = 64;
-
-  const createRing = (
-    baseRadiusM: number,
-    phase: number,
-    irregularity: number,
-  ) => {
-    const coordinates: Array<[number, number]> = [];
-
-    for (let index = 0; index <= points; index += 1) {
-      const angle = (index / points) * Math.PI * 2;
-      const wobble =
-        1 +
-        irregularity * 0.46 * Math.sin(angle * 3 + phase) +
-        irregularity * 0.28 * Math.sin(angle * 5 - phase * 0.7) +
-        irregularity * 0.18 * Math.cos(angle * 7 + 0.8);
-
-      const directionalStretch =
-        1 + 0.18 * Math.max(0, Math.cos(angle - 0.7));
-
-      const radiusM = baseRadiusM * wobble * directionalStretch;
-      const latitudeDelta = radiusM / 111_320;
-      const longitudeDelta =
-        radiusM /
-        (111_320 * Math.max(0.2, Math.cos((latitude * Math.PI) / 180)));
-
-      coordinates.push([
-        longitude + Math.cos(angle) * longitudeDelta,
-        latitude + Math.sin(angle) * latitudeDelta,
-      ]);
-    }
-
-    return coordinates;
-  };
-
-  return {
-    type: "FeatureCollection",
-    features: [
-      {
-        type: "Feature",
-        id: "wildfire-incident-emphasis-outer",
-        geometry: {
-          type: "Polygon",
-          coordinates: [createRing(650, 0.5, 0.34)],
-        },
-        properties: {
-          visualOnly: true,
-          severity: "outer",
-        },
-      },
-      {
-        type: "Feature",
-        id: "wildfire-incident-emphasis-core",
-        geometry: {
-          type: "Polygon",
-          coordinates: [createRing(315, 1.2, 0.24)],
-        },
-        properties: {
-          visualOnly: true,
-          severity: "core",
-        },
-      },
-    ],
-  };
-}
-
 const domainLayerStyle: Record<string, { type: "line" | "fill" | "circle"; color: string; opacity?: number }> = {
   firelines: { type: "line", color: "#d9271c" },
   "spread-predictions": { type: "fill", color: "#d79048", opacity: 0.08 },
@@ -602,39 +520,6 @@ function topologyLinkState(edge: TopologyEdge, referenceTimeMs: number) {
   return state === 2 ? "disconnected" : state === 1 ? "delayed" : "active";
 }
 
-function fallbackTopologyEdges(locations: LiveLocation[]): TopologyEdge[] {
-  const first = (...categories: string[]) => locations.find((location) => categories.includes(location.category));
-  const command = first("COMMAND_VEHICLE", "GCS");
-  const rtkBase = first("RTK_BASE_LPWA_GATEWAY");
-  const private5g = first("PRIVATE_5G_NTN_GATEWAY");
-  const tvwsBase = first("TVWS_BASE_STATION");
-  const lte = first("LTE_GATEWAY");
-  const relay = first("FIXED_RELAY", "MOBILE_RELAY", "MAIN_RELAY_DRONE", "SERVICE_RELAY_DRONE");
-  const edges: TopologyEdge[] = [];
-  const keys = new Set<string>();
-  const add = (from: LiveLocation | undefined, to: LiveLocation | undefined, medium: string) => {
-    if (!from || !to || keyOf(from) === keyOf(to)) return;
-    const signature = [keyOf(from), keyOf(to)].sort().join("|");
-    if (keys.has(signature)) return;
-    keys.add(signature);
-    edges.push({ from, to, medium });
-  };
-
-  for (const location of locations) {
-    if (location.kind === "personnel" || location.category === "RTK_TERMINAL") add(location, rtkBase ?? command, "LPWA");
-    else if (["UAV", "MAIN_RELAY_DRONE", "SERVICE_RELAY_DRONE"].includes(location.category)) add(location, private5g ?? relay ?? command, "이음5G");
-    else if (location.category === "TVWS_CPE") add(location, tvwsBase ?? command, "TVWS");
-    else if (["IR_UWB_GPR", "RSSI_DETECTOR", "REF_AP", "ROVER_AP", "FIXED_RELAY", "MOBILE_RELAY"].includes(location.category)) add(location, relay ?? command, "현장 무선");
-    else if (location.category === "RADIO_GATEWAY_400MHZ") add(location, command, "400MHz");
-    else if (["RTK_BASE_LPWA_GATEWAY", "TVWS_BASE_STATION", "LTE_GATEWAY", "PRIVATE_5G_NTN_GATEWAY"].includes(location.category)) add(location, command, location.category === "TVWS_BASE_STATION" ? "TVWS" : location.category === "RTK_BASE_LPWA_GATEWAY" ? "Ethernet" : "IP");
-    else if (location.category !== "COMMAND_VEHICLE" && location.category !== "GCS") add(location, command ?? rtkBase ?? private5g, "현장망");
-  }
-  add(command, lte, "LTE");
-  add(command, private5g, "5G·LEO");
-  add(command, tvwsBase, "TVWS");
-  return edges;
-}
-
 function topologyEdges(locations: LiveLocation[], topology: NetworkTopology): TopologyEdge[] {
   const byAssetId = new Map(locations.flatMap((location) => {
     const assetId = location.kind === "asset" ? location.id : location.sourceAssetId;
@@ -648,7 +533,7 @@ function topologyEdges(locations: LiveLocation[], topology: NetworkTopology): To
     const to = toNode ? byAssetId.get(String(toNode.assetId ?? "")) : undefined;
     return from && to ? [{ from, to, medium: String(link.medium ?? "IP").replaceAll("_", "·") }] : [];
   });
-  return databaseEdges.length ? databaseEdges : fallbackTopologyEdges(locations);
+  return databaseEdges;
 }
 
 function topologyFeatureCollection(locations: LiveLocation[], topology: NetworkTopology, focusKey: string | null, referenceTimeMs: number): GeoJSON.FeatureCollection {
@@ -810,9 +695,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   // DEMO 이벤트 자체도 산불 DEMO로 인식한다.
   // 운영 URL에 ?demo=1이 빠져 있어도 demo-wildfire-* 이벤트면
   // 현장 중심 줌/마커 표시 규칙을 동일하게 적용한다.
-  const wildfireDemo =
-    isWildfireDemoMode() ||
-    eventId.startsWith("demo-wildfire-");
+
   const [mutedBasemap, setMutedBasemap] = useState(false);
   const [terrain3d, setTerrain3d] = useState(false);
   const [riskHeatmap, setRiskHeatmap] = useState(false);
@@ -837,7 +720,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     );
 
   const fallbackTerrainConfig = resolveTerrainConfig(import.meta.env);
-  const terrainConfig = wildfireDemo ? DEOKSUNG_DEM : fallbackTerrainConfig;
+  const terrainConfig = fallbackTerrainConfig;
   const [tileDegraded, setTileDegraded] = useState(false);
   const selectedViewportRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
@@ -848,8 +731,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: mapStyle,
-      center: wildfireDemo && eventCenter ? eventCenter : [128.7, 36.35],
-      zoom: wildfireDemo && eventCenter ? 13.8 : 12,
+      center: [128.7, 36.35],
+      zoom: 12,
       attributionControl: false,
       maxPitch: 80,
     });
@@ -878,12 +761,10 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     let disposed = false;
 
     const tvwsVisible =
-      wildfireDemo &&
-      visibleLayerIds.has("viewsheds");
+      false;
 
     const termVisible =
-      wildfireDemo &&
-      visibleLayerIds.has("communication-shadows");
+      false;
 
     const applyChungnamViewshed = async () => {
       const definitions = [
@@ -983,7 +864,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       map.off("load", onLoad);
     };
   }, [
-    wildfireDemo,
+    false,
     visibleLayerIds,
   ]);
 
@@ -1029,7 +910,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           source: "terrain-dem",
           layout: { visibility: terrain3d ? "visible" : "none" },
           paint: {
-            "hillshade-exaggeration": wildfireDemo ? 0.55 : 0.45,
+            "hillshade-exaggeration": 0.45,
             "hillshade-shadow-color": "#2f3d36",
             "hillshade-highlight-color": "#ffffff",
             "hillshade-accent-color": "#6f8178",
@@ -1047,7 +928,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
       map.setTerrain(
         terrain3d
-          ? { source: "terrain-dem", exaggeration: wildfireDemo ? 2.2 : 1.8 }
+          ? { source: "terrain-dem", exaggeration: 1.8 }
           : null,
       );
 
@@ -1065,7 +946,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     return () => {
       map.off("styledata", apply);
     };
-  }, [terrain3d, wildfireDemo]);
+  }, [terrain3d, false]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1590,13 +1471,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       `${eventId}:${targetCenter[0].toFixed(3)}:${targetCenter[1].toFixed(3)}`;
 
     // DEMO 관제 화면은 실제 focus가 없을 때만 사건 현장을 우선 표시한다.
-    if (wildfireDemo && !focusCenter && eventCenter) {
-      if (selectedViewportRef.current !== viewportKey) {
-        selectedViewportRef.current = viewportKey;
-        map.easeTo({ center: eventCenter, zoom: 13.8, duration: 700 });
-      }
-      return;
-    }
+
 
     if (selectedViewportRef.current === viewportKey) return;
     selectedViewportRef.current = viewportKey;
@@ -1613,7 +1488,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     } else {
       map.easeTo({ center: targetCenter, zoom: 14, duration: 700 });
     }
-  }, [eventCenter, focusCenter, eventId, locations, wildfireDemo]);
+  }, [eventCenter, focusCenter, eventId, locations, false]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1783,7 +1658,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
             "heatmap-weight": ["coalesce", ["get", "weight"], 0.7],
             "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 14, 1.8],
             "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 40, 14, 118],
-            "heatmap-opacity": wildfireDemo ? 0.92 : 0.86,
+            "heatmap-opacity": 0.86,
             "heatmap-color": [
               "interpolate", ["linear"], ["heatmap-density"],
               0, "rgba(255,220,0,0)",
@@ -1797,12 +1672,12 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         });
       }
 
-      map.setLayoutProperty(layerId, "visibility", wildfireDemo && riskHeatmap ? "visible" : "none");
+      map.setLayoutProperty(layerId, "visibility", "none");
     };
 
     if (map.isStyleLoaded()) render(); else map.once("load", render);
     return () => { map.off("load", render); };
-  }, [domainLayers, eventCenter, riskHeatmap, wildfireDemo]);
+  }, [domainLayers, eventCenter, riskHeatmap, false]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1903,7 +1778,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           id: "event-origin",
           geometry: { type: "Point", coordinates: eventCenter },
           properties: {
-            label: wildfireDemo ? "산불 발생지점" : "재난 발생지점",
+            label: "재난 발생지점",
           },
         }] : [],
       };
@@ -1911,9 +1786,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       if (eventSource) eventSource.setData(eventData);
       else map.addSource("event-origin-source", { type: "geojson", data: eventData });
 
-      const incidentAreaData = wildfireDemo
-        ? wildfireIncidentAreaFeatureCollection(eventCenter)
-        : { type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection;
+      const incidentAreaData = { type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection;
       const incidentAreaSource = map.getSource(
         "wildfire-incident-area-source",
       ) as GeoJSONSource | undefined;
@@ -2047,29 +1920,29 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       if (!map.getLayer("event-origin-halo")) map.addLayer({
         id: "event-origin-halo", type: "circle", source: "event-origin-source",
         paint: {
-          "circle-radius": wildfireDemo ? 62 : 20,
+          "circle-radius": 20,
           "circle-color": "#e02b20",
-          "circle-opacity": wildfireDemo ? 0.12 : 0.18,
-          "circle-blur": wildfireDemo ? 0.68 : 0.2,
+          "circle-opacity": 0.18,
+          "circle-blur": 0.2,
         },
       });
       if (!map.getLayer("event-origin-ring")) map.addLayer({
         id: "event-origin-ring", type: "circle", source: "event-origin-source",
         paint: {
-          "circle-radius": wildfireDemo ? 31 : 13,
+          "circle-radius": 13,
           "circle-color": "rgba(0,0,0,0)",
           "circle-stroke-color": "#ff5b45",
-          "circle-stroke-width": wildfireDemo ? 4 : 2,
-          "circle-stroke-opacity": wildfireDemo ? 0.85 : 0.35,
+          "circle-stroke-width": 2,
+          "circle-stroke-opacity": 0.35,
         },
       });
       if (!map.getLayer("event-origin-point")) map.addLayer({
         id: "event-origin-point", type: "circle", source: "event-origin-source",
         paint: {
-          "circle-radius": wildfireDemo ? 12 : 9,
+          "circle-radius": 9,
           "circle-color": "#d91f18",
           "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": wildfireDemo ? 4 : 3,
+          "circle-stroke-width": 3,
         },
       });
       if (!map.getLayer("event-origin-label")) {
@@ -2079,7 +1952,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           source: "event-origin-source",
           layout: {
             "text-field": ["get", "label"],
-            "text-size": wildfireDemo ? 22 : 18,
+            "text-size": 18,
             "text-anchor": "left",
             "text-offset": [2.25, -0.35],
             "text-allow-overlap": true,
@@ -2398,7 +2271,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           source: "field-resource-source",
           layout: {
             "icon-image": ["get", "resourceIcon"],
-            "icon-size": wildfireDemo ? 1.16 : 0.96,
+            "icon-size": 0.96,
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
           },
@@ -2457,8 +2330,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
             "fire-engine-down", ["literal", [22, 30]],
             ["literal", [21, 0]],
           ],
-          "icon-allow-overlap": wildfireDemo,
-          "icon-ignore-placement": wildfireDemo,
+          "icon-allow-overlap": false,
+          "icon-ignore-placement": false,
           "icon-padding": 4,
         },
         paint: {
@@ -2479,7 +2352,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         );
       }
       const resourceVisibility =
-        showResources || wildfireDemo
+        showResources
           ? "visible"
           : "none";
 
@@ -2648,55 +2521,6 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !wildfireDemo || !showEvent || !eventCenter) return;
-
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    let frame = 0;
-
-    const animate = (now: number) => {
-      const phase = reduceMotion
-        ? 0.35
-        : (now % 1_800) / 1_800;
-
-      if (map.getLayer("event-origin-halo")) {
-        map.setPaintProperty(
-          "event-origin-halo",
-          "circle-radius",
-          64 + phase * 46,
-        );
-        map.setPaintProperty(
-          "event-origin-halo",
-          "circle-opacity",
-          0.26 - phase * 0.20,
-        );
-      }
-
-      if (map.getLayer("event-origin-ring")) {
-        map.setPaintProperty(
-          "event-origin-ring",
-          "circle-radius",
-          31 + phase * 13,
-        );
-        map.setPaintProperty(
-          "event-origin-ring",
-          "circle-stroke-opacity",
-          0.95 - phase * 0.45,
-        );
-      }
-
-      if (!reduceMotion) {
-        frame = requestAnimationFrame(animate);
-      }
-    };
-
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [eventCenter, showEvent, wildfireDemo]);
-
-  useEffect(() => {
-    const map = mapRef.current;
     const hasActivePulse = Object.values(changedUntil).some((until) => until > Date.now());
     if (!map || !showResources) return;
     if (!hasActivePulse) {
@@ -2757,18 +2581,18 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       <div className="basemap-switch" aria-label="지도 표현 전환">
         <button type="button" className={!mutedBasemap && !terrain3d ? "active" : ""} aria-pressed={!mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(false); }}>2D 지도</button>
         <button type="button" className={mutedBasemap && !terrain3d ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(true); }}>현장 강조</button>
-        {wildfireDemo && <button type="button" className={riskHeatmap ? "active heatmap" : "heatmap"} aria-pressed={riskHeatmap} onClick={() => setRiskHeatmap((value) => !value)}>열원 참고</button>}
+
         <button type="button" className={terrain3d ? "active terrain" : "terrain"} aria-pressed={terrain3d} onClick={() => { setMutedBasemap(true); setTerrain3d((value) => !value); }}>3D 지형</button>
       </div>
       {terrain3d && <section className="terrain-analysis-status" aria-label="3D 지형 분석 상태"><b>DEM 3D</b><span>{terrainConfig.resolutionLabel} · {terrainConfig.sourceLabel}</span><small>{terrainElevationM == null ? "지도 위를 이동하면 DEM 고도를 조회합니다" : `커서 지점 고도 ${terrainElevationM.toFixed(1)}m`} · 경사·Viewshed·통신 음영</small></section>}
       <section className="map-meaning-legend command-center-legend" aria-label="지도 범례">
         <strong>지도 범례</strong>
-        {wildfireDemo && <span><i className="incident" />산불 발생지점</span>}
+
         <span><i className="coverage" />통신 운용범위</span><span><i className="fireline" />관측 화선</span>
         <span><i className="spread" />확산 참고</span>
         <span><i className="risk" />산불 위험예보</span>
         <span><i className="evacuation" />대피로</span>
-        {wildfireDemo && <span><i className="heat" />위성 열원</span>}
+
         <span><i className="personnel" />인원</span>
         <span><i className="asset" />자원</span>
       </section>

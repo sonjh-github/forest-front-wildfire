@@ -1,5 +1,4 @@
 import { REQUIREMENTS_READINESS, requirementSummary } from "./requirementsReadiness";
-import { runDemoAcceptance } from "./demoAcceptance";
 import { OFFICIAL_RFP_GAPS, OFFICIAL_RFP_BASELINE, PROJECT_ENHANCED_TARGET, KPI_SOURCE_REFS, officialRfpGapSummary } from "./officialRfpGaps";
 export function buildReadinessEvidence(now = new Date()) {
   return {
@@ -10,7 +9,6 @@ export function buildReadinessEvidence(now = new Date()) {
     requirements: REQUIREMENTS_READINESS,
     officialRfpGapSummary: officialRfpGapSummary(),
     officialRfpGaps: OFFICIAL_RFP_GAPS,
-    demoDataContractCheck: runDemoAcceptance(),
     officialRfpBaseline: OFFICIAL_RFP_BASELINE,
     projectEnhancedTarget: PROJECT_ENHANCED_TARGET,
     sourceRefs: KPI_SOURCE_REFS,

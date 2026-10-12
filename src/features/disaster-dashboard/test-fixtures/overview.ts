@@ -1,6 +1,6 @@
-import { DEOKSUNG_DEM, resolveTerrainConfig } from "./terrainConfig";
-import type { EventOverview, ForestEvent } from "../../http-api";
-import { evaluateRiskZone } from "./operationalEvidence";
+import { DEOKSUNG_DEM, resolveTerrainConfig } from "../terrainConfig";
+import type { EventOverview, ForestEvent } from "../../../http-api";
+import { evaluateRiskZone } from "../operationalEvidence";
 
 const point = (coordinates: [number, number]) => ({ type: "Point", coordinates });
 const line = (coordinates: [number, number][]) => ({ type: "LineString", coordinates });

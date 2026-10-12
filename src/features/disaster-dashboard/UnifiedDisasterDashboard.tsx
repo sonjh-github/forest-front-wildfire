@@ -1,15 +1,11 @@
-import { rtkPositionFetchStatus } from "./rtkPositionFreshness";
 import { DroneTwinDetail } from "./DroneTwinDetail";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { externalDisasterApi, loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
 import { forestApi } from "../../http-api/forest-api";
 import { HttpApiError } from "../../http-api/client";
 import SlenoNetworkQualityPanel from "./SlenoNetworkQualityPanel";
-import { isLocalE2EMode, LOCAL_E2E_EVENT } from "../../http-api/local-e2e";
-import { fieldCoreStatusLabel, fieldEvent, isFieldPreviewMode, isLocalFieldMode } from "../../http-api/field-mode";
-import SemanticMissionPocPanel from "./SemanticMissionPocPanel";
+import { fieldCoreStatusLabel, fieldEvent, isLocalFieldMode } from "../../http-api/field-mode";
 import { decideSemanticFallback } from "./semanticFallback";
-import { encodeSemanticMissionMock } from "./semanticMissionEncoder";
 import LivePositionMap from "./LivePositionMap";
 import MapTimelinePlayer, { type MapTimelineSnapshot } from "./MapTimelinePlayer";
 import {
@@ -23,7 +19,6 @@ import VideoPlayback from "./VideoPlayback";
 import FieldLinkChatWidget from "./FieldLinkChatWidget";
 import type { VideoPlaybackState } from "./videoPlaybackState";
 import RequirementsReadinessModal from "./RequirementsReadinessModal";
-import { createDemoOverview, DEMO_EVENT, DEMO_SCENARIOS, demoScenarioFromLocation } from "./demoOverview";
 import { applyTelemetrySafetyRules, TelemetryStreamClient, type TelemetryStreamStatus } from "./telemetryStream";
 import { calculatePacketSequence, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import { assessKpiMeasurement } from "./kpiMeasurementEvidence";
@@ -43,18 +38,14 @@ const DEFAULT_CHANGE_HIGHLIGHT_MS = POLL_INTERVAL_MS * 0.3;
 const DEFAULT_EVENT_ID =
   import.meta.env.VITE_DEFAULT_EVENT_ID?.trim() ||
   "10000000-0000-4000-8000-000000000001";
-const FORCE_DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
-const FORCE_LOCAL_E2E_MODE = isLocalE2EMode();
+
 const FORCE_LOCAL_FIELD_MODE = isLocalFieldMode() || new URLSearchParams(window.location.search).get("field") === "1";
-const FORCE_FIELD_PREVIEW_MODE = FORCE_LOCAL_FIELD_MODE && (isFieldPreviewMode() || new URLSearchParams(window.location.search).get("preview") === "1");
 
 /*
  * 최종 운영 화면에서는 DEMO/KPI/PoC 검증 UI를 노출하지 않는다.
  * 필요 시 ?debug=1 에서만 개발 검증 UI를 다시 확인할 수 있다.
  */
-const SHOW_VALIDATION_UI =
-  !FORCE_DEMO_MODE ||
-  new URLSearchParams(window.location.search).get("debug") === "1";
+const SHOW_VALIDATION_UI = new URLSearchParams(window.location.search).get("debug") === "1";
 
 function text(value: unknown, fallback = "-") { return value == null || value === "" ? fallback : String(value); }
 const koreanLabels: Record<string, string> = {
@@ -637,152 +628,6 @@ function overviewLocations(overview: EventOverview): LiveLocation[] {
   ].filter((item): item is LiveLocation => item !== null);
 }
 
-
-function demoRtkAssetsFromTelemetry(
-  rows: ApiRecord[],
-): ApiRecord[] {
-  const latest = new Map<string, ApiRecord>();
-
-  for (const row of rows) {
-    if (String(row.assetType ?? "") !== "RTK_TERMINAL") {
-      continue;
-    }
-
-    const assetId = String(
-      row.assetId ??
-      row.sourceAssetId ??
-      "",
-    ).trim();
-
-    const latitude = Number(row.latitude);
-    const longitude = Number(row.longitude);
-    const altitude = Number(row.altitude);
-    const observedAt = String(row.observedAt ?? "");
-
-    if (
-      !assetId ||
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      latitude < -90 ||
-      latitude > 90 ||
-      longitude < -180 ||
-      longitude > 180 ||
-      (latitude === 0 && longitude === 0) ||
-      !observedAt ||
-      !Number.isFinite(Date.parse(observedAt))
-    ) {
-      continue;
-    }
-
-    const attributes =
-      row.attributes &&
-      typeof row.attributes === "object" &&
-      !Array.isArray(row.attributes)
-        ? row.attributes as ApiRecord
-        : {};
-
-    const linkQuality =
-      attributes.linkQuality &&
-      typeof attributes.linkQuality === "object" &&
-      !Array.isArray(attributes.linkQuality)
-        ? attributes.linkQuality as ApiRecord
-        : {};
-
-    const rssi = Number(linkQuality.rssiDbm);
-
-    latest.set(assetId, {
-      assetId,
-
-      assetCode:
-        String(row.assetCode ?? assetId),
-
-      assetName:
-        String(
-          row.assetName ??
-          `Sleno RTK 단말 ${assetId.slice(0, 8)}`
-        ),
-
-      assetType:
-        "RTK_TERMINAL",
-
-      operationalStatus:
-        String(
-          row.operationalStatus ??
-          "UNKNOWN"
-        ),
-
-      observedAt,
-
-      receivedAt:
-        String(
-          row.receivedAt ??
-          observedAt
-        ),
-
-      geometry: {
-        type: "Point",
-        coordinates: [
-          longitude,
-          latitude,
-          Number.isFinite(altitude)
-            ? altitude
-            : 0,
-        ],
-      },
-
-      signalStrengthDbm:
-        Number.isFinite(rssi)
-          ? rssi
-          : null,
-
-      packetLossPct:
-        row.packetLossPct ?? null,
-
-      positioningMethod:
-        String(
-          row.positioningMethod ??
-          attributes.fixType ??
-          "GNSS"
-        ),
-
-      qualityStatus:
-        String(
-          row.operationalStatus ??
-          ""
-        ),
-      positionFetchStatus: rtkPositionFetchStatus(observedAt, false, true),
-
-      sourceSystem:
-        String(
-          attributes.sourceSystem ??
-          "sleno-server"
-        ),
-
-      sourceAssetId:
-        String(
-          row.sourceAssetId ??
-          assetId
-        ),
-
-      reportedByAssetId: "",
-      reportingRole: "JININFRA",
-
-      activeLink:
-        String(
-          attributes.networkType ??
-          "LORAWAN"
-        ),
-
-      eventRegistrationStatus:
-        "REGISTERED",
-
-      attributes,
-    });
-  }
-
-  return [...latest.values()];
-}
-
 const fallbackTopologyLabels: Record<string, string[]> = {
   ENDPOINT: ["대원 RTK 단말", "드론·영상장비", "400㎒ 무전기"],
   FIELD: ["LPWA · 저속", "이음5G · 고속", "무전 중계망"],
@@ -894,7 +739,6 @@ export default function UnifiedDisasterDashboard() {
   const displayProfile = parseDisplayProfile(window.location.search);
   const displayConfig = getDisplayProfileConfig(displayProfile);
   const displayClassName = displayProfileClassName(displayProfile);
-  const demoScenario = demoScenarioFromLocation();
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [overview, setOverview] = useState<EventOverview | null>(null);
@@ -902,18 +746,13 @@ export default function UnifiedDisasterDashboard() {
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [disasterNotFound, setDisasterNotFound] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const demoMode =
-    FORCE_DEMO_MODE ||
-    (window.location.pathname === "/" &&
-      new URLSearchParams(window.location.search).get("live") !== "1");
-  const localE2EMode = FORCE_LOCAL_E2E_MODE;
+
   const localFieldMode = FORCE_LOCAL_FIELD_MODE;
-  const fieldPreviewMode = FORCE_FIELD_PREVIEW_MODE;
+
   const commandShellMode = true;
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [telemetryStreamStatus, setTelemetryStreamStatus] = useState<TelemetryStreamStatus>("DISABLED");
   const [telemetrySamples, setTelemetrySamples] = useState<TelemetrySample[]>([]);
-  const demoSequenceRef = useRef(0);
   const previousLocationsRef = useRef<Map<string, string> | null>(null);
   const previousOverviewUpdateTimeRef = useRef<number | null>(null);
   const highlightDurationRef = useRef(DEFAULT_CHANGE_HIGHLIGHT_MS);
@@ -982,13 +821,7 @@ export default function UnifiedDisasterDashboard() {
       setError(null);
       return;
     }
-    if (localE2EMode) {
-      setDisasterNotFound(false);
-      setEvents([LOCAL_E2E_EVENT]);
-      setSelectedId(LOCAL_E2E_EVENT.eventId);
-      setError(null);
-      return;
-    }
+
     let result;
     try {
       result = await loadDashboardDisasterAssetsCached(DEFAULT_EVENT_ID);
@@ -1029,41 +862,12 @@ export default function UnifiedDisasterDashboard() {
     setEvents([currentEvent]);
     setSelectedId((current) => current || currentEvent.eventId);
     setError(null);
-  }, [localE2EMode, localFieldMode]);
+  }, [localFieldMode]);
 
   /* FIELD_EXTERNAL_API_FINAL */
   const refreshExternalIntegrations = useCallback(async () => {
     /* FIELD_EXTERNAL_INTEGRATIONS_ENABLED */
-    if (localE2EMode) {
-      setExternalFirmsRows([]);
-      setExternalLandslideHistoryRows([]);
-      setExternalWildfireRiskRows([]);
-      setExternalLandslideForecastRows([]);
-      setExternalLandslideRegionalRows([]);
-      setExternalIntegrationStatus({
-        firms: { status: "idle", count: 0, checkedAt: null },
-        wildfireRisk: { status: "idle", count: 0, checkedAt: null },
-        landslideForecast: { status: "idle", count: 0, checkedAt: null },
-        landslideHistory: { status: "idle", count: 0, checkedAt: null },
-        landslideRegionalRisk: { status: "idle", count: 0, checkedAt: null },
-      });
-      return;
-    }
-    if (demoMode) {
-      const demo = createDemoOverview();
-      const checkedAt = new Date().toISOString();
-      setExternalFirmsRows(demo.domainLayers["external-firms"] ?? []);
-      setExternalLandslideHistoryRows(demo.domainLayers["external-landslide-history"] ?? []);
-      setExternalWildfireRiskRows(demo.domainLayers["wildfire-risk-zones"] ?? []);
-      setExternalLandslideForecastRows(demo.domainLayers["slope-assessments"] ?? []);
-      setExternalLandslideRegionalRows(demo.domainLayers["slope-gradients"] ?? []);
-      setExternalIntegrationStatus({
-        firms: { status: "ok", count: 1, checkedAt }, wildfireRisk: { status: "ok", count: 1, checkedAt },
-        landslideForecast: { status: "ok", count: 1, checkedAt }, landslideHistory: { status: "ok", count: 1, checkedAt },
-        landslideRegionalRisk: { status: "ok", count: 1, checkedAt },
-      });
-      return;
-    }
+
     setExternalIntegrationStatus((current) => ({
       firms: { ...current.firms, status: "loading", message: undefined },
       wildfireRisk: { ...current.wildfireRisk, status: "loading", message: undefined },
@@ -1246,7 +1050,7 @@ export default function UnifiedDisasterDashboard() {
             message: errorMessage(landslideRegionalRisk.reason),
           },
     }));
-  }, [demoMode, localE2EMode]);
+  }, []);
 
   useEffect(() => {
     void refreshExternalIntegrations();
@@ -1262,12 +1066,7 @@ export default function UnifiedDisasterDashboard() {
     const selected = events.find((event) => event.eventId === selectedId);
     if (!selected) return;
 
-    const result = fieldPreviewMode
-      ? {
-          ...createDemoOverview(),
-          event: selected,
-        }
-      : await loadEventOverview(selected);
+    const result = await loadEventOverview(selected);
     const polledTelemetrySamples = result.assets
       .map((asset) => telemetrySampleFromLiveAsset(asset))
       .filter((sample): sample is TelemetrySample => sample !== null);
@@ -1325,7 +1124,7 @@ export default function UnifiedDisasterDashboard() {
     );
     setOverview(result);
     setLastUpdatedAt(new Date());
-  }, [events, fieldPreviewMode, selectedId]);
+  }, [events, selectedId]);
 
   useEffect(() => {
     previousLocationsRef.current = null;
@@ -1337,7 +1136,6 @@ export default function UnifiedDisasterDashboard() {
     setTimelineIndex(null);
     setTimelinePlaying(false);
     setTelemetrySamples([]);
-    demoSequenceRef.current = 0;
   }, [selectedId]);
 
   useEffect(() => {
@@ -1357,16 +1155,7 @@ export default function UnifiedDisasterDashboard() {
 
   useEffect(() => {
     let active = true;
-    if (demoMode) {
-      const demo = createDemoOverview();
-      setDisasterNotFound(false);
-      setEvents([demo.event]);
-      setSelectedId(demo.event.eventId);
-      setOverview(demo);
-      setLastUpdatedAt(new Date());
-      setEventsLoaded(true);
-      return () => { active = false; };
-    }
+
     refreshEvents()
       .catch((caught: unknown) => {
         if (!active) return;
@@ -1374,115 +1163,20 @@ export default function UnifiedDisasterDashboard() {
       })
       .finally(() => active && setEventsLoaded(true));
     return () => { active = false; };
-  }, [demoMode, refreshEvents]);
+  }, [refreshEvents]);
 
   useEffect(() => {
-    if (demoMode || localE2EMode || localFieldMode) return;
+    if (localFieldMode) return;
     const timer = window.setInterval(() => {
       refreshEvents().catch(() => undefined);
     }, 10_000);
     return () => window.clearInterval(timer);
-  }, [demoMode, localE2EMode, localFieldMode, refreshEvents]);
+  }, [localFieldMode, refreshEvents]);
 
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    // 20261010 DEMO 갱신과 RTK Core 조회를 분리한다.
-    // API 장애는 단말 자체의 OFFLINE 판정과 구분한다.
-    let lastRtkAssets: ReturnType<typeof demoRtkAssetsFromTelemetry> = [];
-    let rtkRequestPending = false;
-    let rtkRequestFailed = false;
-    let lastRtkRequestAt = 0;
-    const RTK_FETCH_INTERVAL_MS = 5_000;
-
-    const refresh = () => demoMode
-      ? (() => {
-          if (!active) return;
-
-          const now = Date.now();
-
-          // RTK 요청은 중첩하지 않는다. DEMO 애니메이션은 계속 갱신한다.
-          if (
-            !rtkRequestPending &&
-            now - lastRtkRequestAt >= RTK_FETCH_INTERVAL_MS
-          ) {
-            rtkRequestPending = true;
-            lastRtkRequestAt = now;
-
-            void forestApi.dashboardDroneTelemetry(DEFAULT_EVENT_ID)
-              .then((response) => {
-                if (!active) return;
-
-                lastRtkAssets = demoRtkAssetsFromTelemetry(response.data);
-                rtkRequestFailed = false;
-              })
-              .catch((caught: unknown) => {
-                if (!active) return;
-
-                rtkRequestFailed = true;
-                console.warn(
-                  "[demo] Sleno RTK 조회 실패: 마지막 확인 위치 사용",
-                  caught
-                );
-              })
-              .finally(() => {
-                rtkRequestPending = false;
-              });
-          }
-
-          const next = createDemoOverview();
-
-          const overlayAssets = rtkRequestFailed
-            ? lastRtkAssets.map((asset) => ({
-                ...asset,
-                // 표시 전용 상태. 장비 OFFLINE을 뜻하지 않는다.
-                positionFetchStatus: "조회 실패 · 마지막 확인 위치",
-              }))
-            : lastRtkAssets.map((asset) => ({
-                ...asset,
-                positionFetchStatus: rtkPositionFetchStatus(
-                  String(asset.observedAt ?? ""),
-                  false,
-                  true,
-                ),
-              }));
-
-          if (overlayAssets.length > 0) {
-            const ids = new Set(
-              lastRtkAssets.map((asset) => String(asset.assetId))
-            );
-
-            next.assets = [
-              ...next.assets.filter(
-                (asset) => !ids.has(String(asset.assetId))
-              ),
-              ...overlayAssets,
-            ];
-          }
-
-          setOverview(next);
-          const sequence = ++demoSequenceRef.current;
-          setTelemetrySamples((current) => [...current, ...next.assets
-            .filter((asset) => !(String(asset.assetId) === "DRONE-01" && sequence % 20 === 0))
-            .map((asset) => {
-            const coordinates = (asset.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
-            return {
-              assetId: String(asset.assetId),
-              entityType: "ASSET",
-              assetType: String(asset.assetType ?? "ASSET"),
-              observedAt: String(asset.observedAt),
-              // 실제 API 관측값의 수신 시각을 시연 타이머로 덮어쓰지 않는다.
-              // 값이 없다면 수신 시각을 추정하지 않는다.
-              receivedAt: typeof asset.receivedAt === "string" ? asset.receivedAt : "",
-              sequence,
-              latitude: Number(coordinates?.[1]),
-              longitude: Number(coordinates?.[0]),
-            } satisfies TelemetrySample;
-          })].slice(-3_600));
-          setLastUpdatedAt(new Date());
-          return;
-        })()
-      : refreshOverview()
+    const refresh = () => refreshOverview()
       .then(() => active && setError(null))
       .catch((caught: unknown) => {
         if (!active) return;
@@ -1505,11 +1199,11 @@ export default function UnifiedDisasterDashboard() {
     void refresh();
     const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
     return () => { active = false; window.clearInterval(timer); };
-  }, [demoMode, refreshOverview, selectedId]);
+  }, [refreshOverview, selectedId]);
 
   useEffect(() => {
     const url = import.meta.env.VITE_TELEMETRY_WS_URL?.trim();
-    if (demoMode || localE2EMode || localFieldMode || !url || !selectedId) {
+    if (localFieldMode || !url || !selectedId) {
       setTelemetryStreamStatus("DISABLED");
       return;
     }
@@ -1534,11 +1228,11 @@ export default function UnifiedDisasterDashboard() {
     });
     client.connect();
     return () => client.stop();
-  }, [demoMode, localE2EMode, localFieldMode, selectedId]);
+  }, [localFieldMode, selectedId]);
 
   useEffect(() => {
-    if (!selectedId || localE2EMode || localFieldMode) {
-      if (localE2EMode || localFieldMode) setTimeline(null);
+    if (!selectedId || localFieldMode) {
+      if (localFieldMode) setTimeline(null);
       return;
     }
     let active = true;
@@ -1558,7 +1252,7 @@ export default function UnifiedDisasterDashboard() {
     void refreshTimeline();
     const timer = window.setInterval(refreshTimeline, 60_000);
     return () => { active = false; window.clearInterval(timer); };
-  }, [localE2EMode, localFieldMode, selectedId]);
+  }, [localFieldMode, selectedId]);
 
   const mapDomainLayers = useMemo<Record<string, ApiRecord[]>>(
     () => ({
@@ -1592,7 +1286,7 @@ export default function UnifiedDisasterDashboard() {
    * REAL ?field=1 locations are NEVER modified here.
    */
   const fieldScenarioLocations = useMemo(() => {
-    if (!fieldPreviewMode || liveLocations.length === 0) {
+    {
       return liveLocations;
     }
 
@@ -1608,7 +1302,7 @@ export default function UnifiedDisasterDashboard() {
       longitude: location.longitude + deltaLongitude,
       latitude: location.latitude + deltaLatitude,
     }));
-  }, [fieldPreviewMode, liveLocations]);
+  }, [liveLocations]);
 
   const timelineSnapshots = useMemo(
     () => buildTimelineSnapshots(timeline, [...(overview?.assets ?? []), ...(overview?.unregisteredAssets ?? [])]),
@@ -1627,7 +1321,7 @@ export default function UnifiedDisasterDashboard() {
   const playbackSnapshot = timelineIndex == null ? null : timelineSnapshots[timelineIndex] ?? null;
   const mapLocations =
     playbackSnapshot?.locations
-    ?? (fieldPreviewMode ? fieldScenarioLocations : liveLocations);
+    ?? (liveLocations);
   const handleTimelinePlayToggle = useCallback(() => {
     if (timelineSnapshots.length < 2) return;
     if (timelinePlaying) {
@@ -1648,55 +1342,9 @@ export default function UnifiedDisasterDashboard() {
     setSelectedLocationKey(null);
   }, []);
   const activeAlertCount = useMemo(() => overview?.alerts.filter((item) => !["RESOLVED", "EXPIRED", "CANCELLED"].includes(String(item.status))).length ?? 0, [overview]);
-  /* PHASE_5_3B_PREVIEW_MOTION */
-  const [fieldPreviewMotionTick, setFieldPreviewMotionTick] = useState(0);
-
-  useEffect(() => {
-    if (!fieldPreviewMode) {
-      setFieldPreviewMotionTick(0);
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      setFieldPreviewMotionTick((current) => current + 1);
-    }, 1_000);
-
-    return () => window.clearInterval(timer);
-  }, [fieldPreviewMode]);
-
-  const visibleLocations = useMemo(() => {
-    return mapLocations
-      .filter((item) => visibleResourceGroups.has(resourceGroupOf(item)))
-      .map((item) => {
-        if (fieldPreviewMode && resourceGroupOf(item) === "UAV") {
-          const phase = fieldPreviewMotionTick * 0.34;
-
-          const latitude =
-            item.latitude +
-            Math.sin(phase) * 0.0018 +
-            fieldPreviewMotionTick * 0.00008;
-
-          const longitude =
-            item.longitude +
-            Math.cos(phase) * 0.0022 +
-            fieldPreviewMotionTick * 0.00010;
-
-          return {
-            ...item,
-            latitude,
-            longitude,
-            headingDeg: (231 + fieldPreviewMotionTick * 11) % 360,
-          };
-        }
-
-        return item;
-      });
-  }, [
-    fieldPreviewMode,
-    fieldPreviewMotionTick,
-    mapLocations,
-    visibleResourceGroups,
-  ]);
+  const visibleLocations = useMemo(() => mapLocations.filter(
+    (item) => visibleResourceGroups.has(resourceGroupOf(item))
+  ), [mapLocations, visibleResourceGroups]);
   const eventCoordinates = overview?.event.geometry?.coordinates;
   const eventCenter: [number, number] | null =
     localFieldMode
@@ -1728,35 +1376,9 @@ export default function UnifiedDisasterDashboard() {
         (eventCenter[1] - liveCenter[1]) * 111,
       )
     : 0;
-  /*
-   * WILDFIRE demo에서 실제 Sleno RTK가 들어오면
-   * 데모 사건 좌표로 옮겨 그리지 않고 실제 좌표를 지도 중심으로 사용한다.
-   */
-  // 20261010 DEMO 지도 중심 제어
-  // 실제 RTK 데이터 수신만으로는 산불 현장에서 이동하지 않는다.
-  // RTK 자산을 명시적으로 선택했을 때만 실제 좌표로 이동한다.
-  const selectedDemoRtk =
-    demoMode && selectedLocationKey
-      ? mapLocations.find(
-          (item) =>
-            item.category === "RTK_TERMINAL" &&
-            locationKey(item) === selectedLocationKey
-        )
-      : null;
-
-  const mapFocusCenter: [number, number] | null =
-    demoMode
-      ? selectedDemoRtk
-        ? [
-            selectedDemoRtk.longitude,
-            selectedDemoRtk.latitude,
-          ]
-        : eventCenter ?? liveCenter
-      : !eventCenter
-        ? liveCenter
-        : eventToLiveDistance > 0.08
-          ? liveCenter
-          : eventCenter;
+  const mapFocusCenter: [number, number] | null = !eventCenter
+    ? liveCenter
+    : eventToLiveDistance > 0.08 ? liveCenter : eventCenter;
   const coordinateOutlierKeys = new Set(
     liveCenter
       ? mapLocations
@@ -1831,23 +1453,23 @@ export default function UnifiedDisasterDashboard() {
         expectedUnit: item.unit,
         operator: item.operator,
         target: item.target,
-        demoMode: demoMode || fieldPreviewMode,
+        demoMode: false,
         apiStatus: overview.kpiApiStatus,
       });
       return { ...item, value: assessment.value, state: assessment.state };
     });
-  }, [demoMode, fieldPreviewMode, overview]);
-  const fieldPrimaryDrone = (localFieldMode || localE2EMode)
-    ? (localFieldMode && fieldPreviewMode ? fieldScenarioLocations : liveLocations)
+  }, [overview]);
+  const fieldPrimaryDrone = (localFieldMode)
+    ? (liveLocations)
         .find((location) => resourceGroupOf(location) === "UAV") ?? null
     : null;
   const fieldVideoAssetId = fieldPrimaryDrone?.id
-    ?? (localE2EMode ? "e2e-md1000-canonical-uuid" : null);
+    ?? (null);
 
   useEffect(() => {
     let active = true;
 
-    if (!fieldVideoAssetId || fieldPreviewMode) {
+    if (!fieldVideoAssetId) {
       setFieldVideoChannels([]);
       setFieldVideoLoading(false);
       return () => { active = false; };
@@ -1879,9 +1501,9 @@ export default function UnifiedDisasterDashboard() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [fieldVideoAssetId, fieldPreviewMode]);
+  }, [fieldVideoAssetId, false]);
 
-  const fieldPrimaryAsset = (localFieldMode || localE2EMode) && fieldPrimaryDrone
+  const fieldPrimaryAsset = (localFieldMode) && fieldPrimaryDrone
     ? overview?.assets.find((asset) =>
         String(asset.assetId ?? "") === fieldPrimaryDrone.id
         || String(asset.assetCode ?? "") === fieldPrimaryDrone.sourceAssetId
@@ -1906,21 +1528,15 @@ export default function UnifiedDisasterDashboard() {
   const linkExpected = Number(fieldLinkQuality.windowExpected);
   const linkLossPct = Number(fieldLinkQuality.packetLossPct);
 
-  const fieldSequenceReceived = fieldPreviewMode
-    ? 96
-    : Number.isFinite(linkReceived)
+  const fieldSequenceReceived = Number.isFinite(linkReceived)
       ? linkReceived
       : fieldSequenceSummary?.received ?? 0;
 
-  const fieldSequenceLost = fieldPreviewMode
-    ? 4
-    : Number.isFinite(linkLost)
+  const fieldSequenceLost = Number.isFinite(linkLost)
       ? linkLost
       : fieldSequenceSummary?.lost ?? 0;
 
-  const fieldSequenceLossPct = fieldPreviewMode
-    ? 4
-    : Number.isFinite(linkLossPct)
+  const fieldSequenceLossPct = Number.isFinite(linkLossPct)
       ? linkLossPct
       : fieldSequenceSummary?.lossPct ?? null;
 
@@ -1938,7 +1554,7 @@ export default function UnifiedDisasterDashboard() {
     fieldPrimaryAttributes.componentId ??
     fieldLinkQuality.mavlinkComponentId
   );
-  const fieldSourceAddress = text(fieldPrimaryAttributes.sourceAddress, fieldPreviewMode ? "127.0.0.1:64361" : "수신 대기");
+  const fieldSourceAddress = text(fieldPrimaryAttributes.sourceAddress, "수신 대기");
   const fieldTelemetryAgeSec = fieldPrimaryDrone?.observedAt
     ? Math.max(0, Math.floor((Date.now() - new Date(fieldPrimaryDrone.observedAt).getTime()) / 1000))
     : null;
@@ -1956,38 +1572,17 @@ export default function UnifiedDisasterDashboard() {
    * MOCK packet is generated only in preview mode.
    * LIVE operation never fabricates predicted operational data.
    */
-  const semanticFallbackPacket = fieldPreviewMode && fieldPrimaryDrone
-    ? encodeSemanticMissionMock({
-        incidentId: selectedId ?? "preview-incident",
-        assetId: fieldPrimaryDrone.id,
-        observedAt: new Date().toISOString(),
-        sourceBytes: 256_000,
-        position: {
-          longitude: fieldPrimaryDrone.longitude,
-          latitude: fieldPrimaryDrone.latitude,
-          altitudeM: fieldPrimaryDrone.altitude ?? undefined,
-        },
-        fire: {
-          detected: true,
-          confidence: 0.68,
-          riskLevel: "POC",
-        },
-      })
-    : null;
+  const semanticFallbackPacket = null;
 
   const semanticFallbackDecision = decideSemanticFallback(
-    fieldPreviewMode
-      ? "DISCONNECTED"
-      : (fieldLinkHealth ?? "DISCONNECTED"),
+    (fieldLinkHealth ?? "DISCONNECTED"),
     semanticFallbackPacket,
     new Date(),
   );
 
   const semanticFallbackActive =
     semanticFallbackDecision.mode === "SEMANTIC_POC";
-  const fieldTwinState = fieldPreviewMode
-    ? "PREVIEW"
-    : fieldPrimaryDrone == null
+  const fieldTwinState = fieldPrimaryDrone == null
       ? "WAITING"
       : fieldLinkHealth === "CONNECTED"
         ? "LIVE"
@@ -2000,30 +1595,21 @@ export default function UnifiedDisasterDashboard() {
       ? "SYNC DELAY"
       : fieldTwinState === "OFFLINE"
         ? "PHYSICAL LINK OFFLINE"
-        : fieldTwinState === "PREVIEW"
-          ? "PREVIEW TWIN · NOT FLIGHT"
-          : "WAITING FOR PHYSICAL STATE";
+        : "WAITING FOR PHYSICAL STATE";
   const fieldDisplay = {
-    altitude: fieldPrimaryDrone?.altitude ?? (fieldPreviewMode ? 126 : null),
-    speed: fieldPrimaryDrone?.groundSpeedMps ?? (fieldPreviewMode ? 8.4 : null),
-    heading: fieldPrimaryDrone?.headingDeg ?? (fieldPreviewMode ? 132 : null),
-    battery: fieldPrimaryDrone?.batteryPct ?? (fieldPreviewMode ? 84 : null),
-    signal: fieldPrimaryDrone?.signalStrengthDbm ?? (fieldPreviewMode ? -61 : null),
-    flightMode: fieldPrimaryDrone?.flightMode ?? (fieldPreviewMode ? "LOITER" : null),
-    armed: fieldPrimaryDrone?.armed ?? (fieldPreviewMode ? true : null),
-    latitude: fieldPrimaryDrone?.latitude ?? (fieldPreviewMode ? 36.321742 : null),
-    longitude: fieldPrimaryDrone?.longitude ?? (fieldPreviewMode ? 127.414883 : null),
+    altitude: fieldPrimaryDrone?.altitude ?? (null),
+    speed: fieldPrimaryDrone?.groundSpeedMps ?? (null),
+    heading: fieldPrimaryDrone?.headingDeg ?? (null),
+    battery: fieldPrimaryDrone?.batteryPct ?? (null),
+    signal: fieldPrimaryDrone?.signalStrengthDbm ?? (null),
+    flightMode: fieldPrimaryDrone?.flightMode ?? (null),
+    armed: fieldPrimaryDrone?.armed ?? (null),
+    latitude: fieldPrimaryDrone?.latitude ?? (null),
+    longitude: fieldPrimaryDrone?.longitude ?? (null),
   };
-  const fieldSyncPercent = fieldTwinState === "LIVE" ? 100
-    : fieldTwinState === "PREVIEW" ? 100
-      : fieldTwinState === "STALE" ? 62
-        : fieldTwinState === "OFFLINE" ? 0
-          : 0;
   /* PHASE_5_4_FIELD_FRESHNESS */
   const fieldFreshnessState =
-    fieldPreviewMode
-      ? "PREVIEW"
-      : fieldTelemetryAgeSec == null
+    fieldTelemetryAgeSec == null
         ? "WAITING"
         : fieldLinkHealth === "CONNECTED"
           ? "LIVE"
@@ -2038,14 +1624,10 @@ export default function UnifiedDisasterDashboard() {
         ? "STALE · 갱신 지연"
         : fieldFreshnessState === "OFFLINE"
           ? "OFFLINE · 수신 중단"
-          : fieldFreshnessState === "PREVIEW"
-            ? "PREVIEW · SIMULATED"
-            : "WAITING · 위치 수신 대기";
+          : "WAITING · 위치 수신 대기";
 
   const fieldFreshnessDetail =
-    fieldPreviewMode
-      ? "DEMO DATA · NOT FLIGHT"
-      : fieldTelemetryAgeSec == null
+    fieldTelemetryAgeSec == null
         ? "GLOBAL_POSITION_INT(33) 대기"
         : `마지막 위치 수신 ${fieldTelemetryAgeSec}s 전`;
 
@@ -2059,9 +1641,7 @@ export default function UnifiedDisasterDashboard() {
   );
 
   const fieldPipelineMapState =
-    fieldPreviewMode
-      ? "PREVIEW"
-      : fieldHasCorePosition
+    fieldHasCorePosition
         ? fieldFreshnessState
         : "WAIT";
 
@@ -2069,32 +1649,24 @@ export default function UnifiedDisasterDashboard() {
     {
       id: "uplink",
       label: "QGC / Uplink",
-      state: fieldPreviewMode ? "PREVIEW" : "CHECK",
-      detail: fieldPreviewMode
-        ? "SIMULATED"
-        : "CHECK_FIELD_MD1000.ps1",
+      state: "CHECK",
+      detail: "CHECK_FIELD_MD1000.ps1",
     },
     {
       id: "core",
       label: "Core Position",
-      state: fieldPreviewMode || fieldHasCorePosition ? "OK" : "WAIT",
-      detail: fieldPreviewMode
-        ? "PREVIEW POSITION"
-        : fieldHasCorePosition
+      state: fieldHasCorePosition ? "OK" : "WAIT",
+      detail: fieldHasCorePosition
           ? "MSG33 POSITION RECEIVED"
           : "GLOBAL_POSITION_INT(33) WAIT",
     },
     {
       id: "twin",
       label: "Map Twin",
-      state: fieldPreviewMode
-        ? "PREVIEW"
-        : fieldHasCorePosition
+      state: fieldHasCorePosition
           ? "OK"
           : "WAIT",
-      detail: fieldPreviewMode
-        ? "SIMULATED TWIN"
-        : fieldHasCorePosition
+      detail: fieldHasCorePosition
           ? "MARKER / TRAIL READY"
           : "POSITION REQUIRED",
     },
@@ -2102,9 +1674,7 @@ export default function UnifiedDisasterDashboard() {
       id: "freshness",
       label: "Freshness",
       state: fieldPipelineMapState,
-      detail: fieldPreviewMode
-        ? "SIMULATED"
-        : fieldTelemetryAgeSec == null
+      detail: fieldTelemetryAgeSec == null
           ? "NO POSITION"
           : `${fieldTelemetryAgeSec}s`,
     },
@@ -2146,7 +1716,7 @@ export default function UnifiedDisasterDashboard() {
       setEventsLoaded(true);
       setRetrying(false);
     }
-  }, [demoMode, refreshEvents]);
+  }, [refreshEvents]);
 
   return (
 <main className={`unified-disaster-board ${displayClassName}${commandShellMode ? " is-field-mode" : ""}${SHOW_VALIDATION_UI ? "" : " final-ops-ui"}`} aria-label="?? ?? ?? ??">
@@ -2203,15 +1773,13 @@ export default function UnifiedDisasterDashboard() {
             <span>{korean(overview.event.severityCode)}</span>
             <small>{text(overview.event.locationName)}</small>
           </div>
-          {demoMode && <div className="demo-mode-badge" title="모의 시나리오 데이터입니다. 별도 API 관측값이 포함될 수 있으며, 실제 비행이나 통신 품질을 검증한 결과는 아닙니다."><b>DEMO</b><span>모의 시나리오 · 별도 API 관측값 포함 가능</span></div>}
-          {localE2EMode && <div className="demo-mode-badge" title="실기체가 아닌 로컬 synthetic MAVLink 브라우저 E2E입니다"><b>E2E</b><span>SYNTHETIC · NOT FLIGHT</span></div>}
-          {localFieldMode && <div className={`demo-mode-badge field-mode-badge${fieldPreviewMode ? " field-preview-badge" : ""}`} title={fieldPreviewMode ? "화면 확인을 위한 명시적 미리보기 데이터입니다. 실제 비행 증거가 아닙니다." : "실제 MD1000 MAVLink만 수신하는 로컬 현장 모드입니다. Synthetic feed는 사용하지 않습니다."}><b>{fieldPreviewMode ? "미리보기" : "현장"}</b><span>{fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "MD1000 실기체 · MAVLink 연동"}</span></div>}
-          {SHOW_VALIDATION_UI && demoMode && <label className="demo-scenario-selector"><span>검증 시나리오</span><select aria-label="DEMO 검증 시나리오" value={demoScenario} onChange={(event) => { const params = new URLSearchParams(window.location.search); params.set("demo", "1"); params.set("scenario", event.target.value); window.location.search = params.toString(); }}>{DEMO_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label>}
-          {localFieldMode && <button type="button" className="field-preview-toggle" onClick={() => { const params = new URLSearchParams(window.location.search); params.set("field", "1"); if (fieldPreviewMode) params.delete("preview"); else params.set("preview", "1"); window.location.search = params.toString(); }}>{fieldPreviewMode ? "실데이터 보기" : "미리보기 데이터"}</button>}
+
+          {localFieldMode && <div className={`demo-mode-badge field-mode-badge${""}`} title={"실제 MD1000 MAVLink만 수신하는 로컬 현장 모드입니다. Synthetic feed는 사용하지 않습니다."}><b>{"현장"}</b><span>{"MD1000 실기체 · MAVLink 연동"}</span></div>}
+
 {/* restore-field-header-nav-20261011: existing field tools in header */}
           <nav className="field-header-tools-nav" aria-label="현장 도구 선택">
             <button type="button" className={toolDrawerOpen && rightDockTab === "status" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "status"} aria-controls="field-left-drawer-content" onClick={() => { setRightDockTab("status"); setToolDrawerOpen(value => rightDockTab === "status" ? !value : true); }}>현장 상태</button>
-            <button type="button" className={toolDrawerOpen && rightDockTab === "semantic" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "semantic"} aria-controls="field-left-drawer-content" title={SHOW_VALIDATION_UI && demoMode ? "Semantic AI 검증 패널" : "Semantic AI 상세정보는 디버그·시연 모드에서만 제공됩니다"} onClick={() => { setRightDockTab("semantic"); setToolDrawerOpen(value => rightDockTab === "semantic" ? !value : true); }}>Semantic AI</button>
+            <button type="button" className={toolDrawerOpen && rightDockTab === "semantic" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "semantic"} aria-controls="field-left-drawer-content" title={"Semantic AI 상세정보는 디버그·시연 모드에서만 제공됩니다"} onClick={() => { setRightDockTab("semantic"); setToolDrawerOpen(value => rightDockTab === "semantic" ? !value : true); }}>Semantic AI</button>
             <button type="button" className={toolDrawerOpen && rightDockTab === "fieldlink" ? "is-active" : ""} aria-pressed={toolDrawerOpen && rightDockTab === "fieldlink"} aria-controls="field-left-drawer-content" onClick={() => { setRightDockTab("fieldlink"); setToolDrawerOpen(value => rightDockTab === "fieldlink" ? !value : true); }}>FieldLink</button>
           </nav>
           {/* field-capability-shortcuts-20261011: 지원 메뉴는 기존 상태 표시와 분리 */}
@@ -2315,23 +1883,15 @@ export default function UnifiedDisasterDashboard() {
             <div className="field-kpi-context-title">
               <b>
                 {localFieldMode
-                  ? fieldPreviewMode
-                    ? "FIELD 화면 미리보기"
-                    : "실기체 통신 감시"
-                  : localE2EMode
-                    ? "E2E 통신 검증"
-                    : demoMode
-                      ? "모의 관제 통신"
-                      : "현장 통신 상태"}
+                  ? "실기체 통신 감시"
+                  : "현장 통신 상태"}
               </b>
             </div>
 
             <div
               className="field-kpi-context-status"
               title={
-                localE2EMode
-                  ? "LOCAL E2E · 실기체가 아닌 synthetic 검증"
-                  : localFieldMode && !fieldPreviewMode
+                localFieldMode
                     ? "MD1000 실기체 · MAVLink v2"
                     : undefined
               }
@@ -2339,24 +1899,16 @@ export default function UnifiedDisasterDashboard() {
               <small
                 className="field-kpi-mode-chip"
                 data-mode={
-                  localFieldMode && !fieldPreviewMode
+                  localFieldMode
                     ? "physical"
-                    : localE2EMode
-                      ? "synthetic"
-                      : demoMode || fieldPreviewMode
-                        ? "demo"
-                        : "live"
+                    : "live"
                 }
               >
-                {localFieldMode && !fieldPreviewMode
+                {localFieldMode
                   ? "SYNTHETIC OFF"
-                  : localE2EMode
-                    ? "SYNTHETIC E2E"
-                    : demoMode || fieldPreviewMode
-                      ? "DEMO DATA"
-                      : "API DATA · 실측 여부 개별 확인"}
+                  : "API DATA · 실측 여부 개별 확인"}
               </small>
-              {!demoMode && (
+              {(
                 <div
                   className="field-api-health"
                   data-state={fieldApiHealth.toLowerCase()}
@@ -2372,21 +1924,21 @@ export default function UnifiedDisasterDashboard() {
         </section>}
 <section className={`dashboard-map-stage${commandShellMode ? " field-command-stage" : " asset-panel-collapsed"}`} aria-label="?? ?? ?? ???">
           <section className="live-location-panel" aria-label="실시간 현장 위치">
-            {!demoMode && overview.liveDroneTelemetry && <div
+            {overview.liveDroneTelemetry && <div
               className="telemetry-connection-status"
               role="status"
               title={localFieldMode ? "현재 위치는 CRC 검증된 MAVLink GLOBAL_POSITION_INT(33)만 사용합니다." : undefined}
-              data-local-e2e={localE2EMode ? "true" : undefined}
-              data-e2e-live={localE2EMode ? overview.liveDroneTelemetry.live : undefined}
-              data-e2e-stale={localE2EMode ? overview.liveDroneTelemetry.stale : undefined}
-              data-e2e-offline={localE2EMode ? overview.liveDroneTelemetry.offline : undefined}
+              data-local-e2e={undefined}
+              data-e2e-live={undefined}
+              data-e2e-stale={undefined}
+              data-e2e-offline={undefined}
               data-local-field={localFieldMode ? "true" : undefined}
               data-field-live={localFieldMode ? overview.liveDroneTelemetry.live : undefined}
               data-field-stale={localFieldMode ? overview.liveDroneTelemetry.stale : undefined}
               data-field-offline={localFieldMode ? overview.liveDroneTelemetry.offline : undefined}
             >
-              {localFieldMode ? (fieldPreviewMode ? 'MD1000 화면 미리보기 · 데모 데이터 · 실비행 아님' : 'MD1000 실시간 기체 위치') : 'MAVLink 위치 연동'} · {localFieldMode
-                ? (fieldPreviewMode ? 'PREVIEW ONLY' : fieldCoreStatusLabel(overview.liveDroneTelemetry.status, overview.liveDroneTelemetry.matched))
+              {localFieldMode ? ('MD1000 실시간 기체 위치') : 'MAVLink 위치 연동'} · {localFieldMode
+                ? (fieldCoreStatusLabel(overview.liveDroneTelemetry.status, overview.liveDroneTelemetry.matched))
                 : overview.liveDroneTelemetry.status === 'CONNECTED' ? 'Core 조회 정상' : 'Core 조회 실패 · 마지막 수신값 유지'}
               {' · '}지도 연결 {overview.liveDroneTelemetry.matched}대 · LIVE {overview.liveDroneTelemetry.live} · STALE {overview.liveDroneTelemetry.stale} · OFFLINE {overview.liveDroneTelemetry.offline}
               {' · '}ID 미연결 {overview.liveDroneTelemetry.unmatched}대
@@ -2438,7 +1990,7 @@ export default function UnifiedDisasterDashboard() {
                 visibleResourceGroups={visibleResourceGroups}
                 onResourceGroupToggle={toggleResourceGroup}
                 onResourceGroupInspect={(group) => { setSelectedLocationKey(null); setResourceDialogGroup(group); }}
-                locations={fieldPreviewMode ? fieldScenarioLocations : liveLocations}
+                locations={liveLocations}
                 lastUpdatedAt={lastUpdatedAt}
                 activeTab={operationsTab}
                 onActiveTabChange={setOperationsTab}
@@ -2456,15 +2008,11 @@ export default function UnifiedDisasterDashboard() {
 <div id="field-left-drawer-content" className="field-left-drawer-content" inert={!toolDrawerOpen}>
 <div className="field-right-dock-body" hidden={rightDockTab !== "status"}>
                   <strong>관제 현장 상태</strong>
-                  <p>{fieldPreviewMode ? "DEMO · 실제 장비 운용 데이터가 아닙니다." : fieldApiHealthText}</p>
+                  <p>{fieldApiHealthText}</p>
                   <p>지도 왼쪽 관제 메뉴에서 통신망·경보·연계 상태를 확인할 수 있습니다.</p>
                   <button type="button" onClick={() => { setOperationsTab("networks"); setRightDockTab("status"); }}>통신망 정보 보기</button>
                 </div>
-                {SHOW_VALIDATION_UI && demoMode && (
-                  <div className="field-right-dock-semantic" hidden={rightDockTab !== "semantic"}>
-                    <SemanticMissionPocPanel />
-                  </div>
-                )}
+
                 <div className="field-right-dock-fieldlink" hidden={rightDockTab !== "fieldlink"}>
                   <FieldLinkChatWidget
                     embedded
@@ -2474,9 +2022,9 @@ export default function UnifiedDisasterDashboard() {
                 </div>
               </aside>
 
-              {(localFieldMode || localE2EMode || SHOW_VALIDATION_UI) && <aside className="field-command-inspector" aria-label="MD1000 장비 상세 정보">
+              {(localFieldMode || SHOW_VALIDATION_UI) && <aside className="field-command-inspector" aria-label="MD1000 장비 상세 정보">
                 <header>
-                  <div><small>장비 상세 정보</small><strong>{fieldPrimaryDrone?.label ?? (fieldPreviewMode ? "MD1000 미리보기" : "주 기체 수신 대기")}</strong></div>
+                  <div><small>장비 상세 정보</small><strong>{fieldPrimaryDrone?.label ?? ("주 기체 수신 대기")}</strong></div>
                   <em
                     className="field-freshness-chip"
                     data-state={fieldFreshnessState.toLowerCase()}
@@ -2550,7 +2098,7 @@ export default function UnifiedDisasterDashboard() {
                   <header>
                     <div>
                       <small>FIELD SUCCESS GATE</small>
-                      <strong>{fieldPrimaryDrone ? "MD1000 실기체 연동" : fieldPreviewMode ? "MD1000 미리보기 연동" : "실기체 연동 대기"}</strong>
+                      <strong>{fieldPrimaryDrone ? "MD1000 실기체 연동" : "실기체 연동 대기"}</strong>
                     </div>
                     <em data-state={fieldPipelineMapState.toLowerCase()}>
                       {fieldPipelineMapState}
@@ -2576,9 +2124,9 @@ export default function UnifiedDisasterDashboard() {
                 </section>
 
                 <div className="field-inspector-identity">
-                  <span>{fieldPrimaryDrone ? `무인기 · ${fieldPrimaryDrone.label}` : fieldPreviewMode ? "무인기 · MD1000 PREVIEW" : "무인기 · 미수신"}</span>
+                  <span>{fieldPrimaryDrone ? `무인기 · ${fieldPrimaryDrone.label}` : "무인기 · 미수신"}</span>
                   <b>{fieldPrimaryDrone?.status ?? "실기체 위치 수신 대기"}</b>
-                  <small>{fieldPreviewMode ? "DEMO DATA · NOT FLIGHT" : "GLOBAL_POSITION_INT(33) 기반 현재 위치"}</small>
+                  <small>{"GLOBAL_POSITION_INT(33) 기반 현재 위치"}</small>
                 </div>
                 <section className="field-twin-status" data-state={fieldTwinState.toLowerCase()} aria-label="MD1000 디지털 트윈 동기화 상태">
                   <header>
@@ -2586,9 +2134,9 @@ export default function UnifiedDisasterDashboard() {
                     <strong>{fieldTwinLabel}</strong>
                   </header>
                   <div className="field-twin-grid">
-                    <article><small>Physical Asset</small><b>{fieldPrimaryDrone?.label ?? (fieldPreviewMode ? "MD1000 PREVIEW" : "-")}</b></article>
+                    <article><small>Physical Asset</small><b>{fieldPrimaryDrone?.label ?? ("-")}</b></article>
                     <article><small>Twin State</small><b>{fieldTwinState}</b></article>
-                    <article><small>Position Source</small><b>{fieldPreviewMode ? "PREVIEW" : fieldPrimaryDrone ? "MAVLink MSG 33" : "-"}</b></article>
+                    <article><small>Position Source</small><b>{fieldPrimaryDrone ? "MAVLink MSG 33" : "-"}</b></article>
                     <article
                       className="field-freshness-cell"
                       data-state={fieldFreshnessState.toLowerCase()}
@@ -2596,18 +2144,13 @@ export default function UnifiedDisasterDashboard() {
                       <small>Freshness</small>
                       <b>{fieldFreshnessState}</b>
                       <em>
-                        {fieldPreviewMode
-                          ? "SIMULATED"
-                          : fieldTelemetryAgeSec == null
+                        {fieldTelemetryAgeSec == null
                             ? "-"
                             : `${fieldTelemetryAgeSec}s`}
                       </em>
                     </article>
                     <article><small>Latitude</small><b>{fieldDisplay.latitude == null ? "-" : fieldDisplay.latitude.toFixed(6)}</b></article>
                     <article><small>Longitude</small><b>{fieldDisplay.longitude == null ? "-" : fieldDisplay.longitude.toFixed(6)}</b></article>
-                  </div>
-                  <div className="field-sync-meter" aria-label={`Digital Twin sync ${fieldSyncPercent}%`}>
-                    <span style={{ width: `${fieldSyncPercent}%` }} />
                   </div>
                 </section>
                 <nav
@@ -2650,7 +2193,7 @@ export default function UnifiedDisasterDashboard() {
                   role="tabpanel"
                 >
                 <section className="field-seq-summary" aria-label="최근 SEQ 통신 품질">
-                  <header><span>최근 100 SEQ 기준</span><small>{fieldPreviewMode ? "예시 데이터" : fieldSequenceSummary?.expected ? `SEQ ${fieldSequenceSummary.fromSequence ?? "-"}–${fieldSequenceSummary.toSequence ?? "-"}` : "수신 대기"}</small></header>
+                  <header><span>최근 100 SEQ 기준</span><small>{fieldSequenceSummary?.expected ? `SEQ ${fieldSequenceSummary.fromSequence ?? "-"}–${fieldSequenceSummary.toSequence ?? "-"}` : "수신 대기"}</small></header>
                   <div className="field-seq-grid">
                     <article><small>Received</small><strong>{fieldSequenceReceived || "-"}</strong></article>
                     <article><small>Lost</small><strong data-alert={fieldSequenceLost > 0}>{fieldSequenceLost || "-"}</strong></article>
@@ -2744,14 +2287,9 @@ export default function UnifiedDisasterDashboard() {
                 <section className="field-event-log">
                   <header><strong>장비 이벤트 로그</strong><small>최근 상태</small></header>
                   <ol>
-                    {fieldPreviewMode && <>
-                      <li><i data-tone="ok" /><time>14:27:35</time><span>데이터 수신 성공</span><em>SEQ 3287</em></li>
-                      <li><i data-tone="ok" /><time>14:27:34</time><span>데이터 수신 성공</span><em>SEQ 3286</em></li>
-                      <li><i data-tone="bad" /><time>14:27:32</time><span>패킷 손실 감지</span><em>SEQ 3284</em></li>
-                      <li><i data-tone="ok" /><time>14:27:31</time><span>데이터 수신 성공</span><em>SEQ 3283</em></li>
-                    </>}
-                    {!fieldPreviewMode && telemetrySamples.slice(-4).reverse().map((sample, index) => <li key={`${sample.receivedAt}-${index}`}><i data-tone="ok" /><time>{(sample.receivedAt && Number.isFinite(Date.parse(sample.receivedAt)) ? new Date(sample.receivedAt).toLocaleTimeString("ko-KR", { hour12: false }) : "시각 확인 불가")}</time><span>텔레메트리 수신</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}
-                    {!fieldPreviewMode && telemetrySamples.length === 0 && <li className="empty"><span>실기체 텔레메트리 수신 대기</span></li>}
+
+                    {telemetrySamples.slice(-4).reverse().map((sample, index) => <li key={`${sample.receivedAt}-${index}`}><i data-tone="ok" /><time>{(sample.receivedAt && Number.isFinite(Date.parse(sample.receivedAt)) ? new Date(sample.receivedAt).toLocaleTimeString("ko-KR", { hour12: false }) : "시각 확인 불가")}</time><span>텔레메트리 수신</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}
+                    {telemetrySamples.length === 0 && <li className="empty"><span>실기체 텔레메트리 수신 대기</span></li>}
                   </ol>
                 </section>
                 </div>
@@ -2784,9 +2322,7 @@ export default function UnifiedDisasterDashboard() {
                       <span>실시간 영상</span>
                       <strong>
                         {fieldPrimaryDrone?.label ??
-                          (fieldPreviewMode
-                            ? "MD1000 미리보기"
-                            : "주 기체 수신 대기")}
+                          ("주 기체 수신 대기")}
                       </strong>
                       <small>
                         등록 영상 채널 {fieldVideoChannels.length}개
@@ -2827,7 +2363,7 @@ export default function UnifiedDisasterDashboard() {
                   <dt>전송망</dt>
                   <dd>{selectedLocation.networkMode || "망 정보 없음"}</dd>
                 </div>
-                {!demoMode && <DroneTwinDetail asset={overview.assets.find(asset => asset.assetId === selectedLocation.id) ?? {}} />}
+                {<DroneTwinDetail asset={overview.assets.find(asset => asset.assetId === selectedLocation.id) ?? {}} />}
                 <div><dt>최근 통신</dt><dd>{relativeTime(selectedLocation.observedAt)}</dd></div>
                 <div><dt>위치</dt><dd>{selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}</dd></div>
                 <div><dt>고도</dt><dd>{selectedLocation.altitude == null ? "확인 불가" : `${selectedLocation.altitude.toFixed(1)}m`}</dd></div>
@@ -3004,9 +2540,9 @@ export default function UnifiedDisasterDashboard() {
             data-active-pulses={Object.values(changedUntil).filter((until) => until > Date.now()).length}
           ><i /> 사건 데이터 변화 감지 · 갱신 주기의 30% 동안 테두리 강조</div>
         </section>
-{(localFieldMode || localE2EMode || SHOW_VALIDATION_UI) && (displayConfig.showVideoDeck || displayConfig.showEventTimeline) && <section className="field-command-footer" aria-label="?? ?? ? ??? ????">
+{(localFieldMode || SHOW_VALIDATION_UI) && (displayConfig.showVideoDeck || displayConfig.showEventTimeline) && <section className="field-command-footer" aria-label="?? ?? ? ??? ????">
           {displayConfig.showVideoDeck && <div className="field-video-deck">
-            <header><strong>실시간 영상</strong><small>{fieldPreviewMode ? "미리보기 4채널" : "RTSP 연결 상태"}</small></header>
+            <header><strong>실시간 영상</strong><small>{"RTSP 연결 상태"}</small></header>
             <div>
               {[
                 ["MD1000 · 광학", "EO"],
@@ -3025,9 +2561,7 @@ export default function UnifiedDisasterDashboard() {
                   ? fieldVideoPlaybackStates[code]
                   : undefined;
 
-                const stateLabel = fieldPreviewMode
-                  ? "DEMO"
-                  : playbackState
+                const stateLabel = playbackState
                     ? playbackState
                     : fieldVideoLoading
                       ? "CHECK"
@@ -3037,9 +2571,7 @@ export default function UnifiedDisasterDashboard() {
                           ? "RTSP"
                           : "WAIT";
 
-                const detailLabel = fieldPreviewMode
-                  ? "DEMO · 실제 영상 미연결"
-                  : playbackState === "LIVE"
+                const detailLabel = playbackState === "LIVE"
                     ? "실시간 영상 재생 중"
                     : playbackState === "RECONNECTING"
                       ? "영상 연결 복구 시도 중"
@@ -3054,17 +2586,12 @@ export default function UnifiedDisasterDashboard() {
                 return <article
                   key={label}
                   className={`field-video-channel field-video-channel-${index + 1}`}
-                  data-preview={fieldPreviewMode ? "true" : undefined}
+                  data-preview={undefined}
                   data-stream-ready={reachable ? "true" : undefined}
                   data-playback-state={playbackState}
                 >
                   <div className="field-video-preview">
-                    {fieldPreviewMode ? (
-                      <>
-                        <span className="field-video-badge">{`CH${index + 1}`}</span>
-                        <span className="field-video-live">{stateLabel}</span>
-                      </>
-                    ) : (
+                    {(
                       <>
                         <VideoPlayback
                           streamUri={streamUri}
@@ -3102,14 +2629,9 @@ export default function UnifiedDisasterDashboard() {
           {displayConfig.showEventTimeline && <div className="field-timeline-deck">
             <header><strong>주요 이벤트 타임라인</strong><span><i data-tone="comm" />통신</span><span><i data-tone="asset" />장비</span><span><i data-tone="alert" />경보</span></header>
             <ol>
-              {fieldPreviewMode && <>
-                <li><time>14:25</time><i data-tone="alert" /><strong>중계기 1호</strong><span>신호 세기 저하 감지</span></li>
-                <li><time>14:22</time><i data-tone="comm" /><strong>MD1000</strong><span>영상 전송 지연 감시</span></li>
-                <li><time>14:18</time><i data-tone="alert" /><strong>현장대원 1</strong><span>위치 신호 갱신 지연</span></li>
-                <li><time>14:15</time><i data-tone="asset" /><strong>지휘차량</strong><span>통신 정상 복구</span></li>
-              </>}
-              {!fieldPreviewMode && liveLocations.slice(0, 4).map((location) => <li key={locationKey(location)}><time>{new Date(location.observedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}</time><i data-tone="asset" /><strong>{location.label}</strong><span>{location.status} · 최근 수신 {relativeTime(location.observedAt)}</span></li>)}
-              {!fieldPreviewMode && liveLocations.length === 0 && <li className="empty"><span>실기체 이벤트 수신 대기</span></li>}
+
+              {liveLocations.slice(0, 4).map((location) => <li key={locationKey(location)}><time>{new Date(location.observedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}</time><i data-tone="asset" /><strong>{location.label}</strong><span>{location.status} · 최근 수신 {relativeTime(location.observedAt)}</span></li>)}
+              {liveLocations.length === 0 && <li className="empty"><span>실기체 이벤트 수신 대기</span></li>}
             </ol>
           </div>}
         </section>}

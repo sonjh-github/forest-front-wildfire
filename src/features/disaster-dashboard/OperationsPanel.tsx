@@ -5,7 +5,6 @@ import type { ApiRecord, EventOverview } from "../../http-api";
 import type { LiveLocation, ResourceGroup } from "./UnifiedDisasterDashboard";
 import { buildOperationalEvidence, buildPacketLossQualityAlerts, classifyLinkHealth, type TelemetrySample } from "./operationalEvidence";
 import type { TelemetryStreamStatus } from "./telemetryStream";
-import { createAlertAudit, transitionAlert, type AlertWorkflowAction, type AlertWorkflowStatus } from "./alertWorkflow";
 import PerformanceKpiPanel from "./PerformanceKpiPanel";
 import WeatherEnvironmentPanel from "./WeatherEnvironmentPanel";
 import NetworkSequenceQualityPanel from "./NetworkSequenceQualityPanel";
@@ -313,8 +312,6 @@ export function OperationsPanel({
     fieldLinkTraceStorageKey,
   ]);
 
-  const [alertOverrides, setAlertOverrides] = useState<Record<string, AlertWorkflowStatus>>({});
-  const [alertAudit, setAlertAudit] = useState<Array<ReturnType<typeof createAlertAudit>>>([]);
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -618,20 +615,14 @@ export function OperationsPanel({
       ...overview.alerts,
     ];
 
-    return rows.map((alert) => ({ ...alert, status: alertOverrides[value(alert, ["alertId", "id"], "")] ?? alert.status }))
+    return rows
       .filter((alert) => !["RESOLVED", "EXPIRED", "CANCELLED"].includes(value(alert, ["status"])))
       .sort((a, b) =>
         (rank[value(a, ["severity", "severityCode"])] ?? 5) - (rank[value(b, ["severity", "severityCode"])] ?? 5)
         || Date.parse(value(b, ["issuedAt", "createdAt"], "0")) - Date.parse(value(a, ["issuedAt", "createdAt"], "0")),
       );
-  }, [overview.alerts, alertOverrides, sequenceQualityAlerts]);
-  const demoAlertWorkflow = overview.domainDetail?.mode === "SIMULATION";
-  const handleAlertAction = (alertId: string, currentStatus: string, action: AlertWorkflowAction) => {
-    const normalized: AlertWorkflowStatus = ["ACKNOWLEDGED", "RESOLVED"].includes(currentStatus) ? currentStatus as AlertWorkflowStatus : "ACTIVE";
-    const next = transitionAlert(normalized, action);
-    setAlertOverrides((current) => ({ ...current, [alertId]: next }));
-    setAlertAudit((current) => [createAlertAudit(alertId, action, "DEMO 관제자"), ...current].slice(0, 20));
-  };
+  }, [overview.alerts, sequenceQualityAlerts]);
+
   const linkHealthSummary = useMemo(() => {
     const now = new Date();
     const rows = locations.map((location) => ({
@@ -1345,14 +1336,10 @@ export function OperationsPanel({
                     ? "FieldLink 전달 중"
                     : "FieldLink 전달"}
                 </button>
-                {demoAlertWorkflow && <div className="demo-alert-actions">
-                  <button type="button" disabled={value(alert, ["status"]) === "ACKNOWLEDGED"} onClick={() => handleAlertAction(alertKey, value(alert, ["status"], "ACTIVE"), "ACKNOWLEDGE")}>경보 확인</button>
-                  <button type="button" onClick={() => handleAlertAction(alertKey, value(alert, ["status"], "ACTIVE"), "RESOLVE")}>조치 후 해제</button>
-                </div>}
+
               </article>;
             })}
-            {demoAlertWorkflow && alertAudit.length > 0 && <section className="demo-alert-audit" aria-label="경보 조치 이력"><strong>DEMO 조치 이력</strong>{alertAudit.slice(0, 5).map((audit) => <small key={audit.auditId}>{audit.alertId} · {audit.action === "ACKNOWLEDGE" ? "확인" : "해제"} · {new Date(audit.occurredAt).toLocaleTimeString("ko-KR")}</small>)}</section>}
-            <p className="operation-readonly-note">DEMO 조치는 브라우저 세션에서만 유지됩니다. 운영 저장은 명령센터 권한 및 감사 이력 API 연계 후 사용합니다.</p>
+
           </section>}
           {activeTab === "networks" && <section className="operations-records" aria-label="통신망 상태">
             <SlenoNetworkQualityPanel />
