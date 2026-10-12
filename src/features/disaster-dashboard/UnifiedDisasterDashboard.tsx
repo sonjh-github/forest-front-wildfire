@@ -857,6 +857,10 @@ export default function UnifiedDisasterDashboard() {
       disasterType,
       eventName: disaster.disasterName,
       status: disaster.status,
+      geometry: disaster.geometry,
+      severityCode: disaster.severityCode,
+      occurredAt: disaster.occurredAt,
+      locationName: disaster.locationName,
     };
 
     setEvents([currentEvent]);

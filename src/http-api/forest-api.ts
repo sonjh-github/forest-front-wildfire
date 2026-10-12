@@ -50,6 +50,11 @@ export interface DashboardDisasterAssetsResponse {
       disasterName?: string;
       disasterType?: string;
       status?: string;
+      geometry?: ForestEvent["geometry"];
+      severityCode?: string;
+      occurredAt?: string;
+      sourceSystem?: string;
+      locationName?: string;
     };
     assets: DashboardDisasterAsset[];
     assetCount: number;
@@ -544,6 +549,10 @@ export async function loadEventOverview(
         disasterType,
         eventName: disaster.disasterName ?? event.eventName,
         status: disaster.status ?? event.status,
+        geometry: disaster.geometry ?? event.geometry,
+        severityCode: disaster.severityCode ?? event.severityCode,
+        occurredAt: disaster.occurredAt ?? event.occurredAt,
+        locationName: disaster.locationName ?? event.locationName,
       },
       assets: twins.assets,
       liveDroneTelemetry: {status:telemetry.status,matched:twins.matched,unmatched:twins.unmatched,live:twins.states.LIVE,stale:twins.states.STALE,offline:twins.states.OFFLINE},
