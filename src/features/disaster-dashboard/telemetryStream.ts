@@ -1,5 +1,4 @@
 import type { ApiRecord, EventOverview } from "../../http-api";
-import { isDemonstrationTelemetry, isVerifiedOperatingDronePosition } from "../../http-api/live-drone-twin";
 import { evaluateRiskZone } from "./operationalEvidence";
 
 export type TelemetryStreamStatus = "DISABLED" | "CONNECTING" | "CONNECTED" | "RECONNECTING" | "ERROR";
@@ -45,13 +44,12 @@ export function parseTelemetryMessage(raw: unknown): LiveTelemetryMessage | null
   if (!value || typeof value !== "object") return null;
   const envelope = value as Record<string, unknown>;
   const row = (envelope.data && typeof envelope.data === "object" ? envelope.data : envelope) as Record<string, unknown>;
-  if (isDemonstrationTelemetry(row)) return null;
   const coordinates = (row.geometry as { coordinates?: unknown[] } | undefined)?.coordinates;
   const longitude = finite(row.longitude ?? row.lng ?? coordinates?.[0]);
   const latitude = finite(row.latitude ?? row.lat ?? coordinates?.[1]);
   const assetId = String(row.assetId ?? row.sourceAssetId ?? "").trim();
   const observedAt = String(row.observedAt ?? row.timestamp ?? "").trim();
-  if (!assetId || longitude == null || latitude == null || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90 || (longitude === 0 && latitude === 0) || !Number.isFinite(Date.parse(observedAt))) return null;
+  if (!assetId || longitude == null || latitude == null || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90 || !Number.isFinite(Date.parse(observedAt))) return null;
   return {
     assetId, entityType: String(row.entityType ?? row.kind ?? "").toUpperCase() === "PERSONNEL" ? "PERSONNEL" : "ASSET", eventId: row.eventId ? String(row.eventId) : undefined, observedAt,
     receivedAt: row.receivedAt ? String(row.receivedAt) : new Date().toISOString(),
@@ -124,15 +122,8 @@ export function mergeTelemetryIntoOverview(overview: EventOverview, message: Liv
   const collection = personnel ? overview.personnel : overview.assets;
   const identityKey = personnel ? "personExternalId" : "assetId";
   const existingIndex = collection.findIndex((row) => String(row[identityKey]) === message.assetId);
-  if (existingIndex < 0) return overview;
   const previous = existingIndex >= 0 ? collection[existingIndex] : {};
   if (previous.observedAt && Date.parse(String(previous.observedAt)) > Date.parse(message.observedAt)) return overview;
-  const combinedAttributes = { ...(previous.attributes as Record<string, unknown> | undefined), ...message.attributes };
-  if (!personnel && !isVerifiedOperatingDronePosition({
-    ...message,
-    assetType: message.assetType ?? previous.assetType,
-    attributes: combinedAttributes,
-  })) return overview;
   const entity: ApiRecord = {
     ...previous, ...message,
     [identityKey]: message.assetId,
@@ -145,10 +136,10 @@ export function mergeTelemetryIntoOverview(overview: EventOverview, message: Liv
     sourceSystem: "GATEWAY_STREAM",
     sourceAssetId: message.assetId,
     reportingRole: "GATEWAY",
-    attributes: combinedAttributes,
+    attributes: { ...(previous.attributes as Record<string, unknown> | undefined), ...message.attributes },
   };
   const next = [...collection];
-  next[existingIndex] = entity;
+  if (existingIndex >= 0) next[existingIndex] = entity; else next.push(entity);
   return personnel ? { ...overview, personnel: next } : { ...overview, assets: next };
 }
 
@@ -226,11 +217,9 @@ export class TelemetryStreamClient {
       }, 1_000);
     };
     this.socket.onmessage = (event) => {
+      this.lastMessageAt = Date.now();
       const message = this.mavlink.push(event.data) ?? parseTelemetryMessage(event.data);
       if (!message || (message.eventId && message.eventId !== this.options.eventId)) return;
-      // 파싱·사건 검증을 통과한 메시지만 실제 수신으로 계산한다.
-      // 미등록 객체는 merge 단계에서 다시 거부된다.
-      this.lastMessageAt = Date.now();
       const previous = this.lastSequence.get(message.assetId);
       if (message.sequence != null && previous != null && message.sequence <= previous) return;
       if (message.sequence != null) this.lastSequence.set(message.assetId, message.sequence);

@@ -3,17 +3,6 @@ import { createDemoOverview } from "./demoOverview";
 import { MavlinkTelemetryAccumulator, applyTelemetrySafetyRules, isTelemetryStreamStale, mergeTelemetryIntoOverview, parseTelemetryMessage } from "./telemetryStream";
 
 describe("Gateway telemetry stream", () => {
-  const verifiedDroneFields = {
-    assetType: "UAV",
-    receivedAt: "2026-09-04T00:00:03Z",
-    altitude: 330,
-    attributes: {
-      telemetryPositionSource: "GLOBAL_POSITION_INT(33)",
-      gpsFixType: 6,
-      pathEvidence: { coreReceivedAt: "2026-09-04T00:00:03Z" },
-    },
-  };
-
   it("Gateway 좌표 메시지를 표준 텔레메트리로 검증한다", () => {
     const message = parseTelemetryMessage(JSON.stringify({ data: { assetId: "DRONE-01", eventId: "demo-wildfire-deoksungsan", observedAt: "2026-09-04T01:00:00Z", lat: 36.672667, lng: 126.621667, sequence: 10, positioningMethod: "RTK_FIXED" } }));
     expect(message).toMatchObject({ assetId: "DRONE-01", latitude: 36.672667, longitude: 126.621667, sequence: 10 });
@@ -25,33 +14,10 @@ describe("Gateway telemetry stream", () => {
 
   it("최신 스트림 좌표를 assetId 기준으로 overview에 병합한다", () => {
     const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
-    const message = parseTelemetryMessage({ assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", latitude: 37.625, longitude: 128.375, sequence: 2, ...verifiedDroneFields })!;
+    const message = parseTelemetryMessage({ assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", latitude: 37.625, longitude: 128.375, altitude: 330, sequence: 2 })!;
     const merged = mergeTelemetryIntoOverview(overview, message);
     expect((merged.assets.find((asset) => asset.assetId === "DRONE-01")?.geometry as { coordinates: number[] }).coordinates).toEqual([128.375, 37.625, 330]);
     expect(merged.assets.find((asset) => asset.assetId === "DRONE-01")?.sourceSystem).toBe("GATEWAY_STREAM");
-  });
-
-  it("DEMO 또는 미등록 드론 스트림을 운영 overview에 유입하지 않는다", () => {
-    expect(parseTelemetryMessage({
-      assetId: "SIM-UAV-01",
-      eventId: "event-1",
-      observedAt: "2026-09-04T00:00:03Z",
-      latitude: 37.625,
-      longitude: 128.375,
-      altitude: 330,
-      synthetic: true,
-    })).toBeNull();
-
-    const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
-    const unknown = parseTelemetryMessage({
-      assetId: "UNKNOWN-UAV",
-      eventId: overview.event.eventId,
-      observedAt: "2026-09-04T00:00:03Z",
-      latitude: 37.625,
-      longitude: 128.375,
-      ...verifiedDroneFields,
-    })!;
-    expect(mergeTelemetryIntoOverview(overview, unknown)).toBe(overview);
   });
 
   it("대원 RTK 스트림을 personExternalId 기준으로 갱신한다", () => {
@@ -74,7 +40,7 @@ describe("Gateway telemetry stream", () => {
 
   it("실시간 위치가 위험면에 진입하면 관제 경보를 자동 발령한다", () => {
     const overview = createDemoOverview(new Date("2026-09-04T00:00:00Z"), "WILDFIRE");
-    const updated = applyTelemetrySafetyRules(overview, { assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", latitude: 36.667667, longitude: 126.621667, ...verifiedDroneFields });
+    const updated = applyTelemetrySafetyRules(overview, { assetId: "DRONE-01", eventId: overview.event.eventId, observedAt: "2026-09-04T00:00:03Z", receivedAt: "2026-09-04T00:00:03Z", latitude: 36.667667, longitude: 126.621667 });
     expect(updated.alerts.find((alert) => alert.alertId === "ALT-GEOFENCE-DRONE-01")).toMatchObject({ status: "ACTIVE", severity: "CRITICAL", issuerOrgCode: "공간판정 엔진" });
   });
 

@@ -53,80 +53,6 @@ function finite(value: unknown): number | undefined {
     : undefined;
 }
 
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function isUavAsset(asset: ApiRecord): boolean {
-  return [
-    "UAV",
-    "MAIN_RELAY_DRONE",
-    "SERVICE_RELAY_DRONE",
-  ].includes(text(asset.assetType).toUpperCase());
-}
-
-export function isDemonstrationTelemetry(row: ApiRecord): boolean {
-  const attributes = record(row.attributes);
-  const specifications = record(row.specifications);
-  const identifiers = [
-    row.assetId,
-    row.sourceAssetId,
-    row.assetCode,
-  ].map(text);
-  const provenance = [
-    row.sourceSystem,
-    row.evidenceScope,
-    row.dataProvenance,
-    attributes.sourceSystem,
-    attributes.evidenceScope,
-    attributes.dataProvenance,
-    specifications.sourceSystem,
-    specifications.evidenceScope,
-    specifications.dataProvenance,
-    record(attributes.pathEvidence).uplinkSource,
-    record(attributes.pathEvidence).transport,
-  ]
-    .map(text)
-    .join(" ")
-    .toUpperCase();
-
-  return row.synthetic === true ||
-    attributes.synthetic === true ||
-    specifications.synthetic === true ||
-    row.previewOnly === true ||
-    identifiers.some((value) => /^(SIM-|DEMO-)/i.test(value)) ||
-    /(^|[_\s-])(DEMO|MOCK|SIMULATION|SYNTHETIC)([_\s-]|$)/.test(provenance);
-}
-
-export function isVerifiedOperatingDronePosition(row: ApiRecord): boolean {
-  const attributes = record(row.attributes);
-  const pathEvidence = record(attributes.pathEvidence);
-  const positionSource = text(attributes.telemetryPositionSource).toUpperCase();
-  const receivedAt = text(row.receivedAt);
-  const coreReceivedAt = text(pathEvidence.coreReceivedAt);
-  const gpsFixType = finite(attributes.gpsFixType);
-  const positioningMethod = text(row.positioningMethod).toUpperCase();
-
-  return text(row.assetType).toUpperCase() === "UAV" &&
-    !isDemonstrationTelemetry(row) &&
-    typeof row.latitude === "number" &&
-    Number.isFinite(row.latitude) &&
-    Math.abs(row.latitude) <= 90 &&
-    typeof row.longitude === "number" &&
-    Number.isFinite(row.longitude) &&
-    Math.abs(row.longitude) <= 180 &&
-    !(row.latitude === 0 && row.longitude === 0) &&
-    typeof row.altitude === "number" &&
-    Number.isFinite(row.altitude) &&
-    typeof row.observedAt === "string" &&
-    Number.isFinite(Date.parse(row.observedAt)) &&
-    positionSource === "GLOBAL_POSITION_INT(33)" &&
-    Number.isFinite(Date.parse(receivedAt)) &&
-    Number.isFinite(Date.parse(coreReceivedAt)) &&
-    (gpsFixType == null || gpsFixType >= 2) &&
-    !["NO_FIX", "FIX_NOT_AVAILABLE"].includes(positioningMethod);
-}
-
 function normalizedPositioningMethod(
   telemetry: ApiRecord,
 ): string | undefined {
@@ -169,7 +95,16 @@ function validTelemetry(
 ): boolean {
   return (
     row.eventId === eventId &&
-    isVerifiedOperatingDronePosition(row)
+    typeof row.latitude === "number" &&
+    Number.isFinite(row.latitude) &&
+    Math.abs(row.latitude) <= 90 &&
+    typeof row.longitude === "number" &&
+    Number.isFinite(row.longitude) &&
+    Math.abs(row.longitude) <= 180 &&
+    typeof row.altitude === "number" &&
+    Number.isFinite(row.altitude) &&
+    typeof row.observedAt === "string" &&
+    Number.isFinite(Date.parse(row.observedAt))
   );
 }
 
@@ -195,9 +130,6 @@ export function mergeDroneTwins(
   };
 
   const rows = assets.map((asset) => {
-    if (!isUavAsset(asset)) {
-      return asset;
-    }
     const source =
       record(asset.specifications)
         .telemetrySourceAssetId;
@@ -288,12 +220,6 @@ export function mergeDroneTwins(
         normalizedHorizontalAccuracyM(value),
 
       qualityStatus: state,
-      positionFetchStatus:
-        state === "LIVE"
-          ? "Core API 조회 성공 · 최근 관측"
-          : state === "STALE"
-            ? "STALE · 마지막 관측 위치"
-            : "OFFLINE · 오래된 마지막 관측 위치",
       sourceSystem: "GCS_UPLINK",
       sourceAssetId: id,
 
@@ -319,17 +245,18 @@ export function mergeDroneTwins(
     assets: rows,
     matched: matched.size,
     unmatched: valid.length - matched.size,
-    positionUnknown: Math.max(
-      0,
-      assets.filter(isUavAsset).length - matched.size,
-    ),
     states: stateCounts,
   };
 }
 
+// API 장애 시 마지막 실제 위치를 잠깐 유지한다.
+// DEMO 데이터는 이 캐시에 들어가지 않는다.
 export class LiveDroneTelemetryReader {
+  private cache =
+    new Map<string, ApiRecord[]>();
+
   async read(
-    _eventId: string,
+    eventId: string,
     demo: boolean,
     fetchRows: () => Promise<ApiRecord[]>,
   ) {
@@ -349,16 +276,20 @@ export class LiveDroneTelemetryReader {
         );
       }
 
+      if (this.cache.size > 4) {
+        this.cache.clear();
+      }
+
+      this.cache.set(eventId, rows);
+
       return {
         rows,
         status: "CONNECTED",
       };
     } catch {
       return {
-        // API 실패 시 이전 좌표를 새 응답처럼 재사용하지 않는다.
-        // 화면에 이미 남아 있는 위치는 상위 UI에서 명시적으로
-        // STALE/OFFLINE 마지막 확인 위치로 강등한다.
-        rows: [] as ApiRecord[],
+        rows:
+          this.cache.get(eventId) ?? [],
         status: "UNAVAILABLE",
       };
     }

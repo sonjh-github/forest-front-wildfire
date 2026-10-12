@@ -896,17 +896,10 @@
 }
 
 /* E2E/DEMO 뱃지가 액션 버튼 밑으로 들어가던 원인 제거 */
-.unified-disaster-board.is-field-mode:not(.is-demo-mode)
+.unified-disaster-board.is-field-mode
   .map-command-header
   > .demo-mode-badge:not(.field-mode-badge) {
   display: none !important;
-}
-
-/* 명시적 DEMO 경로에서는 출처 배지를 항상 노출한다. */
-.unified-disaster-board.is-field-mode.is-demo-mode
-  .map-command-header
-  > .demo-mode-badge:not(.field-mode-badge) {
-  display: inline-flex !important;
 }
 
 /* 가운데 주요 액션 */

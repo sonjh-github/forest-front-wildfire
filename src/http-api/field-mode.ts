@@ -273,7 +273,7 @@ export function fieldCoreStatusLabel(status: unknown, matched: number): string {
       : "Core API 정상 · 실기체 위치 대기";
   }
   if (status === "UNAVAILABLE") {
-    return "Core API 미연결 · 실기체 위치 확인 불가";
+    return "Core API 재연결 중 · 마지막 유효 위치 유지";
   }
   return "Core API 상태 확인 중";
 }

@@ -33,5 +33,5 @@ export function rtkPositionFetchStatus(
     return "STALE · 마지막 관측 위치";
   }
 
-  return "API 조회 성공 · 최근 관측";
+  return "조회 성공 · 최근 관측";
 }

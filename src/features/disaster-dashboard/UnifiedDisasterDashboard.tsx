@@ -1,9 +1,9 @@
 import { rtkPositionFetchStatus } from "./rtkPositionFreshness";
-import { finiteTelemetryNumber, parsePointGeometry } from "./locationGeometry";
 import { DroneTwinDetail } from "./DroneTwinDetail";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { externalDisasterApi, loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
 import { forestApi } from "../../http-api/forest-api";
+import { HttpApiError } from "../../http-api/client";
 import SlenoNetworkQualityPanel from "./SlenoNetworkQualityPanel";
 import { isLocalE2EMode, LOCAL_E2E_EVENT } from "../../http-api/local-e2e";
 import { fieldCoreStatusLabel, fieldEvent, isFieldPreviewMode, isLocalFieldMode } from "../../http-api/field-mode";
@@ -34,15 +34,6 @@ import {
   getDisplayProfileConfig,
   parseDisplayProfile,
 } from "./displayProfile";
-import { isExplicitDashboardDemo } from "./dashboardMode";
-import { markOperatingOverviewUnavailable } from "./operatingOverviewState";
-import {
-  classifyOperatingBootstrapFailure,
-  createOperatingNoDataEvent,
-  createOperatingNoDataOverview,
-  type OperatingBootstrapState,
-} from "./operatingBootstrap";
-import { topologyDataStatus, topologyLabelsFor } from "./topologyDisplay";
 import "./unified-disaster-dashboard.css";
 import "./field-header-hotfix.css";
 import "./field-interaction-hotfix.css";
@@ -52,7 +43,7 @@ const DEFAULT_CHANGE_HIGHLIGHT_MS = POLL_INTERVAL_MS * 0.3;
 const DEFAULT_EVENT_ID =
   import.meta.env.VITE_DEFAULT_EVENT_ID?.trim() ||
   "10000000-0000-4000-8000-000000000001";
-const FORCE_DEMO_MODE = isExplicitDashboardDemo(window.location.search);
+const FORCE_DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
 const FORCE_LOCAL_E2E_MODE = isLocalE2EMode();
 const FORCE_LOCAL_FIELD_MODE = isLocalFieldMode() || new URLSearchParams(window.location.search).get("field") === "1";
 const FORCE_FIELD_PREVIEW_MODE = FORCE_LOCAL_FIELD_MODE && (isFieldPreviewMode() || new URLSearchParams(window.location.search).get("preview") === "1");
@@ -209,9 +200,12 @@ export type LiveLocation = {
 };
 
 function locationFrom(item: Record<string, unknown>, kind: LiveLocation["kind"]): LiveLocation | null {
-  const position = parsePointGeometry(item.geometry);
-  if (!position) return null;
-  const { longitude, latitude, altitude: altitudeValue } = position;
+  const geometry = item.geometry as { coordinates?: unknown[] } | undefined;
+  const coordinates = geometry?.coordinates;
+  const longitude = Number(coordinates?.[0]);
+  const latitude = Number(coordinates?.[1]);
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
+  const altitudeValue = Number(coordinates?.[2]);
   const attributes = item.attributes && typeof item.attributes === "object"
     ? item.attributes as Record<string, unknown>
     : {};
@@ -283,7 +277,7 @@ function locationFrom(item: Record<string, unknown>, kind: LiveLocation["kind"])
     status: korean(kind === "personnel" ? item.activityStatus ?? item.safetyStatus : item.operationalStatus),
     longitude,
     latitude,
-    altitude: altitudeValue,
+    altitude: Number.isFinite(altitudeValue) ? altitudeValue : null,
     observedAt: String(item.observedAt ?? ""),
     category: String(kind === "personnel" ? "PERSONNEL" : item.assetType ?? "ASSET"),
     batteryPct: (item.batteryPct != null && Number.isFinite(Number(item.batteryPct))) ? Number(item.batteryPct) : null,
@@ -351,10 +345,13 @@ function locationFingerprint(item: LiveLocation) {
 
 function telemetrySampleFromLiveAsset(asset: ApiRecord): TelemetrySample | null {
   if (asset.sourceSystem !== "GCS_UPLINK") return null;
-  const position = parsePointGeometry(asset.geometry);
+  const geometry = asset.geometry as { coordinates?: unknown[] } | undefined;
+  const coordinates = geometry?.coordinates;
+  const longitude = Number(coordinates?.[0]);
+  const latitude = Number(coordinates?.[1]);
   const observedAt = typeof asset.observedAt === "string" ? asset.observedAt : "";
   const receivedAt = typeof asset.receivedAt === "string" ? asset.receivedAt : "";
-  if (!position || !observedAt || !receivedAt) return null;
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || !observedAt || !receivedAt) return null;
   return {
     assetId: String(asset.assetId ?? ""),
     entityType: "ASSET",
@@ -362,8 +359,8 @@ function telemetrySampleFromLiveAsset(asset: ApiRecord): TelemetrySample | null 
     observedAt,
     receivedAt,
     sequence: asset.sequence != null && Number.isFinite(Number(asset.sequence)) ? Number(asset.sequence) : undefined,
-    latitude: position.latitude,
-    longitude: position.longitude,
+    latitude,
+    longitude,
   };
 }
 
@@ -657,15 +654,15 @@ function demoRtkAssetsFromTelemetry(
       "",
     ).trim();
 
-    const latitude = finiteTelemetryNumber(row.latitude);
-    const longitude = finiteTelemetryNumber(row.longitude);
-    const altitude = finiteTelemetryNumber(row.altitude);
+    const latitude = Number(row.latitude);
+    const longitude = Number(row.longitude);
+    const altitude = Number(row.altitude);
     const observedAt = String(row.observedAt ?? "");
 
     if (
       !assetId ||
-      latitude === null ||
-      longitude === null ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
       latitude < -90 ||
       latitude > 90 ||
       longitude < -180 ||
@@ -717,16 +714,19 @@ function demoRtkAssetsFromTelemetry(
       observedAt,
 
       receivedAt:
-        typeof row.receivedAt === "string"
-          ? row.receivedAt
-          : "",
+        String(
+          row.receivedAt ??
+          observedAt
+        ),
 
       geometry: {
         type: "Point",
         coordinates: [
           longitude,
           latitude,
-          ...(altitude === null ? [] : [altitude]),
+          Number.isFinite(altitude)
+            ? altitude
+            : 0,
         ],
       },
 
@@ -742,7 +742,7 @@ function demoRtkAssetsFromTelemetry(
         String(
           row.positioningMethod ??
           attributes.fixType ??
-          "UNKNOWN"
+          "GNSS"
         ),
 
       qualityStatus:
@@ -774,13 +774,30 @@ function demoRtkAssetsFromTelemetry(
         ),
 
       eventRegistrationStatus:
-        "UNASSIGNED",
+        "REGISTERED",
 
       attributes,
     });
   }
 
   return [...latest.values()];
+}
+
+const fallbackTopologyLabels: Record<string, string[]> = {
+  ENDPOINT: ["대원 RTK 단말", "드론·영상장비", "400㎒ 무전기"],
+  FIELD: ["LPWA · 저속", "이음5G · 고속", "무전 중계망"],
+  COMMAND: ["게이트웨이·L3 스위치", "RTK 기준국", "현장 상황판"],
+  BACKHAUL: ["LTE", "TVWS", "LEO 위성"],
+  CLOUD: ["수집 API", "PostgreSQL", "통합 상황판"],
+};
+
+function topologyLabelsFor(overview: EventOverview | null, layer: string) {
+  const labels = overview?.topology.nodes
+    .filter((node) => String(node.topologyLayer) === layer && String(node.status) !== "UNAVAILABLE")
+    .sort((left, right) => Number(left.sortOrder ?? 0) - Number(right.sortOrder ?? 0))
+    .map((node) => String(node.nodeName ?? node.nodeCode ?? ""))
+    .filter(Boolean) ?? [];
+  return labels.length ? labels : fallbackTopologyLabels[layer] ?? [];
 }
 
 function buildTimelineSnapshots(timeline: EventTimeline | null, currentAssets: ApiRecord[]): MapTimelineSnapshot[] {
@@ -883,11 +900,12 @@ export default function UnifiedDisasterDashboard() {
   const [overview, setOverview] = useState<EventOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eventsLoaded, setEventsLoaded] = useState(false);
-  const [operatingBootstrapState, setOperatingBootstrapState] =
-    useState<OperatingBootstrapState>(FORCE_DEMO_MODE ? "READY" : "CHECKING");
   const [disasterNotFound, setDisasterNotFound] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const demoMode = FORCE_DEMO_MODE;
+  const demoMode =
+    FORCE_DEMO_MODE ||
+    (window.location.pathname === "/" &&
+      new URLSearchParams(window.location.search).get("live") !== "1");
   const localE2EMode = FORCE_LOCAL_E2E_MODE;
   const localFieldMode = FORCE_LOCAL_FIELD_MODE;
   const fieldPreviewMode = FORCE_FIELD_PREVIEW_MODE;
@@ -962,7 +980,6 @@ export default function UnifiedDisasterDashboard() {
       setEvents([event]);
       setSelectedId(event.eventId);
       setError(null);
-      setOperatingBootstrapState("READY");
       return;
     }
     if (localE2EMode) {
@@ -970,29 +987,30 @@ export default function UnifiedDisasterDashboard() {
       setEvents([LOCAL_E2E_EVENT]);
       setSelectedId(LOCAL_E2E_EVENT.eventId);
       setError(null);
-      setOperatingBootstrapState("READY");
       return;
     }
     let result;
     try {
       result = await loadDashboardDisasterAssetsCached(DEFAULT_EVENT_ID);
     } catch (caught) {
-      const failure = classifyOperatingBootstrapFailure(caught);
-      const unavailableEvent = createOperatingNoDataEvent(DEFAULT_EVENT_ID, failure.state);
-      setDisasterNotFound(failure.state === "DISASTER_NOT_FOUND");
-      setOperatingBootstrapState(failure.state);
-      setEvents([unavailableEvent]);
-      setSelectedId(DEFAULT_EVENT_ID);
-      setOverview((current) =>
-        failure.state === "API_UNAVAILABLE" && current && !current.operatingDataStatus
-          ? markOperatingOverviewUnavailable(current, failure.message)
-          : createOperatingNoDataOverview(unavailableEvent, failure),
-      );
-      setError(failure.state === "API_UNAVAILABLE" ? failure.message : null);
+      const missingDisaster =
+        caught instanceof HttpApiError &&
+        caught.status === 404 &&
+        typeof caught.payload === "object" &&
+        caught.payload !== null &&
+        "error" in caught.payload &&
+        (caught.payload as { error?: { code?: string } }).error?.code ===
+          "DISASTER_NOT_FOUND";
+      if (!missingDisaster) throw caught;
+      // 등록되지 않은 재난은 API 장애나 재난이 없다는 확정 증거가 아니다.
+      setDisasterNotFound(true);
+      setEvents([]);
+      setSelectedId("");
+      setOverview(null);
+      setError(null);
       return;
     }
     setDisasterNotFound(false);
-    setOperatingBootstrapState("READY");
     const disaster = result.data.disaster;
     const rawDisasterType = String(disaster.disasterType ?? "WILDFIRE").toUpperCase();
     const disasterType: ForestEvent["disasterType"] =
@@ -1010,7 +1028,6 @@ export default function UnifiedDisasterDashboard() {
 
     setEvents([currentEvent]);
     setSelectedId((current) => current || currentEvent.eventId);
-    setOverview((current) => current?.operatingDataStatus ? null : current);
     setError(null);
   }, [localE2EMode, localFieldMode]);
 
@@ -1348,7 +1365,6 @@ export default function UnifiedDisasterDashboard() {
       setOverview(demo);
       setLastUpdatedAt(new Date());
       setEventsLoaded(true);
-      setOperatingBootstrapState("READY");
       return () => { active = false; };
     }
     refreshEvents()
@@ -1369,7 +1385,7 @@ export default function UnifiedDisasterDashboard() {
   }, [demoMode, localE2EMode, localFieldMode, refreshEvents]);
 
   useEffect(() => {
-    if (!selectedId || (!demoMode && !localE2EMode && !localFieldMode && operatingBootstrapState !== "READY")) return;
+    if (!selectedId) return;
     let active = true;
     // 20261010 DEMO 갱신과 RTK Core 조회를 분리한다.
     // API 장애는 단말 자체의 OFFLINE 판정과 구분한다.
@@ -1472,14 +1488,24 @@ export default function UnifiedDisasterDashboard() {
         if (!active) return;
         const message = caught instanceof Error ? caught.message : "현황 조회 실패";
         setError(message);
-        setOverview((current) => current
-          ? markOperatingOverviewUnavailable(current, message)
-          : current);
+        setOverview((current) =>
+          current
+            ? {
+                ...current,
+                kpis: [],
+                kpiApiStatus: {
+                  state: "ERROR",
+                  checkedAt: new Date().toISOString(),
+                  message,
+                },
+              }
+            : current,
+        );
       });
     void refresh();
     const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
     return () => { active = false; window.clearInterval(timer); };
-  }, [demoMode, localE2EMode, localFieldMode, operatingBootstrapState, refreshOverview, selectedId]);
+  }, [demoMode, refreshOverview, selectedId]);
 
   useEffect(() => {
     const url = import.meta.env.VITE_TELEMETRY_WS_URL?.trim();
@@ -1762,13 +1788,15 @@ export default function UnifiedDisasterDashboard() {
       || (resourceDialogGroup === "ALL_ASSETS" ? location.kind === "asset" : resourceGroupOf(location) === resourceDialogGroup))
     : [];
   const topologyLabels = {
-    endpoints: topologyLabelsFor(overview?.topology, "ENDPOINT", demoMode),
-    field: topologyLabelsFor(overview?.topology, "FIELD", demoMode),
-    command: topologyLabelsFor(overview?.topology, "COMMAND", demoMode),
-    backhaul: topologyLabelsFor(overview?.topology, "BACKHAUL", demoMode),
-    cloud: topologyLabelsFor(overview?.topology, "CLOUD", demoMode),
+    endpoints: topologyLabelsFor(overview, "ENDPOINT"),
+    field: topologyLabelsFor(overview, "FIELD"),
+    command: topologyLabelsFor(overview, "COMMAND"),
+    backhaul: topologyLabelsFor(overview, "BACKHAUL"),
+    cloud: topologyLabelsFor(overview, "CLOUD"),
   };
-  const topologyStatus = topologyDataStatus(overview?.topology, demoMode);
+  const topologyDataStatus = overview?.topology.nodes.length
+    ? `${overview.topology.nodes.length}개 노드 · ${overview.topology.links.length}개 연결`
+    : "운용 기준 구성";
   const externalIntegrationItems = Object.values(externalIntegrationStatus);
   const failedExternalIntegrations = externalIntegrationItems.filter(
     (item) => item.status === "error",
@@ -2119,19 +2147,10 @@ export default function UnifiedDisasterDashboard() {
       setRetrying(false);
     }
   }, [demoMode, refreshEvents]);
-  const operatingDataStatus = overview?.operatingDataStatus;
 
   return (
-<main className={`unified-disaster-board ${displayClassName}${commandShellMode ? " is-field-mode" : ""}${demoMode ? " is-demo-mode" : ""}${SHOW_VALIDATION_UI ? "" : " final-ops-ui"}`} aria-label="산림재난 통합상황판">
-      {(error || operatingDataStatus) && <p className="unified-disaster-error" role="status" data-state={operatingDataStatus?.state}>
-        <strong>{operatingDataStatus?.state === "DISASTER_NOT_FOUND" ? "등록 사건 없음" : "데이터 갱신 중단"}</strong>
-        <span>{operatingDataStatus?.message ?? error}</span>
-        <small>{operatingDataStatus
-          ? "현재 표시 가능한 사건·자산 데이터가 없습니다. 임의 데이터로 대체하지 않습니다."
-          : overview
-            ? "화면의 기존 값은 마지막 확인 데이터이며 현재 상태가 아닙니다."
-            : "연결을 다시 확인하고 있습니다."}</small>
-      </p>}
+<main className={`unified-disaster-board ${displayClassName}${commandShellMode ? " is-field-mode" : ""}${SHOW_VALIDATION_UI ? "" : " final-ops-ui"}`} aria-label="?? ?? ?? ??">
+      {error && <p className="unified-disaster-error" role="status"><strong>데이터 갱신 지연</strong><span>{error}</span><small>{overview ? "마지막 정상 데이터를 유지합니다." : "연결을 다시 확인하고 있습니다."}</small></p>}
       {!overview && (
         <section className="dashboard-readiness" aria-live="polite">
           <header>
@@ -2368,13 +2387,8 @@ export default function UnifiedDisasterDashboard() {
             >
               {localFieldMode ? (fieldPreviewMode ? 'MD1000 화면 미리보기 · 데모 데이터 · 실비행 아님' : 'MD1000 실시간 기체 위치') : 'MAVLink 위치 연동'} · {localFieldMode
                 ? (fieldPreviewMode ? 'PREVIEW ONLY' : fieldCoreStatusLabel(overview.liveDroneTelemetry.status, overview.liveDroneTelemetry.matched))
-                : overview.liveDroneTelemetry.status === 'CONNECTED'
-                  ? 'Core 조회 정상'
-                  : overview.liveDroneTelemetry.status === 'UNAVAILABLE'
-                    ? `Core 미연결 · 마지막 확인 위치 ${overview.liveDroneTelemetry.lastKnown ?? 0}대`
-                    : 'Core 상태 확인 중'}
+                : overview.liveDroneTelemetry.status === 'CONNECTED' ? 'Core 조회 정상' : 'Core 조회 실패 · 마지막 수신값 유지'}
               {' · '}지도 연결 {overview.liveDroneTelemetry.matched}대 · LIVE {overview.liveDroneTelemetry.live} · STALE {overview.liveDroneTelemetry.stale} · OFFLINE {overview.liveDroneTelemetry.offline}
-              {' · '}위치 미확인 {overview.liveDroneTelemetry.positionUnknown ?? 0}대
               {' · '}ID 미연결 {overview.liveDroneTelemetry.unmatched}대
               {overview.liveDroneTelemetry.unmatched > 0 && ' · 자산 코드 또는 telemetrySourceAssetId 확인'}
             </div>}
@@ -2903,7 +2917,7 @@ export default function UnifiedDisasterDashboard() {
                 {(resourceDialogGroup === "COMMUNICATION" || resourceDialogGroup === "POSITIONING" || resourceDialogGroup === "ALL") && <section className="communication-topology" aria-label="통신망 전체 토폴로지">
                   <header>
                     <div><small>전체 통신 토폴로지</small><strong>현장 단말 → 현장망 → 지휘·통신차량 → 외부망 → 클라우드</strong></div>
-                    <span>{topologyStatus}</span>
+                    <span>{topologyDataStatus}</span>
                   </header>
                   <div className="communication-topology-scroll">
                     <div className="communication-topology-grid">

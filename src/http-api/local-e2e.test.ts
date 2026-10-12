@@ -52,7 +52,6 @@ it("local E2E overview uses fixture registration but real Core telemetry rows", 
   vi.spyOn(forestApi, "dashboardDroneTelemetry").mockResolvedValue({
     data: [{
       assetId: "MD1000-01",
-      assetType: "UAV",
       eventId: LOCAL_E2E_EVENT_ID,
       observedAt: now,
       receivedAt: now,
@@ -61,11 +60,6 @@ it("local E2E overview uses fixture registration but real Core telemetry rows", 
       altitude: 123,
       verticalSpeedMps: 1.5,
       mavlinkVersion: 2,
-      attributes: {
-        telemetryPositionSource: "GLOBAL_POSITION_INT(33)",
-        gpsFixType: 6,
-        pathEvidence: { coreReceivedAt: now },
-      },
     }],
   });
 
@@ -85,6 +79,5 @@ it("local E2E overview uses fixture registration but real Core telemetry rows", 
     live: 1,
     stale: 0,
     offline: 0,
-    positionUnknown: 0,
   });
 });

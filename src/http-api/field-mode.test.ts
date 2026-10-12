@@ -49,7 +49,6 @@ it("field overview uses local registry metadata but only real Core telemetry row
   vi.spyOn(forestApi, "dashboardDroneTelemetry").mockResolvedValue({
     data: [{
       assetId: "MD1000-01",
-      assetType: "UAV",
       eventId: fieldEventId(),
       observedAt: now,
       receivedAt: now,
@@ -57,9 +56,6 @@ it("field overview uses local registry metadata but only real Core telemetry row
       longitude: 127.38,
       altitude: 120,
       attributes: {
-        telemetryPositionSource: "GLOBAL_POSITION_INT(33)",
-        gpsFixType: 6,
-        pathEvidence: { coreReceivedAt: now },
         mavlinkVersion: 2,
         systemId: 1,
         componentId: 1,
@@ -84,7 +80,6 @@ it("field overview uses local registry metadata but only real Core telemetry row
     live: 1,
     stale: 0,
     offline: 0,
-    positionUnknown: 0,
   });
 });
 
@@ -126,6 +121,6 @@ it("field preview generator marks every primary object as preview-only", () => {
 it("field Core status distinguishes reachable-empty from API failure", () => {
   expect(fieldCoreStatusLabel("CONNECTED", 0)).toBe("Core API 정상 · 실기체 위치 대기");
   expect(fieldCoreStatusLabel("CONNECTED", 1)).toBe("Core API 정상");
-  expect(fieldCoreStatusLabel("UNAVAILABLE", 1)).toBe("Core API 미연결 · 실기체 위치 확인 불가");
+  expect(fieldCoreStatusLabel("UNAVAILABLE", 1)).toBe("Core API 재연결 중 · 마지막 유효 위치 유지");
   expect(fieldCoreStatusLabel("OTHER", 0)).toBe("Core API 상태 확인 중");
 });

@@ -11,7 +11,7 @@ describe("RTK 위치 조회 및 관측 최신성", () => {
 
   it("최근 관측이면 조회 성공으로 표시한다", () => {
     expect(rtkPositionFetchStatus(observation(1_000), false, true, now))
-      .toBe("API 조회 성공 · 최근 관측");
+      .toBe("조회 성공 · 최근 관측");
   });
 
   it("60초 경계부터 STALE로 표시한다", () => {
@@ -55,9 +55,9 @@ describe("RTK 위치 조회 및 관측 최신성", () => {
     ];
 
     expect(states).toEqual([
-      "API 조회 성공 · 최근 관측",
+      "조회 성공 · 최근 관측",
       "조회 실패 · 마지막 확인 위치",
-      "API 조회 성공 · 최근 관측",
+      "조회 성공 · 최근 관측",
     ]);
   });
 
