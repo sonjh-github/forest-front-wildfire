@@ -743,6 +743,7 @@ export default function UnifiedDisasterDashboard() {
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [overview, setOverview] = useState<EventOverview | null>(null);
+  const [standaloneRtkAssets, setStandaloneRtkAssets] = useState<ApiRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [disasterNotFound, setDisasterNotFound] = useState(false);
@@ -1278,7 +1279,51 @@ export default function UnifiedDisasterDashboard() {
     ],
   );
 
-  const liveLocations = useMemo(() => overview ? overviewLocations(overview) : [], [overview]);
+  // Separate RTK telemetry feed: Core serves JININFRA RTK_POSITION independently
+  // of disaster registration. This does NOT associate devices with an event.
+  useEffect(() => {
+    if (demoMode || localFieldMode || localE2EMode) return;
+    let active = true;
+    let inFlight = false;
+    const refreshStandaloneRtk = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const response = await forestApi.dashboardDroneTelemetry(DEFAULT_EVENT_ID);
+        if (!active) return;
+        const confirmedRows = response.data.filter((row) => {
+          if (row.assetType !== "RTK_TERMINAL") return false;
+          const attrs = row.attributes && typeof row.attributes === "object" && !Array.isArray(row.attributes)
+            ? row.attributes as ApiRecord : {};
+          return attrs.sourceSystem === "sleno-server" &&
+            attrs.telemetryPositionSource === "JININFRA_RTK_POSITION" &&
+            (attrs.persistenceStatus === "PERSISTED" || attrs.persistenceStatus === "LIVE_UNPERSISTED");
+        });
+        setStandaloneRtkAssets(demoRtkAssetsFromTelemetry(confirmedRows).map((asset) => ({
+          ...asset,
+          eventRegistrationStatus: "UNREGISTERED",
+          assetName: `${String(asset.assetName ?? asset.assetId)} · 사건 미배정`,
+        })));
+      } catch {
+        if (active) setStandaloneRtkAssets([]);
+      } finally {
+        inFlight = false;
+      }
+    };
+    void refreshStandaloneRtk();
+    const timer = window.setInterval(() => { void refreshStandaloneRtk(); }, 5_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [demoMode, localFieldMode, localE2EMode]);
+
+  const liveLocations = useMemo(() => {
+    if (!overview) return [];
+    const eventLocations = overviewLocations(overview);
+    const eventAssetIds = new Set(eventLocations.map((location) => location.id));
+    const rtkLocations = standaloneRtkAssets
+      .map((asset) => locationFrom(asset, "asset"))
+      .filter((location): location is LiveLocation => location !== null && !eventAssetIds.has(location.id));
+    return [...eventLocations, ...rtkLocations];
+  }, [overview, standaloneRtkAssets]);
 
   const timelineSnapshots = useMemo(
     () => buildTimelineSnapshots(timeline, [...(overview?.assets ?? []), ...(overview?.unregisteredAssets ?? [])]),
