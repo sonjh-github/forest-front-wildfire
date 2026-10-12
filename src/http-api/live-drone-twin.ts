@@ -220,7 +220,8 @@ export function mergeDroneTwins(
         normalizedHorizontalAccuracyM(value),
 
       qualityStatus: state,
-      sourceSystem: "GCS_UPLINK",
+      sourceSystem: valueAttributes.sourceSystem ?? "GCS_UPLINK",
+      positionFetchStatus: value.positionFetchStatus,
       sourceAssetId: id,
 
       attributes: {

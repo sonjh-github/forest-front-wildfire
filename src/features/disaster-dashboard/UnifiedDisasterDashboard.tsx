@@ -83,6 +83,7 @@ const koreanLabels: Record<string, string> = {
   BOOTING: "시작 중",
   FAILED: "고장",
   UNKNOWN: "확인 필요",
+  NO_FIX: "측위 미확정",
   RTK_FIXED: "RTK FIX · 보정 안정",
   RTK_FLOAT: "RTK FLOAT · 보정 중",
   GNSS: "일반 GNSS",
@@ -1349,9 +1350,7 @@ export default function UnifiedDisasterDashboard() {
         (eventCenter[1] - liveCenter[1]) * 111,
       )
     : 0;
-  const mapFocusCenter: [number, number] | null = !eventCenter
-    ? liveCenter
-    : eventToLiveDistance > 0.08 ? liveCenter : eventCenter;
+  const mapFocusCenter: [number, number] | null = eventCenter ?? liveCenter;
   const coordinateOutlierKeys = new Set(
     liveCenter
       ? mapLocations
@@ -1949,7 +1948,7 @@ export default function UnifiedDisasterDashboard() {
                 {eventToLiveDistance > 0.08 && (
                   <p className="map-coordinate-warning" role="status">
                     <strong>좌표 정합성 확인 필요</strong>
-                    사건 기준점과 현장 자산 중심이 약 {eventToLiveDistanceKm.toFixed(1)}km 떨어져 있어 자산 중심으로 표시합니다.
+                    재난 위치와 수신 장비 좌표의 중심이 약 {eventToLiveDistanceKm.toFixed(1)}km 떨어져 있습니다. 지도는 지정한 재난 위치를 중심으로 표시합니다.
                   </p>
                 )}
                 {liveLocations.length === 0 && <p>수신된 위치가 없습니다.</p>}
