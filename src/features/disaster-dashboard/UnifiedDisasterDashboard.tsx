@@ -1350,7 +1350,12 @@ export default function UnifiedDisasterDashboard() {
         (eventCenter[1] - liveCenter[1]) * 111,
       )
     : 0;
-  const mapFocusCenter: [number, number] | null = eventCenter ?? liveCenter;
+  const focusedLocation = selectedLocationKey
+    ? mapLocations.find(location => locationKey(location) === selectedLocationKey)
+    : undefined;
+  const mapFocusCenter: [number, number] | null = focusedLocation
+    ? [focusedLocation.longitude, focusedLocation.latitude]
+    : eventCenter ?? liveCenter;
   const coordinateOutlierKeys = new Set(
     liveCenter
       ? mapLocations
@@ -1907,7 +1912,7 @@ export default function UnifiedDisasterDashboard() {
               data-field-stale={localFieldMode ? overview.liveDroneTelemetry.stale : undefined}
               data-field-offline={localFieldMode ? overview.liveDroneTelemetry.offline : undefined}
             >
-              {localFieldMode ? ('MD1000 실시간 기체 위치') : 'MAVLink 위치 연동'} · {localFieldMode
+              {localFieldMode ? ('MD1000 실시간 기체 위치') : '실시간 장비 위치 연동'} · {localFieldMode
                 ? (fieldCoreStatusLabel(overview.liveDroneTelemetry.status, overview.liveDroneTelemetry.matched))
                 : overview.liveDroneTelemetry.status === 'CONNECTED' ? 'Core 조회 정상' : 'Core 조회 실패 · 마지막 수신값 유지'}
               {' · '}지도 연결 {overview.liveDroneTelemetry.matched}대 · LIVE {overview.liveDroneTelemetry.live} · STALE {overview.liveDroneTelemetry.stale} · OFFLINE {overview.liveDroneTelemetry.offline}
@@ -1948,7 +1953,7 @@ export default function UnifiedDisasterDashboard() {
                 {eventToLiveDistance > 0.08 && (
                   <p className="map-coordinate-warning" role="status">
                     <strong>좌표 정합성 확인 필요</strong>
-                    재난 위치와 수신 장비 좌표의 중심이 약 {eventToLiveDistanceKm.toFixed(1)}km 떨어져 있습니다. 지도는 지정한 재난 위치를 중심으로 표시합니다.
+                    재난 위치와 수신 장비 좌표의 중심이 약 {eventToLiveDistanceKm.toFixed(1)}km 떨어져 있습니다. 장비를 선택하면 마지막 수신 위치로 이동하며, 기본 중심은 지정한 재난 위치입니다.
                   </p>
                 )}
                 {liveLocations.length === 0 && <p>수신된 위치가 없습니다.</p>}
@@ -2463,7 +2468,16 @@ export default function UnifiedDisasterDashboard() {
                   {resourceDialogGroup === "ALL_ASSETS" ? (
                     <>
                       {overview.assets.map((asset) => (
-                        <button key={String(asset.assetId)} type="button">
+                        <button key={String(asset.assetId)} type="button"
+                          disabled={!mapLocations.some(location => location.id === String(asset.assetId))}
+                          title={mapLocations.some(location => location.id === String(asset.assetId)) ? "마지막 수신 위치 보기" : "위치 수신 대기"}
+                          onClick={() => {
+                            const location = mapLocations.find(item => item.id === String(asset.assetId));
+                            if (location) {
+                              setResourceDialogGroup(null);
+                              handleLocationSelect(location);
+                            }
+                          }}>
                           <span>{assetTypeLabel(String(asset.assetType ?? "ASSET"))}</span>
                           <strong>{String(asset.assetName ?? asset.assetCode ?? asset.assetId ?? "-")}</strong>
                           <em>{korean(asset.operationalStatus ?? asset.status ?? "UNKNOWN")}</em>
