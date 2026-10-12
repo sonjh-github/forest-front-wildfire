@@ -1275,35 +1275,6 @@ export default function UnifiedDisasterDashboard() {
 
   const liveLocations = useMemo(() => overview ? overviewLocations(overview) : [], [overview]);
 
-  /* FIELD_DEOKSUNG_SCENARIO_ALIGNMENT */
-  const FIELD_DEOKSUNG_CENTER: [number, number] = [126.616667, 36.666667];
-
-  /*
-   * Preview only:
-   * Preserve the relative layout of all synthetic assets,
-   * but translate the whole scenario to Deoksungsan.
-   *
-   * REAL ?field=1 locations are NEVER modified here.
-   */
-  const fieldScenarioLocations = useMemo(() => {
-    {
-      return liveLocations;
-    }
-
-    const anchor =
-      liveLocations.find((location) => resourceGroupOf(location) === "UAV")
-      ?? liveLocations[0];
-
-    const deltaLongitude = FIELD_DEOKSUNG_CENTER[0] - anchor.longitude;
-    const deltaLatitude = FIELD_DEOKSUNG_CENTER[1] - anchor.latitude;
-
-    return liveLocations.map((location) => ({
-      ...location,
-      longitude: location.longitude + deltaLongitude,
-      latitude: location.latitude + deltaLatitude,
-    }));
-  }, [liveLocations]);
-
   const timelineSnapshots = useMemo(
     () => buildTimelineSnapshots(timeline, [...(overview?.assets ?? []), ...(overview?.unregisteredAssets ?? [])]),
     [overview?.assets, overview?.unregisteredAssets, timeline],
@@ -1347,9 +1318,7 @@ export default function UnifiedDisasterDashboard() {
   ), [mapLocations, visibleResourceGroups]);
   const eventCoordinates = overview?.event.geometry?.coordinates;
   const eventCenter: [number, number] | null =
-    localFieldMode
-      ? FIELD_DEOKSUNG_CENTER
-      : eventCoordinates
+    eventCoordinates
         && Number.isFinite(Number(eventCoordinates[0]))
         && Number.isFinite(Number(eventCoordinates[1]))
           ? [Number(eventCoordinates[0]), Number(eventCoordinates[1])] as [number, number]
@@ -1459,12 +1428,10 @@ export default function UnifiedDisasterDashboard() {
       return { ...item, value: assessment.value, state: assessment.state };
     });
   }, [overview]);
-  const fieldPrimaryDrone = (localFieldMode)
-    ? (liveLocations)
-        .find((location) => resourceGroupOf(location) === "UAV") ?? null
-    : null;
-  const fieldVideoAssetId = fieldPrimaryDrone?.id
-    ?? (null);
+  const fieldPrimaryDrone = liveLocations.find(
+    (location) => resourceGroupOf(location) === "UAV"
+  ) ?? null;
+  const fieldVideoAssetId = fieldPrimaryDrone?.id ?? null;
 
   useEffect(() => {
     let active = true;
@@ -1501,7 +1468,7 @@ export default function UnifiedDisasterDashboard() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [fieldVideoAssetId, false]);
+  }, [fieldVideoAssetId]);
 
   const fieldPrimaryAsset = (localFieldMode) && fieldPrimaryDrone
     ? overview?.assets.find((asset) =>
@@ -2544,13 +2511,10 @@ export default function UnifiedDisasterDashboard() {
           {displayConfig.showVideoDeck && <div className="field-video-deck">
             <header><strong>실시간 영상</strong><small>{"RTSP 연결 상태"}</small></header>
             <div>
-              {[
-                ["MD1000 · 광학", "EO"],
-                ["MD1000 · 열화상", "IR"],
-                ["지휘차량 · 현장", "CMD"],
-                ["공중 자산 · 보조", "AIR"],
-              ].map(([label, code], index) => {
-                const channel = fieldVideoChannels[index] ?? null;
+              {fieldVideoChannels.length === 0 && <p>등록된 영상 채널이 없습니다.</p>}
+              {fieldVideoChannels.map((channel, index) => {
+                const label = text(channel.channelName, "등록 영상 채널");
+                const code = text(channel.channelCode, String(channel.videoChannelId ?? index));
                 const streamUri = text(channel?.streamUri, "");
                 const enabled = channel?.enabled === true;
                 const verification = text(channel?.verificationStatus, "UNVERIFIED");
