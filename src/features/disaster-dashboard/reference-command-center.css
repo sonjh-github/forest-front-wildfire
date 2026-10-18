@@ -3631,3 +3631,31 @@ body,
   padding-top: 7px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
+
+/* Query-gated hybrid exhibition rail override.
+ * This file loads after the legacy command-center width rules. */
+.unified-disaster-board.is-field-mode.final-ops-ui.hybrid-exhibition-mode
+  .dashboard-map-stage.field-command-stage
+  .operations-panel.is-collapsed {
+  width: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+  padding-right: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #075f4c !important;
+}
+
+.unified-disaster-board.is-field-mode.hybrid-exhibition-mode
+  .operations-panel.is-collapsed
+  .operation-rail-brand,
+.unified-disaster-board.is-field-mode.hybrid-exhibition-mode
+  .operations-panel.is-collapsed
+  > nav,
+.unified-disaster-board.is-field-mode.hybrid-exhibition-mode
+  .operations-panel.is-collapsed
+  .operation-collapse {
+  width: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+}

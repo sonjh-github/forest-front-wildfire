@@ -2,6 +2,7 @@ import UnifiedDisasterDashboard from "./features/disaster-dashboard/UnifiedDisas
 import DeviceManagementPage from "./pages/device/DeviceManagementPage";
 import "./styles.css";
 import "./features/disaster-dashboard/reference-command-center.css";
+import "./features/disaster-dashboard/cinematic-exhibition.css";
 
 function normalizedPath() {
   const path = window.location.pathname.replace(/\/+$/, "");

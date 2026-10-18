@@ -27,8 +27,13 @@ import { PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
 import {
   displayProfileClassName,
   getDisplayProfileConfig,
+  isHybridExhibitionMode,
   parseDisplayProfile,
 } from "./displayProfile";
+import {
+  EXHIBITION_TOUR_STEPS,
+  isExhibitionTourStepAvailable,
+} from "./exhibitionTour";
 import "./unified-disaster-dashboard.css";
 import "./field-header-hotfix.css";
 import "./field-interaction-hotfix.css";
@@ -740,6 +745,7 @@ export default function UnifiedDisasterDashboard() {
   const displayProfile = parseDisplayProfile(window.location.search);
   const displayConfig = getDisplayProfileConfig(displayProfile);
   const displayClassName = displayProfileClassName(displayProfile);
+  const hybridExhibitionMode = isHybridExhibitionMode(window.location.search);
   const [events, setEvents] = useState<ForestEvent[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [overview, setOverview] = useState<EventOverview | null>(null);
@@ -773,6 +779,10 @@ export default function UnifiedDisasterDashboard() {
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(null);
   const [topologyLocationKey, setTopologyLocationKey] = useState<string | null>(null);
   const [resourceDialogGroup, setResourceDialogGroup] = useState<ResourceGroup | "ALL" | "ALL_ASSETS" | null>(null);
+  const [exhibitionTourStepIndex, setExhibitionTourStepIndex] = useState<number | null>(null);
+  const [terrainPresentationState, setTerrainPresentationState] = useState<"2D" | "3D" | "FALLBACK">(
+    hybridExhibitionMode ? "3D" : "2D",
+  );
 
   const [videoDrone, setVideoDrone] = useState<LiveLocation | null>(null);
   const [fieldInspectorTab, setFieldInspectorTab] =
@@ -1320,7 +1330,8 @@ export default function UnifiedDisasterDashboard() {
   const activeAlertCount = useMemo(() => overview?.alerts.filter((item) => !["RESOLVED", "EXPIRED", "CANCELLED"].includes(String(item.status))).length ?? 0, [overview]);
   const visibleLocations = useMemo(() => mapLocations.filter(
     (item) => visibleResourceGroups.has(resourceGroupOf(item))
-  ), [mapLocations, visibleResourceGroups]);
+      && (!hybridExhibitionMode || item.registeredToEvent)
+  ), [hybridExhibitionMode, mapLocations, visibleResourceGroups]);
   const eventCoordinates = overview?.event.geometry?.coordinates;
   const eventCenter: [number, number] | null =
     eventCoordinates
@@ -1382,6 +1393,27 @@ export default function UnifiedDisasterDashboard() {
     ? positioningWarning(selectedLocation)
     : null;
   const selectedCommunicationProfile = selectedLocation ? communicationProfile(selectedLocation) : null;
+  const registeredLiveLocations = liveLocations.filter((location) => location.registeredToEvent);
+  const exhibitionLocations = hybridExhibitionMode ? registeredLiveLocations : liveLocations;
+  const positioningLocations = exhibitionLocations.filter(isPositioningLocation);
+  const communicationLocations = exhibitionLocations.filter((location) => resourceGroupOf(location) === "COMMUNICATION");
+  const rtkFixedCount = positioningLocations.filter((location) =>
+    location.positioningMethod === "RTK_FIXED" ||
+    (location.category === "RTK_BASE_LPWA_GATEWAY" && location.rtcmStatus === "READY")
+  ).length;
+  const rtkFloatCount = positioningLocations.filter((location) => location.positioningMethod === "RTK_FLOAT").length;
+  const gnssCount = positioningLocations.filter((location) => ["GNSS", "DGPS"].includes(String(location.positioningMethod))).length;
+  const currentTourStep = exhibitionTourStepIndex == null
+    ? null
+    : EXHIBITION_TOUR_STEPS[exhibitionTourStepIndex] ?? null;
+  const currentTourStepAvailable = currentTourStep
+    ? isExhibitionTourStepAvailable(currentTourStep.id, {
+        hasIncident: Boolean(eventCenter),
+        positioningCount: positioningLocations.length,
+        communicationCount: communicationLocations.length,
+        responseCount: registeredLiveLocations.length,
+      })
+    : false;
   const dialogLocations = resourceDialogGroup
     ? liveLocations.filter((location) => resourceDialogGroup === "ALL"
       || (resourceDialogGroup === "ALL_ASSETS" ? location.kind === "asset" : resourceGroupOf(location) === resourceDialogGroup))
@@ -1694,7 +1726,7 @@ export default function UnifiedDisasterDashboard() {
   }, [refreshEvents]);
 
   return (
-<main className={`unified-disaster-board ${displayClassName}${commandShellMode ? " is-field-mode" : ""}${SHOW_VALIDATION_UI ? "" : " final-ops-ui"}`} aria-label="?? ?? ?? ??">
+<main className={`unified-disaster-board ${displayClassName}${commandShellMode ? " is-field-mode" : ""}${SHOW_VALIDATION_UI ? "" : " final-ops-ui"}${hybridExhibitionMode ? " hybrid-exhibition-mode" : ""}`} aria-label="산림재난 통합상황판">
       {error && <p className="unified-disaster-error" role="status"><strong>데이터 갱신 지연</strong><span>{error}</span><small>{overview ? "마지막 정상 데이터를 유지합니다." : "연결을 다시 확인하고 있습니다."}</small></p>}
       {!overview && (
         <section className="dashboard-readiness" aria-live="polite">
@@ -1795,6 +1827,71 @@ export default function UnifiedDisasterDashboard() {
           <button type="button" className="asset-status-open" onClick={() => { setSelectedLocationKey(null); setResourceDialogGroup("ALL"); }}>사건 투입 자산</button>
           <time className="last-updated" title={lastUpdatedAt?.toLocaleString("ko-KR")}><i /> 최근 갱신 {lastUpdatedAt ? relativeTime(lastUpdatedAt.toISOString()) : "대기 중"}</time>
         </header>
+        {hybridExhibitionMode && (
+          <section className="hybrid-status-bar" aria-label="전시 관제 핵심 상태">
+            <div className="hybrid-mode-label">
+              <small>TOBEUNICORN · FOREST COMMAND CENTER</small>
+              <strong>CINEMATIC MISSION CONTROL</strong>
+              <span>{text(overview.event.eventName, overview.event.eventCode)} · 운영 API</span>
+            </div>
+            <article data-tone={activeAlertCount > 0 ? "alert" : "normal"}>
+              <em className="hybrid-data-state" data-state="measured">API 수신</em>
+              <span>재난</span>
+              <strong>{korean(overview.event.disasterType, "재난")} · {korean(overview.event.status)}</strong>
+              <small>{korean(overview.event.severityCode)} · 경보 {activeAlertCount}건</small>
+            </article>
+            <article data-tone={overview.liveDroneTelemetry?.status === "CONNECTED" ? "normal" : "warning"}>
+              <em className="hybrid-data-state" data-state={overview.liveDroneTelemetry?.status === "CONNECTED" ? "measured" : overview.liveDroneTelemetry ? "error" : "missing"}>{overview.liveDroneTelemetry?.status === "CONNECTED" ? "실측 수신" : overview.liveDroneTelemetry ? "API 오류" : "미수신"}</em>
+              <span>통신 수신</span>
+              <strong>{overview.liveDroneTelemetry ? `LIVE ${overview.liveDroneTelemetry.live} · 연결 ${overview.liveDroneTelemetry.matched}` : "수신 상태 확인 중"}</strong>
+              <small>{overview.liveDroneTelemetry ? `STALE ${overview.liveDroneTelemetry.stale} · OFFLINE ${overview.liveDroneTelemetry.offline}` : "Core 텔레메트리 응답 대기"}</small>
+            </article>
+            <article data-tone={positioningLocations.length > 0 && rtkFixedCount === 0 ? "warning" : "normal"}>
+              <em className="hybrid-data-state" data-state={positioningLocations.length > 0 ? "measured" : "missing"}>{positioningLocations.length > 0 ? "실측 위치" : "미수신"}</em>
+              <span>RTK · GNSS</span>
+              <strong>{positioningLocations.length > 0 ? `FIX ${rtkFixedCount} · FLOAT ${rtkFloatCount}` : "위치 상태 미수신"}</strong>
+              <small>GNSS/DGPS {gnssCount} · 등록 장비 {positioningLocations.length}</small>
+            </article>
+            <article className="hybrid-terrain-state" data-tone={terrainPresentationState === "FALLBACK" ? "warning" : "normal"}>
+              <em className="hybrid-data-state" data-state={terrainPresentationState === "FALLBACK" ? "error" : "measured"}>{terrainPresentationState === "FALLBACK" ? "DEM 오류" : "지도 정상"}</em>
+              <span>GIS</span>
+              <strong>{terrainPresentationState === "FALLBACK" ? "2D 복구 모드" : terrainPresentationState === "3D" ? "DEM 3D 활성" : "2D 지도"}</strong>
+              <small>{terrainPresentationState === "FALLBACK" ? "DEM 오류 감지" : "MapLibre 지형 엔진"}</small>
+            </article>
+            <button
+              type="button"
+              className="exhibition-tour-toggle"
+              data-running={currentTourStep ? "true" : "false"}
+              onClick={() => setExhibitionTourStepIndex(currentTourStep ? null : 0)}
+            >
+              <span>{currentTourStep ? "TOUR RUNNING" : "GUIDED TOUR"}</span>
+              <strong>{currentTourStep ? "투어 중단" : "전시 투어 시작"}</strong>
+            </button>
+          </section>
+        )}
+        {hybridExhibitionMode && currentTourStep && (
+          <aside className="hybrid-tour-controller" aria-label="전시 투어 진행">
+            <header>
+              <div><small>{currentTourStep.eyebrow}</small><strong>{currentTourStep.title}</strong></div>
+              <span>{String(exhibitionTourStepIndex! + 1).padStart(2, "0")} / {String(EXHIBITION_TOUR_STEPS.length).padStart(2, "0")}</span>
+            </header>
+            <p>{currentTourStep.description}</p>
+            <div className="hybrid-tour-data-state" data-available={currentTourStepAvailable ? "true" : "false"}>
+              <i />{currentTourStepAvailable ? "확인된 운영 데이터로 카메라 이동" : "관련 데이터 수신 대기 · 카메라 이동 생략"}
+            </div>
+            <footer>
+              <button type="button" onClick={() => setExhibitionTourStepIndex(null)}>중단</button>
+              <button type="button" disabled={exhibitionTourStepIndex === 0} onClick={() => setExhibitionTourStepIndex((index) => index == null ? null : Math.max(0, index - 1))}>이전</button>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => setExhibitionTourStepIndex((index) => index == null || index >= EXHIBITION_TOUR_STEPS.length - 1 ? null : index + 1)}
+              >
+                {exhibitionTourStepIndex === EXHIBITION_TOUR_STEPS.length - 1 ? "투어 종료" : currentTourStepAvailable ? "다음 단계" : "이 단계 건너뛰기"}
+              </button>
+            </footer>
+          </aside>
+        )}
         {capabilityMenu && (
           <section className="field-capability-panel" role="dialog" aria-modal="false"
             aria-label="현장 지원 기능 정보">
@@ -1940,6 +2037,9 @@ export default function UnifiedDisasterDashboard() {
                   referenceTimeMs={playbackSnapshot ? Date.parse(playbackSnapshot.at) + 59_999 : Date.now()}
                   domainLayers={mapDomainLayers}
                   visibleLayerIds={visibleLayerIds}
+                  cinematicMode={hybridExhibitionMode}
+                  tourStage={currentTourStep?.id ?? null}
+                  onTerrainStateChange={setTerrainPresentationState}
                 />
                 <MapTimelinePlayer
                   snapshots={timelineSnapshots}
@@ -1976,6 +2076,7 @@ export default function UnifiedDisasterDashboard() {
                 telemetryStreamStatus={telemetryStreamStatus}
                 onOpenDroneVideo={(location) => setVideoDrone(location)}
                 telemetrySamples={telemetrySamples}
+                initiallyCollapsed={hybridExhibitionMode}
               />
 
               {/* Right-side tools do not cover the central map while inactive. */}
@@ -2327,7 +2428,7 @@ export default function UnifiedDisasterDashboard() {
               </aside>}
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
-            <section className="selected-location-drawer resource-modal" role="dialog" aria-modal="true" aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
+            <section className="selected-location-drawer resource-modal" role="dialog" aria-modal={!hybridExhibitionMode} aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
               <div><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small></div>
               <dl>
                 <div>
@@ -2344,9 +2445,12 @@ export default function UnifiedDisasterDashboard() {
                 <div><dt>고도</dt><dd>{selectedLocation.altitude == null ? "확인 불가" : `${selectedLocation.altitude.toFixed(1)}m`}</dd></div>
                 <div><dt>배터리</dt><dd>{selectedLocation.batteryPct == null ? "측정값 없음" : `${selectedLocation.batteryPct.toFixed(0)}%`}</dd></div>
                 <div><dt>신호</dt><dd>{selectedLocation.signalStrengthDbm == null ? "측정값 없음" : `${selectedLocation.signalStrengthDbm.toFixed(0)} dBm`}</dd></div>
+                {hybridExhibitionMode && <div><dt>SNR</dt><dd>{selectedLocation.snrDb == null ? "측정값 없음" : `${selectedLocation.snrDb.toFixed(1)} dB`}</dd></div>}
+                {hybridExhibitionMode && <div><dt>관측시각·신선도</dt><dd>{new Date(selectedLocation.observedAt).toLocaleString("ko-KR")} · {korean(classifyLinkHealth(selectedLocation.observedAt, new Date()))}</dd></div>}
                 <div><dt>지연·손실</dt><dd>{selectedLocation.latencyMs == null ? "측정값 없음" : `${selectedLocation.latencyMs.toFixed(0)} ms · ${selectedLocation.packetLossPct?.toFixed(1) ?? "-"}%`}</dd></div>
                 <div><dt>데이터 발생 장비</dt><dd>{selectedLocation.sourceAssetId || selectedLocation.id}</dd></div>
                 <div><dt>API 전달 주체</dt><dd>{selectedLocation.reportedByAssetId ? `${korean(selectedLocation.reportingRole || "GATEWAY")} · ${selectedLocation.reportedByAssetId}` : "직접 보고 또는 정보 미수신"}</dd></div>
+                {hybridExhibitionMode && <div><dt>데이터 출처</dt><dd>{selectedLocation.sourceSystem || "출처 미수신"} · API 수신값</dd></div>}
               {isPositioningLocation(selectedLocation) && <>
                   {selectedLocation.category === "RTK_TERMINAL" && (
                     <div><dt>위치 조회 상태</dt><dd>{selectedLocation.positionFetchStatus || "조회 상태 미확인"}</dd></div>

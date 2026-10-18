@@ -65,6 +65,7 @@ interface OperationsPanelProps {
   telemetryStreamStatus: TelemetryStreamStatus;
   telemetrySamples: TelemetrySample[];
   onOpenDroneVideo: (location: LiveLocation) => void;
+  initiallyCollapsed?: boolean;
 }
 
 const resourceGroups: Array<{ id: ResourceGroup; label: string; description: string }> = [
@@ -165,11 +166,12 @@ export function OperationsPanel({
   telemetryStreamStatus,
   telemetrySamples,
   onOpenDroneVideo,
+  initiallyCollapsed = false,
 }: OperationsPanelProps) {
   const [fieldResourceKey, setFieldResourceKey] = useState("");
   const fieldResource = locations.find(x => `${x.kind}-${x.id}` === fieldResourceKey);
   const nms = nmsSummary(overview.networks, overview.assets);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(initiallyCollapsed);
 
   const fieldLinkConfig = useMemo(
     () => getFieldLinkConfig(),
