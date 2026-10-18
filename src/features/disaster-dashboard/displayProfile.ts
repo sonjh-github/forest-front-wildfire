@@ -67,3 +67,7 @@ export function displayProfileClassName(
     ? "display-profile-field-vehicle"
     : "display-profile-command-center";
 }
+
+export function isHybridExhibitionMode(search: string): boolean {
+  return new URLSearchParams(search).get("demo") === "1";
+}

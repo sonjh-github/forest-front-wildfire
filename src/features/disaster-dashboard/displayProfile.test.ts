@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   displayProfileClassName,
   getDisplayProfileConfig,
+  isHybridExhibitionMode,
   parseDisplayProfile,
 } from "./displayProfile";
 
@@ -53,5 +54,13 @@ describe("displayProfile", () => {
     expect(displayProfileClassName("FIELD_VEHICLE")).toBe(
       "display-profile-field-vehicle",
     );
+  });
+
+  it("enables the hybrid exhibition layout only for demo=1", () => {
+    expect(isHybridExhibitionMode("?demo=1")).toBe(true);
+    expect(isHybridExhibitionMode("?display=vehicle&demo=1")).toBe(true);
+    expect(isHybridExhibitionMode("")).toBe(false);
+    expect(isHybridExhibitionMode("?demo=0")).toBe(false);
+    expect(isHybridExhibitionMode("?demo=true")).toBe(false);
   });
 });
