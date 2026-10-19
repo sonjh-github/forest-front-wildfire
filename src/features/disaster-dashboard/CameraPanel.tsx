@@ -5,7 +5,7 @@ import "./camera-panel.css";
 
 type CameraSession = { id: string; playbackPath: string };
 export default function CameraPanel() {
-  const [uri, setUri] = useState("");
+  const [uri, setUri] = useState("rtsp://210.99.70.120:1935/live/cctv001.stream");
   const [requestedUri, setRequestedUri] = useState("");
   const [playbackUri, setPlaybackUri] = useState("");
   const [error, setError] = useState("");
