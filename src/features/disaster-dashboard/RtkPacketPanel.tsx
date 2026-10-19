@@ -12,6 +12,7 @@ type Packet = {
 type RtkData = {
   selectedDevice:{id:string;code:string;type:string}|null;packets:Packet[];checkedAt:string;
   receiverState:string;latestReceivedAt:string|null;lastStoredAt:string|null;
+  sharingWindow?:{fromCounter:number;toCounter:number;expectedCount:number;receivedCount:number;missingCount:number;successRatePercent:number}|null;
   summary:{count:number;confirmed:number;noFix:number;zero:number;unknownFix:number};
 };
 const fixes:Record<string,string> = {RTK_FIXED:"RTK 고정해",RTK_FLOAT:"RTK 유동해",DGPS:"차분 측위",GNSS:"일반 GNSS",NO_FIX:"측위 미확정",UNKNOWN:"Fix 정보 미확인"};
@@ -64,7 +65,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
     </div>}
     <section className="rtk-performance-targets" aria-label="위치정보 성능 지표">
       <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>수신 기록 평균 <strong>{metrics?.measuredIntervalMs != null ? delay(metrics.measuredIntervalMs) : ""}</strong></span><small>최근 수신 패킷의 장비 측정 시각 기준</small></div>
-      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>실측값 <strong aria-label="성공률 실측값 미연동" /></span></div>
+      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>실측값 <strong>{data?.sharingWindow ? `${data.sharingWindow.successRatePercent.toFixed(1)}%` : ""}</strong></span>{data?.sharingWindow && <><small>수신 {data.sharingWindow.receivedCount} / {data.sharingWindow.expectedCount}개 · 미수신 {data.sharingWindow.missingCount}개</small><small>FCnt {data.sharingWindow.fromCounter} ~ {data.sharingWindow.toCounter} · 중복은 1회 집계</small></>}</div>
     </section>
     {data && <>
       <h3 className="rtk-history-heading">패킷 이력 · 최근 100개</h3>
