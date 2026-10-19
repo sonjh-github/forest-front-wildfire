@@ -47,34 +47,27 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
   const latest=data?.packets[0];
   const metrics=data ? rtkPacketMetrics(data.packets) : null;
   return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
-    <header className="rtk-packet-heading"><div><strong>RTK 상태 · 최근 100개 패킷</strong><small>장비별 서버 수신 시각 내림차순 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
-    <section className="rtk-performance-targets" aria-label="위치정보 성능 지표">
-      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>수신 기록 평균 <strong>{metrics?.measuredIntervalMs != null ? delay(metrics.measuredIntervalMs) : ""}</strong></span><small>최근 수신 패킷의 장비 측정 시각 기준</small></div>
-      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>실측값 <strong aria-label="성공률 실측값 미연동" /></span></div>
-    </section>
+    <header className="rtk-packet-heading"><div><strong>현재 상태</strong><small>수신·측위·좌표·측정 시각 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
+    {data && <>
+      <div className="rtk-status-grid" role="group" aria-label="현재 상태">
+        <div><span>서버 수신 상태</span><strong data-state={error ? "UNKNOWN" : data.receiverState}>{error ? "확인 불가" : reception[data.receiverState] ?? data.receiverState}</strong><small>{time(data.latestReceivedAt)}</small></div>
+        <div><span>최신 저장 패킷 Fix</span><strong data-state={latest?.fixState}>{latest ? fixes[latest.fixState] : ""}</strong><small>{latest?.fixType ?? ""}</small></div>
+        <div><span>좌표 상태</span><strong data-state={latest?.coordinateState}>{latest ? coordinates[latest.coordinateState] : ""}</strong><small>{latest ? [value(latest.latitude),value(latest.longitude)].filter(Boolean).join(", ") : ""}</small></div>
+        <div><span>장비 측정 시각</span><strong>{time(latest?.occurredAt ?? null)}</strong>{latest?.delayMs != null && <small>측정 → 수신 지연: {delay(latest.delayMs)}</small>}</div>
+      </div>
+    </>}
     {error && <p role="alert" className="rtk-packet-error">조회 실패: {error} {data ? "· 아래 값은 마지막 조회 결과입니다." : ""}</p>}
     {!data && !error && <div className="rtk-packet-loading">
       <p role="status">최근 100개 패킷을 불러오고 있습니다.</p>
       <div className="rtk-status-grid" aria-hidden="true">{["서버 수신 상태", "최신 저장 패킷 Fix", "좌표 상태", "장비 측정 시각"].map(label => <div key={label}><span>{label}</span><i className="rtk-loading-line" /><i className="rtk-loading-line short" /></div>)}</div>
       <div className="rtk-loading-table" aria-hidden="true">{Array.from({length:6},(_,index)=><i className="rtk-loading-line" key={index} />)}</div>
     </div>}
-    {data && metrics && <>
-      <section className="rtk-frame-metrics" aria-label="FCnt 핵심 지표">
-        <strong>FCnt 핵심 지표 · 최근 {data.packets.length}개 수신 기록</strong>
-        <div className="rtk-status-grid">
-          <div><span>고유 FCnt · 서로 다른 카운터</span><strong>{metrics.uniqueCount}개 <small>/ 수신 {data.packets.length}건</small></strong><small>FCnt 범위 {value(metrics.minCounter)} ~ {value(metrics.maxCounter)}</small></div>
-          <div><span>중복 FCnt 수신</span><strong>{metrics.duplicateCount}건</strong><small>FCnt 누락·오류 {metrics.missingCounterCount}건</small></div>
-          <div><span>평균 패킷 간격 · 장비 시각</span><strong>{metrics.measuredIntervalMs===null ? "계산 불가" : delay(metrics.measuredIntervalMs)}</strong><small>중복 포함 · {metrics.measuredIntervalSamples}개 간격</small><small>고유 FCnt 간격: {metrics.frameIntervalMs===null ? "계산 불가" : delay(metrics.frameIntervalMs)}</small></div>
-          <div><span>서버 평균 수신 간격</span><strong>{metrics.receivedIntervalMs===null ? "계산 불가" : delay(metrics.receivedIntervalMs)}</strong><small>중복 포함 · {metrics.receivedIntervalSamples}개 간격</small></div>
-        </div>
-        <p>원본 로그는 중복을 포함해 모두 표시합니다. 평균 간격은 유효한 시각을 시간순으로 정렬해 계산합니다(최소 2건). 고유 FCnt 간격만 카운터별 최초 측정 시각을 사용합니다.</p>
-      </section>
-      <div className="rtk-status-grid">
-        <div><span>서버 수신 상태</span><strong data-state={error ? "UNKNOWN" : data.receiverState}>{error ? "확인 불가" : reception[data.receiverState] ?? data.receiverState}</strong><small>{time(data.latestReceivedAt)}</small></div>
-        <div><span>최신 저장 패킷 Fix</span><strong data-state={latest?.fixState}>{latest ? fixes[latest.fixState] : ""}</strong><small>{latest?.fixType ?? ""}</small></div>
-        <div><span>좌표 상태</span><strong data-state={latest?.coordinateState}>{latest ? coordinates[latest.coordinateState] : ""}</strong><small>{latest ? [value(latest.latitude),value(latest.longitude)].filter(Boolean).join(", ") : ""}</small></div>
-        <div><span>장비 측정 시각</span><strong>{time(latest?.occurredAt ?? null)}</strong>{latest?.delayMs != null && <small>측정 → 수신 지연: {delay(latest.delayMs)}</small>}</div>
-      </div>
+    <section className="rtk-performance-targets" aria-label="위치정보 성능 지표">
+      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>수신 기록 평균 <strong>{metrics?.measuredIntervalMs != null ? delay(metrics.measuredIntervalMs) : ""}</strong></span><small>최근 수신 패킷의 장비 측정 시각 기준</small></div>
+      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>실측값 <strong aria-label="성공률 실측값 미연동" /></span></div>
+    </section>
+    {data && <>
+      <h3 className="rtk-history-heading">패킷 이력 · 최근 100개</h3>
       <p className="rtk-state-explanation">수신 중: 30초 이내 · 지연: 30~120초 · 이후 최근 수신 없음. 통신 수신과 측위 확정은 별개입니다. 좌표가 있어도 Fix 미확정이면 정상 측위로 계산하지 않습니다.</p>
       <div className="rtk-packet-counts"><span>최근 <b>{data.summary.count}</b>/100건</span><span>좌표·Fix 확인 <b>{data.summary.confirmed}</b></span><span>No Fix <b>{data.summary.noFix}</b></span><span>0,0 <b>{data.summary.zero}</b></span><span>Fix 미확인 <b>{data.summary.unknownFix}</b></span></div>
       <p className="rtk-state-explanation">아래 목록은 DB에 저장된 RTK_POSITION 패킷 기준입니다. 0,0·No Fix도 제외하지 않습니다. 서버 수신 상태는 실시간 수신 캐시를 포함합니다. 조회: {time(data.checkedAt)}</p>
