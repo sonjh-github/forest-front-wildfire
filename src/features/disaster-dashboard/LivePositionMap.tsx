@@ -134,7 +134,7 @@ function resourceQualityPopupContent(location: LiveLocation) {
 
   const dl = document.createElement("dl");
 
-  for (const [label, value] of rows) {
+  for (const [label, value] of rows.filter(([label]) => !isRtk || !["패킷 손실", "지연"].includes(label))) {
     const row = document.createElement("div");
 
     const dt = document.createElement("dt");

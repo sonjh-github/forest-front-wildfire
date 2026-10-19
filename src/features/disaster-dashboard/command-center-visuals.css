@@ -405,3 +405,9 @@
 .resource-quality-map-popup .maplibregl-popup-content { pointer-events:none; }
 .resource-quality-popup-card { width:270px; box-sizing:border-box; }
 .resource-quality-popup-card dd { max-width:165px; overflow-wrap:anywhere; text-align:right; }
+
+.resource-quality-popup-card { padding:10px 12px; line-height:1.35; }
+.resource-quality-popup-card dl { gap:4px; margin:6px 0; }
+.resource-quality-popup-card dl div { line-height:1.35; }
+.resource-quality-popup-card dt { flex-shrink:0; }
+.resource-quality-popup-card > small { line-height:1.4; }
