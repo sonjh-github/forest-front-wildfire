@@ -2430,8 +2430,8 @@ export default function UnifiedDisasterDashboard() {
               </aside>}
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
-            <section className="selected-location-drawer resource-modal" role="dialog" aria-modal={!hybridExhibitionMode} aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
-              <div><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{selectedRtk ? "최근 100개 패킷 · 수신·측위 상태" : coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small></div>
+            <section className={`selected-location-drawer resource-modal${selectedRtk ? " rtk-detail-modal" : ""}`} role="dialog" aria-modal={!hybridExhibitionMode} aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="resource-detail-heading"><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{selectedRtk ? "최근 100개 패킷 · 수신·측위 상태" : coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small><button type="button" onClick={() => setSelectedLocationKey(null)} aria-label="자산 상세 닫기">×</button></div>
               {selectedRtk ? <RtkPacketPanel key={selectedLocation.id} assetId={selectedLocation.id} /> : <dl>
                 <div>
                   <dt>통신 상태</dt>
@@ -2514,7 +2514,6 @@ export default function UnifiedDisasterDashboard() {
                   <div><dt>연결경로</dt><dd>{selectedCommunicationProfile.path}</dd></div>
                 </dl>
               </section>}
-              <button type="button" onClick={() => setSelectedLocationKey(null)} aria-label="자산 상세 닫기">×</button>
             </section></div>}
             {resourceDialogGroup && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setResourceDialogGroup(null)}>
               <section className="resource-status-modal resource-modal" role="dialog" aria-modal="true" aria-label="자산 현황" onMouseDown={(event) => event.stopPropagation()}>

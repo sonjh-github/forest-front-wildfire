@@ -24,11 +24,12 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
   const [data,setData] = useState<RtkData|null>(null);
   const [error,setError] = useState("");
   const [revision,setRevision] = useState(0);
+  const [refreshing,setRefreshing] = useState(true);
   const [expanded,setExpanded] = useState<string|null>(null);
   useEffect(() => {
     const controller = new AbortController();
     let timer:ReturnType<typeof setTimeout>|undefined;
-    setData(null);setError("");setExpanded(null);
+    setRefreshing(true);
     async function refresh() {
       try {
         const response = await dashboardApi<{data:RtkData}>(`/api/v1/dashboard/rtk/packets?assetId=${encodeURIComponent(assetId)}`,{signal:controller.signal});
@@ -36,17 +37,21 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
       } catch(reason) {
         if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "RTK 패킷을 불러오지 못했습니다.");
       } finally {
-        if (!controller.signal.aborted) timer = setTimeout(refresh,5000);
+        if (!controller.signal.aborted) {setRefreshing(false);timer = setTimeout(refresh,5000);}
       }
     }
     void refresh();
     return () => {controller.abort();if(timer)clearTimeout(timer);};
   },[assetId,revision]);
   const latest=data?.packets[0];
-  return <section className="rtk-packet-panel" aria-label="RTK 최근 100개 패킷">
-    <header className="rtk-packet-heading"><div><strong>RTK 상태 · 최근 100개 패킷</strong><small>장비별 서버 수신 시각 내림차순 · 5초마다 갱신</small></div><button type="button" onClick={() => setRevision(v=>v+1)}>새로고침</button></header>
+  return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
+    <header className="rtk-packet-heading"><div><strong>RTK 상태 · 최근 100개 패킷</strong><small>장비별 서버 수신 시각 내림차순 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
     {error && <p role="alert" className="rtk-packet-error">조회 실패: {error} {data ? "· 아래 값은 마지막 조회 결과입니다." : ""}</p>}
-    {!data && !error && <p role="status">RTK 패킷 조회 중…</p>}
+    {!data && !error && <div className="rtk-packet-loading">
+      <p role="status">최근 100개 패킷을 불러오고 있습니다.</p>
+      <div className="rtk-status-grid" aria-hidden="true">{["서버 수신 상태", "최신 저장 패킷 Fix", "좌표 상태", "장비 측정 시각"].map(label => <div key={label}><span>{label}</span><i className="rtk-loading-line" /><i className="rtk-loading-line short" /></div>)}</div>
+      <div className="rtk-loading-table" aria-hidden="true">{Array.from({length:6},(_,index)=><i className="rtk-loading-line" key={index} />)}</div>
+    </div>}
     {data && <>
       <div className="rtk-status-grid">
         <div><span>서버 수신 상태</span><strong data-state={error ? "UNKNOWN" : data.receiverState}>{error ? "확인 불가" : reception[data.receiverState] ?? data.receiverState}</strong><small>{time(data.latestReceivedAt)}</small></div>

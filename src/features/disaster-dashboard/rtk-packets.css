@@ -24,3 +24,20 @@
 
 .rtk-packet-panel { min-width:0; max-width:100%; box-sizing:border-box; }
 .rtk-packet-table { min-width:0; width:100%; max-width:100%; box-sizing:border-box; }
+
+.resource-detail-heading { position:relative; }
+.resource-detail-heading > button { position:absolute; top:0; right:0; width:32px; height:32px; border:1px solid #dce5e2; border-radius:50%; background:#fff; color:#516861; font-size:20px; cursor:pointer; }
+.resource-modal-backdrop:has(.rtk-detail-modal) { padding:76px 24px 24px; }
+.dashboard-map-stage .selected-location-drawer.resource-modal.rtk-detail-modal { width:min(1200px,calc(100vw - 48px)); max-width:1200px; height:calc(100dvh - 100px); max-height:calc(100dvh - 100px); padding:20px; box-sizing:border-box; display:block; overflow:auto; }
+.dashboard-map-stage .rtk-detail-modal > .resource-detail-heading { position:sticky; top:-20px; z-index:5; display:grid; padding:14px 48px 14px 0; margin-top:-14px; background:#fff; }
+.rtk-detail-modal .resource-detail-heading > button { top:14px; }
+.rtk-detail-modal .rtk-status-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.rtk-detail-modal .rtk-packet-table { max-height:460px; }
+.rtk-packet-panel button:disabled { cursor:wait; opacity:.6; }
+.rtk-packet-loading { min-height:460px; }
+.rtk-packet-loading > p { margin:0 0 14px; color:#59736b; font-size:13px; }
+.rtk-loading-line { display:block; height:14px; width:100%; border-radius:4px; background:#e2ebe7; }
+.rtk-loading-line.short { width:65%; height:10px; }
+.rtk-loading-table { display:grid; gap:22px; padding:20px; margin-top:24px; border:1px solid #d5e2dd; border-radius:7px; background:#fff; }
+@media(max-width:800px) { .rtk-detail-modal .rtk-status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:480px) { .resource-modal-backdrop:has(.rtk-detail-modal) { padding:72px 8px 12px; } .dashboard-map-stage .selected-location-drawer.resource-modal.rtk-detail-modal { width:calc(100vw - 16px); height:calc(100dvh - 84px); max-height:calc(100dvh - 84px); padding:12px; } .dashboard-map-stage .rtk-detail-modal > .resource-detail-heading { top:-12px; } .rtk-detail-modal .rtk-status-grid { grid-template-columns:1fr; } }
