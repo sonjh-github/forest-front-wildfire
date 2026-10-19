@@ -21,3 +21,6 @@
 .rtk-packet-table td strong { font-size:11px; }
 .rtk-packet-table pre { max-height:220px; overflow:auto; background:#101f1c; color:#dceee6; padding:12px; font-size:11px; text-align:left; }
 @media(max-width:600px) { .rtk-status-grid {grid-template-columns:1fr;} .rtk-packet-panel {padding:10px;} }
+
+.rtk-packet-panel { min-width:0; max-width:100%; box-sizing:border-box; }
+.rtk-packet-table { min-width:0; width:100%; max-width:100%; box-sizing:border-box; }

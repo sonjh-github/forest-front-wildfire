@@ -2431,7 +2431,7 @@ export default function UnifiedDisasterDashboard() {
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
             <section className="selected-location-drawer resource-modal" role="dialog" aria-modal={!hybridExhibitionMode} aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
-              <div><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small></div>
+              <div><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{selectedRtk ? "최근 100개 패킷 · 수신·측위 상태" : coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small></div>
               {selectedRtk ? <RtkPacketPanel key={selectedLocation.id} assetId={selectedLocation.id} /> : <dl>
                 <div>
                   <dt>통신 상태</dt>

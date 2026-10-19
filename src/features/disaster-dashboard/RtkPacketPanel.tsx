@@ -18,7 +18,7 @@ const coordinates:Record<string,string> = {VALID:"좌표·Fix 확인",ZERO:"0,0 
 const reception:Record<string,string> = {RECEIVING:"최근 수신 중",DELAYED:"수신 지연",NO_RECENT_RECEPTION:"최근 수신 없음",WAITING:"수신 이력 없음"};
 function time(value:string|null) { return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString("ko-KR",{timeZone:"Asia/Seoul",hour12:false}) : "미수신"; }
 function value(value:number|null, suffix="") { return value === null ? "미수신" : `${value}${suffix}`; }
-function delay(value:number|null) { return value === null ? "확인 불가" : value < 0 ? "장비 시각이 서버보다 미래 · 시각 확인 필요" : value >= 60_000 ? `${(value/60_000).toFixed(1)}분` : `${(value/1000).toFixed(1)}초`; }
+function delay(value:number|null) { return value === null ? "확인 불가" : value < 0 ? "장비 시각이 서버보다 미래 · 시각 확인 필요" : value >= 86_400_000 ? `${Math.floor(value/86_400_000)}일 ${Math.floor((value%86_400_000)/3_600_000)}시간` : value >= 3_600_000 ? `${(value/3_600_000).toFixed(1)}시간` : value >= 60_000 ? `${(value/60_000).toFixed(1)}분` : `${(value/1000).toFixed(1)}초`; }
 
 export default function RtkPacketPanel({assetId}:{assetId:string}) {
   const [data,setData] = useState<RtkData|null>(null);
