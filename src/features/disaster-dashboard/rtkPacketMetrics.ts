@@ -10,6 +10,15 @@ function meanInterval(times:number[]) {
 }
 export function rtkPacketMetrics(packets:Sample[]) {
   const frames=new Map<number,number|null>();
+  const latestCounter=packets[0]?.frameCounter;
+  const latestRun:number[]=[];
+  if(latestCounter!=null && Number.isSafeInteger(latestCounter) && latestCounter>=0) {
+    for(const packet of packets) {
+      if(packet.frameCounter!==latestCounter)break;
+      const received=timestamp(packet.receivedAt);
+      if(received!==null)latestRun.push(received);
+    }
+  }
   const receivedTimes:number[]=[];
   const allMeasuredTimes:number[]=[];
   let validCounterCount=0;
@@ -28,6 +37,7 @@ export function rtkPacketMetrics(packets:Sample[]) {
   const measuredTimes=[...frames.values()].filter((time):time is number=>time!==null);
   const counters=[...frames.keys()];
   return {
+    latestCounterRepeatedCount:latestRun.length,latestCounterObservedSpanMs:latestRun.length>=2 ? Math.max(...latestRun)-Math.min(...latestRun) : null,
     uniqueCount:frames.size,duplicateCount:validCounterCount-frames.size,
     missingCounterCount:packets.length-validCounterCount,
     minCounter:counters.length ? Math.min(...counters) : null,

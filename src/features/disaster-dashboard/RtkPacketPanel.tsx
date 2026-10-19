@@ -47,6 +47,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
   },[assetId,revision]);
   const latest=data?.packets[0];
   const metrics=data ? rtkPacketMetrics(data.packets) : null;
+  const frameStalled=metrics?.latestCounterObservedSpanMs!=null && metrics.latestCounterObservedSpanMs>5000;
   return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
     <header className="rtk-packet-heading"><div><strong>현재 상태</strong><small>수신·측위·좌표·측정 시각 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
     {data && <>
@@ -64,8 +65,8 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
       <div className="rtk-loading-table" aria-hidden="true">{Array.from({length:6},(_,index)=><i className="rtk-loading-line" key={index} />)}</div>
     </div>}
     <section className="rtk-performance-targets" aria-label="위치정보 성능 지표">
-      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>수신 기록 평균 <strong>{metrics?.measuredIntervalMs != null ? delay(metrics.measuredIntervalMs) : ""}</strong></span><small>최근 수신 패킷의 장비 측정 시각 기준</small></div>
-      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>실측값 <strong>{data?.sharingWindow ? `${data.sharingWindow.successRatePercent.toFixed(1)}%` : ""}</strong></span>{data?.sharingWindow && <><small>수신 {data.sharingWindow.receivedCount} / {data.sharingWindow.expectedCount}개 · 미수신 {data.sharingWindow.missingCount}개</small><small>FCnt {data.sharingWindow.fromCounter} ~ {data.sharingWindow.toCounter} · 중복은 1회 집계</small></>}</div>
+      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>새 FCnt 평균 간격 <strong>{frameStalled ? "FCnt 정체" : metrics?.frameIntervalMs != null ? delay(metrics.frameIntervalMs) : metrics ? "갱신 미확인" : ""}</strong></span><small>서로 다른 FCnt의 최초 장비 측정 시각 기준</small>{metrics && <small>로그 수신 기록 간격: {metrics.measuredIntervalMs===null ? "" : delay(metrics.measuredIntervalMs)} · 중복 포함</small>}</div>
+      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>번호 구간 누적 수신율 <strong>{data?.sharingWindow ? `${data.sharingWindow.successRatePercent.toFixed(1)}%` : ""}</strong></span>{data?.sharingWindow && <><small>수신 {data.sharingWindow.receivedCount} / {data.sharingWindow.expectedCount}개 · 미수신 {data.sharingWindow.missingCount}개</small><small>FCnt {data.sharingWindow.fromCounter} ~ {data.sharingWindow.toCounter} · 중복은 1회 집계</small></>}{frameStalled && metrics && latest && <p className="rtk-frame-stalled" role="status">최신 {metrics.latestCounterRepeatedCount}건 연속 FCnt {latest.frameCounter} · 최소 {delay(metrics.latestCounterObservedSpanMs)} 동안 새 번호 수신 없음</p>}</div>
     </section>
     {data && <>
       <h3 className="rtk-history-heading">패킷 이력 · 최근 100개</h3>

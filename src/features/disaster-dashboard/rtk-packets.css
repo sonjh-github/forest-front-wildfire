@@ -55,3 +55,5 @@
 
 .rtk-packet-panel > .rtk-status-grid { margin-bottom:18px; }
 .rtk-history-heading { font-size:14px; margin:18px 0 10px; color:#233e39; }
+
+.rtk-performance-targets .rtk-frame-stalled { margin:8px 0 0; padding:8px; border-left:3px solid #b56b08; background:#fff4df; color:#805000; font-size:12px; }

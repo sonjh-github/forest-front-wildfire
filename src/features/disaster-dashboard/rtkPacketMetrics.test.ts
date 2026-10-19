@@ -5,6 +5,7 @@ describe("RTK FCnt 핵심 지표",()=>{
   it("100번 반복 수신해도 고유 FCnt는 하나이며 새 프레임 간격을 만들지 않는다",()=>{
     const result=rtkPacketMetrics(Array.from({length:100},(_,i)=>sample(11320,i*2)));
     expect(result.uniqueCount).toBe(1);expect(result.duplicateCount).toBe(99);
+    expect(result.latestCounterObservedSpanMs).toBe(198000);expect(result.latestCounterRepeatedCount).toBe(100);
     expect(result.frameIntervalMs).toBeNull();expect(result.receivedIntervalMs).toBe(2000);expect(result.measuredIntervalMs).toBe(2000);
   });
   it("순서와 재전송에 관계없이 FCnt별 최초 측정으로 평균 간격을 계산한다",()=>{
@@ -12,6 +13,11 @@ describe("RTK FCnt 핵심 지표",()=>{
     expect(result.uniqueCount).toBe(3);expect(result.duplicateCount).toBe(1);
     expect(result.frameIntervalMs).toBe(7000);expect(result.frameIntervalSamples).toBe(2);
     expect(result.receivedIntervalMs).toBeCloseTo(20000/3);
+  });
+  it("과거 프레임이 섞여 있어도 최신 FCnt가 정체된 구간을 따로 센다",()=>{
+    const result=rtkPacketMetrics([sample(3,30),sample(3,20),sample(3,10),sample(2,5)]);
+    expect(result.uniqueCount).toBe(2);expect(result.latestCounterRepeatedCount).toBe(3);
+    expect(result.latestCounterObservedSpanMs).toBe(20000);
   });
   it("FCnt 0은 유효하며 누락·음수·소수는 고유값과 중복에서 제외한다",()=>{
     const result=rtkPacketMetrics([sample(0,0),sample(null,1),sample(-1,2),sample(1.2,3)]);
