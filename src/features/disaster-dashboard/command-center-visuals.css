@@ -400,3 +400,8 @@
   color: #82908c;
   font-size: 9px;
 }
+
+.resource-quality-map-popup,
+.resource-quality-map-popup .maplibregl-popup-content { pointer-events:none; }
+.resource-quality-popup-card { width:270px; box-sizing:border-box; }
+.resource-quality-popup-card dd { max-width:165px; overflow-wrap:anywhere; text-align:right; }

@@ -85,13 +85,14 @@ function resourceQualityPopupContent(location: LiveLocation) {
   header.append(title, type);
   root.appendChild(header);
 
+  const isRtk = ["RTK_TERMINAL", "RTK_BASE_LPWA_GATEWAY"].includes(location.category);
   const rows: Array<[string, string]> = [
     [
-      "통신 상태",
-      location.qualityStatus || location.status || "확인 중",
+      isRtk ? "측정값 상태" : "통신 상태",
+      isRtk ? (location.positioningMethod === "NO_FIX" ? "측위 미확정" : location.positioningMethod || "측위 상태 미수신") : location.qualityStatus || location.status || "확인 중",
     ],
-    ...(location.category === "RTK_TERMINAL"
-      ? [["위치 조회 상태", location.positionFetchStatus || "조회 상태 미확인"] as [string, string]]
+    ...(isRtk
+      ? [["보고 좌표", `${location.latitude.toFixed(8)}, ${location.longitude.toFixed(8)}`], ["고도", location.altitude == null ? "미수신" : `${location.altitude} m`]] as Array<[string, string]>
       : []),
     [
       "신호",
@@ -122,12 +123,12 @@ function resourceQualityPopupContent(location: LiveLocation) {
       location.networkMode || "망 정보 없음",
     ],
     [
-      "최근 수신",
+      "장비 측정 시각",
       location.observedAt && Number.isFinite(Date.parse(location.observedAt))
-        ? new Date(location.observedAt).toLocaleTimeString("ko-KR", {
-            hour12: false,
+        ? new Date(location.observedAt).toLocaleString("ko-KR", {
+            timeZone: "Asia/Seoul", hour12: false,
           })
-        : "수신 시각 없음",
+        : "측정 시각 없음",
     ],
   ];
 
@@ -149,7 +150,7 @@ function resourceQualityPopupContent(location: LiveLocation) {
   root.appendChild(dl);
 
   const footer = document.createElement("small");
-  footer.textContent = "클릭하면 장치 상세정보를 확인할 수 있습니다.";
+  footer.textContent = isRtk ? "클릭하면 최근 100개 패킷·서버 수신 상태·JSON 원문을 확인합니다." : "클릭하면 장치 상세정보를 확인할 수 있습니다.";
   root.appendChild(footer);
 
   return root;
@@ -740,6 +741,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const selectedViewportRef = useRef("");
   const singleClickTimerRef = useRef<number | null>(null);
   const resourcePopupRef = useRef<maplibregl.Popup | null>(null);
+  const resourceHoveredKeyRef = useRef<string | null>(null);
+  const resourceHoverHideTimerRef = useRef<number | null>(null);
   const terrainActivatedRef = useRef(false);
 
   useEffect(() => {
@@ -773,6 +776,11 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     mapRef.current = map;
     return () => {
       resizeObserver.disconnect();
+      if (singleClickTimerRef.current !== null) window.clearTimeout(singleClickTimerRef.current);
+      if (resourceHoverHideTimerRef.current !== null) window.clearTimeout(resourceHoverHideTimerRef.current);
+      resourcePopupRef.current?.remove();
+      resourcePopupRef.current = null;
+      resourceHoveredKeyRef.current = null;
       map.off("error", handleError);
       map.off("load", handleLoad);
       map.remove();
@@ -2529,6 +2537,9 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       ]) {
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
+      const hovered = locations.find(item => keyOf(item) === resourceHoveredKeyRef.current);
+      if (hovered && showResources) showResourceQualityFor(hovered);
+      else if (resourceHoveredKeyRef.current) hideResourceQuality();
     };
     const selectResource = (event: maplibregl.MapLayerMouseEvent) => {
       const key = String(event.features?.[0]?.properties?.key ?? "");
@@ -2560,45 +2571,39 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         onLocationDoubleClick(location);
       }
     };
-    const showResourceQuality = (
-      event: maplibregl.MapLayerMouseEvent,
-    ) => {
-      map.getCanvas().style.cursor = "pointer";
-
-      const key = String(
-        event.features?.[0]?.properties?.key ?? "",
-      );
-
-      const location =
-        locations.find(
-          (item) => keyOf(item) === key,
-        );
-
-      if (!location) return;
-
-      resourcePopupRef.current?.remove();
-
-      resourcePopupRef.current =
-        new maplibregl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 22,
-          className: "resource-quality-map-popup",
-        })
-          .setLngLat([
-            location.longitude,
-            location.latitude,
-          ])
-          .setDOMContent(
-            resourceQualityPopupContent(location),
-          )
-          .addTo(map);
+    const showResourceQualityFor = (location: LiveLocation) => {
+      resourceHoveredKeyRef.current = keyOf(location);
+      const popup = resourcePopupRef.current ?? new maplibregl.Popup({
+        closeButton: false, closeOnClick: false, offset: 22, maxWidth: "320px",
+        className: "resource-quality-map-popup",
+      });
+      resourcePopupRef.current = popup;
+      popup.setLngLat([location.longitude, location.latitude])
+        .setDOMContent(resourceQualityPopupContent(location));
+      if (!popup.isOpen()) popup.addTo(map);
     };
-
     const hideResourceQuality = () => {
+      if (resourceHoverHideTimerRef.current !== null) window.clearTimeout(resourceHoverHideTimerRef.current);
+      resourceHoverHideTimerRef.current = null;
       map.getCanvas().style.cursor = "";
       resourcePopupRef.current?.remove();
       resourcePopupRef.current = null;
+      resourceHoveredKeyRef.current = null;
+    };
+    const trackResourceQuality = (event: maplibregl.MapMouseEvent) => {
+      const layers = ["field-resource-point", "field-resource-label"].filter(id => Boolean(map.getLayer(id)));
+      const feature = showResources && layers.length ? map.queryRenderedFeatures(event.point, {layers})[0] : undefined;
+      const key = String(feature?.properties?.key ?? "");
+      const location = locations.find(item => keyOf(item) === key);
+      if (!location) {
+        // Bridge the small gap between the marker and its label without flicker.
+        if (resourceHoverHideTimerRef.current === null) resourceHoverHideTimerRef.current = window.setTimeout(hideResourceQuality,180);
+        return;
+      }
+      if (resourceHoverHideTimerRef.current !== null) window.clearTimeout(resourceHoverHideTimerRef.current);
+      resourceHoverHideTimerRef.current = null;
+      map.getCanvas().style.cursor = "pointer";
+      if (resourceHoveredKeyRef.current !== key || !resourcePopupRef.current?.isOpen()) showResourceQualityFor(location);
     };
     // 20261010 RTK 위치 갱신: 최초 load 이후에도 스타일 준비 상태를 재확인
     const renderWhenReady = () => {
@@ -2622,15 +2627,9 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     map.on("dblclick", "field-resource-label", openDroneVideo);
     map.on("contextmenu", "field-resource-point", showResourceTopology);
     map.on("contextmenu", "field-resource-label", showResourceTopology);
-    map.on("mouseenter", "field-resource-point", showResourceQuality);
-    map.on("mouseenter", "field-resource-label", showResourceQuality);
-    map.on("mouseleave", "field-resource-point", hideResourceQuality);
-    map.on("mouseleave", "field-resource-label", hideResourceQuality);
+    map.on("mousemove", trackResourceQuality);
+    map.on("mouseout", hideResourceQuality);
     return () => {
-      if (singleClickTimerRef.current !== null) {
-        window.clearTimeout(singleClickTimerRef.current);
-        singleClickTimerRef.current = null;
-      }
       map.off("styledata", renderWhenReady);
       map.off("idle", renderWhenReady);
       map.off("click", "field-resource-point", selectResource);
@@ -2639,12 +2638,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       map.off("dblclick", "field-resource-label", openDroneVideo);
       map.off("contextmenu", "field-resource-point", showResourceTopology);
       map.off("contextmenu", "field-resource-label", showResourceTopology);
-      resourcePopupRef.current?.remove();
-      resourcePopupRef.current = null;
-      map.off("mouseenter", "field-resource-point", showResourceQuality);
-      map.off("mouseenter", "field-resource-label", showResourceQuality);
-      map.off("mouseleave", "field-resource-point", hideResourceQuality);
-      map.off("mouseleave", "field-resource-label", hideResourceQuality);
+      map.off("mousemove", trackResourceQuality);
+      map.off("mouseout", hideResourceQuality);
     };
   }, [cinematicMode, locations, changedUntil, eventCenter, onLocationDoubleClick, onLocationSelect, onLocationTopology, referenceTimeMs, selectedKey, showEvent, showResources, showTopology, topology, topologyFocusKey]);
 
