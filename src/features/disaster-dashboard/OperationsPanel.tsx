@@ -1,3 +1,4 @@
+import CameraPanel from "./CameraPanel";
 import { nmsSummary, receivedNumber } from "./nmsSummary";
 import { OFFICIAL_RFP_BASELINE, PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
 import { useEffect, useMemo, useState } from "react";
@@ -28,7 +29,7 @@ import {
   type AlertDeliveryTrace,
 } from "./alertDeliveryTrace";
 
-export type PanelTab = "weather" | "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
+export type PanelTab = "camera" | "weather" | "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
 export type ExternalSourceId =
   | "firms"
@@ -95,6 +96,7 @@ const SHOW_VALIDATION_UI =
 
 /* weather-operations-navigation-20261011: 시작 화면은 현장 기상 */
 const tabs: Array<{ id: PanelTab; label: string; icon: string }> = [
+  { id: "camera", label: "카메라", icon: "◉" },
   { id: "weather", label: "현장 기상", icon: "☀" },
   { id: "layers", label: "지도 레이어", icon: "▱" },
   { id: "alerts", label: "현장 경보", icon: "!" },
@@ -1002,6 +1004,7 @@ export function OperationsPanel({
           )}
         </header>
         <div className="operations-panel-body">
+          {activeTab === "camera" && <CameraPanel />}
           {activeTab === "weather" && <WeatherEnvironmentPanel />}
           {activeTab === "layers" && <section className="layer-control-list" aria-label="지도 레이어">
             <section className="layer-level-group" aria-labelledby="resource-layer-title">

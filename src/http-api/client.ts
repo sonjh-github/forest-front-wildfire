@@ -8,7 +8,7 @@ const API_BASE_URL = (
   `http://${API_HOST}:18000`
 ).replace(/\/+$/, "");
 
-const DASHBOARD_API_BASE_URL = (
+export const DASHBOARD_API_BASE_URL = (
   import.meta.env.VITE_DASHBOARD_API_BASE_URL?.trim() ||
   "https://api.forest.tobeunicorn.kr"
 ).replace(/\/+$/, "");
