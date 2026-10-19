@@ -14,3 +14,7 @@
 
 .camera-panel > p { color:#40586b; }
 .camera-screen p { color:#dbe8f6; }
+
+.camera-screen .video-playback { position:relative; overflow:hidden; isolation:isolate; }
+.camera-screen .video-playback__status,
+.camera-screen .video-playback__error { pointer-events:none; }

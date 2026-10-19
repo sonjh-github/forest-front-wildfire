@@ -96,7 +96,9 @@ export default function VideoPlayback({
       return;
     }
 
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    // Chromium may report native HLS support but fail on MPEG-TS streams.
+    // Prefer hls.js/MSE; use native HLS only when MSE is unavailable.
+    if (!Hls.isSupported() && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = playbackUri;
 
       void video.play().catch(() => {
