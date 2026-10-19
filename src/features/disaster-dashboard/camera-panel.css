@@ -1,7 +1,7 @@
-.camera-panel { display:grid; gap:16px; padding:16px; color:#dbe8f6; }
+.camera-panel { display:grid; gap:16px; padding:16px; color:#213c4c; }
 .camera-panel p { margin:0; font-size:13px; line-height:1.6; }
 .camera-panel form { display:grid; gap:10px; }
-.camera-panel label { font-size:12px; font-weight:600; }
+.camera-panel label { color:#213c4c; font-size:12px; font-weight:600; }
 .camera-panel input:not([type=checkbox]) { box-sizing:border-box; width:100%; min-width:0; border:1px solid #40536d; border-radius:6px; background:#0e1b2c; color:#e8f1ff; padding:11px; }
 .camera-address-toggle { display:flex; align-items:center; gap:7px; }
 .camera-actions { display:flex; gap:8px; }
@@ -9,5 +9,8 @@
 .camera-actions button:disabled { opacity:.5; cursor:default; }
 .camera-screen { background:#060c15; border:1px solid #2d435d; border-radius:8px; min-height:190px; overflow:hidden; display:grid; align-items:center; text-align:center; }
 .camera-screen video { display:block; width:100%; max-height:340px; }
-.camera-panel .camera-error { color:#ffb3a9; }
-.camera-panel small { font-size:11px; line-height:1.7; color:#a7bad1; }
+.camera-panel .camera-error { color:#a92320; }
+.camera-panel small { font-size:11px; line-height:1.7; color:#536c7d; }
+
+.camera-panel > p { color:#40586b; }
+.camera-screen p { color:#dbe8f6; }
