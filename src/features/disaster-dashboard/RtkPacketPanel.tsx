@@ -48,6 +48,10 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
   const metrics=data ? rtkPacketMetrics(data.packets) : null;
   return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
     <header className="rtk-packet-heading"><div><strong>RTK 상태 · 최근 100개 패킷</strong><small>장비별 서버 수신 시각 내림차순 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
+    <section className="rtk-performance-targets" aria-label="위치정보 성능 지표">
+      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>수신 기록 평균 <strong>{metrics?.measuredIntervalMs != null ? delay(metrics.measuredIntervalMs) : ""}</strong></span><small>최근 수신 패킷의 장비 측정 시각 기준</small></div>
+      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>실측값 <strong aria-label="성공률 실측값 미연동" /></span></div>
+    </section>
     {error && <p role="alert" className="rtk-packet-error">조회 실패: {error} {data ? "· 아래 값은 마지막 조회 결과입니다." : ""}</p>}
     {!data && !error && <div className="rtk-packet-loading">
       <p role="status">최근 100개 패킷을 불러오고 있습니다.</p>

@@ -47,3 +47,13 @@
 .rtk-frame-metrics .rtk-status-grid strong { font-size:23px; color:#164f3b; }
 .rtk-frame-metrics .rtk-status-grid strong small { display:inline; font-size:12px; font-weight:400; }
 .rtk-frame-metrics > p { margin:10px 0 0; font-size:11px; line-height:1.6; color:#526d65; }
+
+.rtk-performance-targets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+.rtk-performance-targets > div { min-width:0; padding:14px; border:1px solid #b7cec3; border-radius:8px; background:white; }
+.rtk-performance-targets header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; }
+.rtk-performance-targets header strong { font-size:14px; }
+.rtk-performance-targets header b { padding:5px 8px; border-radius:5px; background:#e5f1eb; color:#14583d; font-size:13px; }
+.rtk-performance-targets p { margin:8px 0 12px; color:#59736b; font-size:12px; }
+.rtk-performance-targets > div > span { display:block; min-height:28px; font-size:12px; color:#59736b; }
+.rtk-performance-targets span strong { margin-left:8px; font-size:22px; color:#164f3b; }
+@media(max-width:600px) { .rtk-performance-targets { grid-template-columns:1fr; } }
