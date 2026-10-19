@@ -411,3 +411,5 @@
 .resource-quality-popup-card dl div { line-height:1.35; }
 .resource-quality-popup-card dt { flex-shrink:0; }
 .resource-quality-popup-card > small { line-height:1.4; }
+
+.resource-quality-map-popup { z-index:60; }
