@@ -57,3 +57,13 @@
 .rtk-history-heading { font-size:14px; margin:18px 0 10px; color:#233e39; }
 
 .rtk-performance-targets .rtk-frame-stalled { margin:8px 0 0; padding:8px; border-left:3px solid #b56b08; background:#fff4df; color:#805000; font-size:12px; }
+
+.rtk-performance-targets .rtk-indicator-state { display:inline-flex; padding:6px 10px; margin:0 0 12px; border-radius:5px; background:#edf0ef; color:#536660; font-size:13px; font-weight:700; }
+.rtk-performance-targets .rtk-indicator-state[data-state=NORMAL], .rtk-performance-targets .rtk-indicator-state[data-state=PASS] { background:#e1f2e8; color:#14633f; }
+.rtk-performance-targets .rtk-indicator-state[data-state=STALLED], .rtk-performance-targets .rtk-indicator-state[data-state=DELAYED], .rtk-performance-targets .rtk-indicator-state[data-state=INSUFFICIENT] { background:#fff0d7; color:#885000; }
+.rtk-performance-targets .rtk-indicator-state[data-state=FAIL] { background:#fce6e4; color:#a22d28; }
+
+.rtk-metric-evidence { margin-top:12px; padding-top:10px; border-top:1px solid #e1e9e5; }
+.rtk-metric-evidence summary { cursor:pointer; font-size:12px; color:#59736b; }
+.rtk-metric-evidence[open] summary { margin-bottom:7px; }
+.rtk-performance-targets .rtk-delivery-counts { margin:6px 0 10px; font-size:16px; color:#233e39; }

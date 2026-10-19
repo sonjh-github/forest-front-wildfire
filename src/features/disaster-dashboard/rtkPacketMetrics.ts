@@ -12,9 +12,13 @@ export function rtkPacketMetrics(packets:Sample[]) {
   const frames=new Map<number,number|null>();
   const latestCounter=packets[0]?.frameCounter;
   const latestRun:number[]=[];
+  let priorCounterObserved=false;
   if(latestCounter!=null && Number.isSafeInteger(latestCounter) && latestCounter>=0) {
     for(const packet of packets) {
-      if(packet.frameCounter!==latestCounter)break;
+      if(packet.frameCounter!==latestCounter) {
+        priorCounterObserved=packet.frameCounter!=null && Number.isSafeInteger(packet.frameCounter) && packet.frameCounter>=0;
+        break;
+      }
       const received=timestamp(packet.receivedAt);
       if(received!==null)latestRun.push(received);
     }
@@ -37,6 +41,7 @@ export function rtkPacketMetrics(packets:Sample[]) {
   const measuredTimes=[...frames.values()].filter((time):time is number=>time!==null);
   const counters=[...frames.keys()];
   return {
+    lastNewFrameReceivedAt:priorCounterObserved && latestRun.length ? new Date(Math.min(...latestRun)).toISOString() : null,
     latestCounterRepeatedCount:latestRun.length,latestCounterObservedSpanMs:latestRun.length>=2 ? Math.max(...latestRun)-Math.min(...latestRun) : null,
     uniqueCount:frames.size,duplicateCount:validCounterCount-frames.size,
     missingCounterCount:packets.length-validCounterCount,
@@ -46,4 +51,19 @@ export function rtkPacketMetrics(packets:Sample[]) {
     measuredIntervalMs:meanInterval(allMeasuredTimes),measuredIntervalSamples:Math.max(0,allMeasuredTimes.length-1),
     receivedIntervalMs:meanInterval(receivedTimes),receivedIntervalSamples:Math.max(0,receivedTimes.length-1),
   };
+}
+
+export function rtkIndicatorStates(metrics:ReturnType<typeof rtkPacketMetrics>|null,receiverState:string|undefined,
+  sharingWindow:{expectedCount:number;successRatePercent:number}|null|undefined,hasError=false,latestReceivedAgeMs:number|null=null) {
+  const update=hasError ? "UNKNOWN" : !metrics ? "LOADING"
+    : receiverState==="DELAYED" || receiverState==="NO_RECENT_RECEPTION" ? "DELAYED"
+    : receiverState!=="RECEIVING" ? "UNKNOWN"
+    : latestReceivedAgeMs!==null && !Number.isFinite(latestReceivedAgeMs) ? "UNKNOWN"
+    : latestReceivedAgeMs!==null && latestReceivedAgeMs>5000 ? "DELAYED"
+    : metrics.latestCounterObservedSpanMs!==null && metrics.latestCounterObservedSpanMs>5000 ? "STALLED"
+    : metrics.frameIntervalMs===null ? "UNKNOWN" : metrics.frameIntervalMs<=5000 ? "NORMAL" : "DELAYED";
+  const sharing=hasError ? "UNKNOWN" : !metrics ? "LOADING" : !sharingWindow ? "UNKNOWN"
+    : !Number.isFinite(sharingWindow.successRatePercent) || sharingWindow.successRatePercent<0 || sharingWindow.successRatePercent>100 ? "UNKNOWN"
+    : sharingWindow.expectedCount<100 ? "INSUFFICIENT" : sharingWindow.successRatePercent>=98 ? "PASS" : "FAIL";
+  return {update,sharing} as const;
 }

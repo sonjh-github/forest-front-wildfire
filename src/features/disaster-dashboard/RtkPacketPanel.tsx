@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { dashboardApi } from "../../http-api/client";
 import "./rtk-packets.css";
-import { rtkPacketMetrics } from "./rtkPacketMetrics";
+import { rtkPacketMetrics, rtkIndicatorStates } from "./rtkPacketMetrics";
 
 type Packet = {
   id:string;eventExternalId:string|null;receivedAt:string|null;occurredAt:string|null;delayMs:number|null;
@@ -47,7 +47,10 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
   },[assetId,revision]);
   const latest=data?.packets[0];
   const metrics=data ? rtkPacketMetrics(data.packets) : null;
-  const frameStalled=metrics?.latestCounterObservedSpanMs!=null && metrics.latestCounterObservedSpanMs>5000;
+  const latestReceivedAgeMs=data && latest?.receivedAt ? Math.max(0,Date.parse(data.checkedAt)-Date.parse(latest.receivedAt)) : null;
+  const indicatorStates=rtkIndicatorStates(metrics,data?.receiverState,data?.sharingWindow,Boolean(error),latestReceivedAgeMs);
+  const updateLabels={LOADING:"조회 중",UNKNOWN:"확인 불가",NORMAL:"새 데이터 갱신 정상",DELAYED:"새 데이터 갱신 지연",STALLED:"새 데이터 확인 안 됨"};
+  const sharingLabels={LOADING:"조회 중",UNKNOWN:"계산 불가",INSUFFICIENT:"평가할 기록 부족",PASS:"수신율 목표 충족",FAIL:"수신율 목표 미달"};
   return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
     <header className="rtk-packet-heading"><div><strong>현재 상태</strong><small>수신·측위·좌표·측정 시각 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
     {data && <>
@@ -65,8 +68,22 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
       <div className="rtk-loading-table" aria-hidden="true">{Array.from({length:6},(_,index)=><i className="rtk-loading-line" key={index} />)}</div>
     </div>}
     <section className="rtk-performance-targets" aria-label="위치정보 성능 지표">
-      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header><p>대원/차량의 위치정보 실시간 송신 주기</p><span>새 FCnt 평균 간격 <strong>{frameStalled ? "FCnt 정체" : metrics?.frameIntervalMs != null ? delay(metrics.frameIntervalMs) : metrics ? "갱신 미확인" : ""}</strong></span><small>서로 다른 FCnt의 최초 장비 측정 시각 기준</small>{metrics && <small>로그 수신 기록 간격: {metrics.measuredIntervalMs===null ? "" : delay(metrics.measuredIntervalMs)} · 중복 포함</small>}</div>
-      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header><p>실시간 대원/차량의 위치정보 성공 전달률</p><span>번호 구간 누적 수신율 <strong>{data?.sharingWindow ? `${data.sharingWindow.successRatePercent.toFixed(1)}%` : ""}</strong></span>{data?.sharingWindow && <><small>수신 {data.sharingWindow.receivedCount} / {data.sharingWindow.expectedCount}개 · 미수신 {data.sharingWindow.missingCount}개</small><small>FCnt {data.sharingWindow.fromCounter} ~ {data.sharingWindow.toCounter} · 중복은 1회 집계</small></>}{frameStalled && metrics && latest && <p className="rtk-frame-stalled" role="status">최신 {metrics.latestCounterRepeatedCount}건 연속 FCnt {latest.frameCounter} · 최소 {delay(metrics.latestCounterObservedSpanMs)} 동안 새 번호 수신 없음</p>}</div>
+      <div><header><strong>위치정보 갱신주기</strong><b>목표 5초 이하</b></header>
+        <p>지금 새 위치 데이터가 계속 들어오는지 확인합니다.</p>
+        <div className="rtk-indicator-state" data-state={indicatorStates.update} role="status">{updateLabels[indicatorStates.update]}</div>
+        <span>평균 갱신 간격 <strong>{metrics?.frameIntervalMs!=null ? delay(metrics.frameIntervalMs) : "—"}</strong></span>
+        <small>마지막 새 데이터 수신: {metrics?.lastNewFrameReceivedAt ? time(metrics.lastNewFrameReceivedAt) : "현재 조회 기록만으로 확인 불가"}</small>
+        {indicatorStates.update==="STALLED" && metrics && <p className="rtk-frame-stalled">수신은 계속되고 있지만, 최신 {metrics.latestCounterRepeatedCount}건의 데이터 번호가 같습니다.</p>}
+        <details className="rtk-metric-evidence"><summary>계산 근거</summary><small>서로 다른 데이터 번호의 최초 측정 시각으로 간격을 계산합니다.</small>{metrics && latest && <><small>최신 FCnt {latest.frameCounter} · 동일 번호 연속 {metrics.latestCounterRepeatedCount}건</small><small>조회 기록 범위 {delay(metrics.latestCounterObservedSpanMs)} · 실제 정체 시작 시각을 뜻하지 않습니다.</small><small>중복 포함 로그 간격: {metrics.measuredIntervalMs===null ? "" : delay(metrics.measuredIntervalMs)}</small></>}</details>
+      </div>
+      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header>
+        <p>최근 100개 데이터 번호 중 도착한 비율입니다.</p>
+        <div className="rtk-indicator-state" data-state={indicatorStates.sharing} role="status">{sharingLabels[indicatorStates.sharing]}</div>
+        <span>수신율 <strong>{data?.sharingWindow ? `${data.sharingWindow.successRatePercent.toFixed(1)}%` : "—"}</strong></span>
+        {data?.sharingWindow && <p className="rtk-delivery-counts"><b>{data.sharingWindow.receivedCount}개 도착</b> · {data.sharingWindow.missingCount}개 미수신 <small>전체 {data.sharingWindow.expectedCount}개 기준</small></p>}
+        <small>수신율이 높아도 현재 새 데이터 갱신이 멈춰 있을 수 있습니다.</small>
+        <details className="rtk-metric-evidence"><summary>계산 근거</summary>{data?.sharingWindow && <><small>FCnt {data.sharingWindow.fromCounter} ~ {data.sharingWindow.toCounter}</small><small>같은 번호는 한 번만 집계합니다. 번호가 바뀌지 않으면 이 계산 범위도 유지됩니다.</small></>}</details>
+      </div>
     </section>
     {data && <>
       <h3 className="rtk-history-heading">패킷 이력 · 최근 100개</h3>
