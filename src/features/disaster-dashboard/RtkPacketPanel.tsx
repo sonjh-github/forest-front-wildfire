@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { dashboardApi } from "../../http-api/client";
 import "./rtk-packets.css";
+import { rtkPacketMetrics } from "./rtkPacketMetrics";
 
 type Packet = {
   id:string;eventExternalId:string|null;receivedAt:string|null;occurredAt:string|null;delayMs:number|null;
@@ -44,6 +45,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
     return () => {controller.abort();if(timer)clearTimeout(timer);};
   },[assetId,revision]);
   const latest=data?.packets[0];
+  const metrics=data ? rtkPacketMetrics(data.packets) : null;
   return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
     <header className="rtk-packet-heading"><div><strong>RTK 상태 · 최근 100개 패킷</strong><small>장비별 서버 수신 시각 내림차순 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
     {error && <p role="alert" className="rtk-packet-error">조회 실패: {error} {data ? "· 아래 값은 마지막 조회 결과입니다." : ""}</p>}
@@ -52,7 +54,17 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
       <div className="rtk-status-grid" aria-hidden="true">{["서버 수신 상태", "최신 저장 패킷 Fix", "좌표 상태", "장비 측정 시각"].map(label => <div key={label}><span>{label}</span><i className="rtk-loading-line" /><i className="rtk-loading-line short" /></div>)}</div>
       <div className="rtk-loading-table" aria-hidden="true">{Array.from({length:6},(_,index)=><i className="rtk-loading-line" key={index} />)}</div>
     </div>}
-    {data && <>
+    {data && metrics && <>
+      <section className="rtk-frame-metrics" aria-label="FCnt 핵심 지표">
+        <strong>FCnt 핵심 지표 · 최근 {data.packets.length}개 수신 기록</strong>
+        <div className="rtk-status-grid">
+          <div><span>고유 FCnt · 서로 다른 카운터</span><strong>{metrics.uniqueCount}개 <small>/ 수신 {data.packets.length}건</small></strong><small>FCnt 범위 {value(metrics.minCounter)} ~ {value(metrics.maxCounter)}</small></div>
+          <div><span>중복 FCnt 수신</span><strong>{metrics.duplicateCount}건</strong><small>FCnt 누락·오류 {metrics.missingCounterCount}건</small></div>
+          <div><span>평균 패킷 간격 · 장비 시각</span><strong>{metrics.measuredIntervalMs===null ? "계산 불가" : delay(metrics.measuredIntervalMs)}</strong><small>중복 포함 · {metrics.measuredIntervalSamples}개 간격</small><small>고유 FCnt 간격: {metrics.frameIntervalMs===null ? "계산 불가" : delay(metrics.frameIntervalMs)}</small></div>
+          <div><span>서버 평균 수신 간격</span><strong>{metrics.receivedIntervalMs===null ? "계산 불가" : delay(metrics.receivedIntervalMs)}</strong><small>중복 포함 · {metrics.receivedIntervalSamples}개 간격</small></div>
+        </div>
+        <p>원본 로그는 중복을 포함해 모두 표시합니다. 평균 간격은 유효한 시각을 시간순으로 정렬해 계산합니다(최소 2건). 고유 FCnt 간격만 카운터별 최초 측정 시각을 사용합니다.</p>
+      </section>
       <div className="rtk-status-grid">
         <div><span>서버 수신 상태</span><strong data-state={error ? "UNKNOWN" : data.receiverState}>{error ? "확인 불가" : reception[data.receiverState] ?? data.receiverState}</strong><small>{time(data.latestReceivedAt)}</small></div>
         <div><span>최신 저장 패킷 Fix</span><strong data-state={latest?.fixState}>{latest ? fixes[latest.fixState] : "자체 위치 패킷 없음"}</strong><small>{latest?.fixType ?? "Fix 값 미수신"}</small></div>

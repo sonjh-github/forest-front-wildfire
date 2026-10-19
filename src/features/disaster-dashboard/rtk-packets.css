@@ -41,3 +41,9 @@
 .rtk-loading-table { display:grid; gap:22px; padding:20px; margin-top:24px; border:1px solid #d5e2dd; border-radius:7px; background:#fff; }
 @media(max-width:800px) { .rtk-detail-modal .rtk-status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:480px) { .resource-modal-backdrop:has(.rtk-detail-modal) { padding:72px 8px 12px; } .dashboard-map-stage .selected-location-drawer.resource-modal.rtk-detail-modal { width:calc(100vw - 16px); height:calc(100dvh - 84px); max-height:calc(100dvh - 84px); padding:12px; } .dashboard-map-stage .rtk-detail-modal > .resource-detail-heading { top:-12px; } .rtk-detail-modal .rtk-status-grid { grid-template-columns:1fr; } }
+
+.rtk-frame-metrics { margin-bottom:18px; padding:14px; border:1px solid #9fbeaf; border-radius:8px; background:#edf5f0; }
+.rtk-frame-metrics > strong { display:block; margin-bottom:12px; font-size:14px; color:#164f3b; }
+.rtk-frame-metrics .rtk-status-grid strong { font-size:23px; color:#164f3b; }
+.rtk-frame-metrics .rtk-status-grid strong small { display:inline; font-size:12px; font-weight:400; }
+.rtk-frame-metrics > p { margin:10px 0 0; font-size:11px; line-height:1.6; color:#526d65; }
