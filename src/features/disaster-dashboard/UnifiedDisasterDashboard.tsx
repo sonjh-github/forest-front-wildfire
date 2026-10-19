@@ -1,3 +1,4 @@
+import RtkPacketPanel from "./RtkPacketPanel";
 import { DroneTwinDetail } from "./DroneTwinDetail";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { externalDisasterApi, loadDashboardDisasterAssetsCached, loadEventOverview, loadEventTimeline, type ApiRecord, type EventOverview, type EventTimeline, type ForestEvent } from "../../http-api";
@@ -1375,6 +1376,7 @@ export default function UnifiedDisasterDashboard() {
       : [],
   );
   const selectedLocation = mapLocations.find((location) => locationKey(location) === selectedLocationKey) ?? null;
+  const selectedRtk = Boolean(selectedLocation && ["RTK_TERMINAL", "RTK_BASE_LPWA_GATEWAY"].includes(selectedLocation.category));
   const selectedTelemetryHistory = selectedLocation
     ? telemetrySamples.filter((sample) => sample.assetId === selectedLocation.id).slice(-20).reverse()
     : [];
@@ -2430,7 +2432,7 @@ export default function UnifiedDisasterDashboard() {
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
             <section className="selected-location-drawer resource-modal" role="dialog" aria-modal={!hybridExhibitionMode} aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
               <div><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small></div>
-              <dl>
+              {selectedRtk ? <RtkPacketPanel key={selectedLocation.id} assetId={selectedLocation.id} /> : <dl>
                 <div>
                   <dt>통신 상태</dt>
                   <dd>{selectedLocation.qualityStatus || selectedLocation.status || "확인 중"}</dd>
@@ -2466,8 +2468,8 @@ export default function UnifiedDisasterDashboard() {
                   <div><dt>속도·방향</dt><dd>{selectedLocation.groundSpeedMps == null ? "수신 전" : `${selectedLocation.groundSpeedMps.toFixed(1)}m/s · ${selectedLocation.headingDeg?.toFixed(0) ?? "-"}°`}</dd></div>
                   <div><dt>비상 상태</dt><dd>{selectedLocation.emergencyStatus ?? "정상"}</dd></div>
                 </>}
-              </dl>
-              {selectedTelemetryHistory.length > 0 && <section className="asset-live-history" aria-label={`${selectedLocation.id} 실시간 수신 이력`}>
+              </dl>}
+              {!selectedRtk && selectedTelemetryHistory.length > 0 && <section className="asset-live-history" aria-label={`${selectedLocation.id} 실시간 수신 이력`}>
                 <header><div><small>GATEWAY RAW HISTORY</small><strong>최근 위치 수신 {selectedTelemetryHistory.length}건</strong></div><button type="button" onClick={downloadSelectedTelemetry}>JSON 증적</button></header>
                 <ol>{selectedTelemetryHistory.slice(0, 6).map((sample, index) => <li key={`${sample.observedAt}-${sample.sequence ?? index}`}><time>{new Date(sample.observedAt).toLocaleTimeString("ko-KR")}</time><span>{sample.latitude?.toFixed(6) ?? "-"}, {sample.longitude?.toFixed(6) ?? "-"}</span><em>SEQ {sample.sequence ?? "-"}</em></li>)}</ol>
               </section>}

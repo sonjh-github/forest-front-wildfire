@@ -1,0 +1,23 @@
+.rtk-packet-panel { margin:14px 0; padding:16px; border:1px solid #c3d5d0; border-radius:10px; background:#f6faf9; color:#233e39; }
+.rtk-packet-heading { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; }
+.rtk-packet-heading strong { font-size:15px; }
+.rtk-packet-panel small { display:block; font-size:11px; color:#59736b; line-height:1.6; }
+.rtk-packet-panel button { border:1px solid #a9c3ba; border-radius:5px; background:white; color:#225647; padding:6px 9px; cursor:pointer; white-space:nowrap; }
+.rtk-status-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.rtk-status-grid > div { display:grid; gap:5px; padding:12px; border:1px solid #d5e2dd; border-radius:7px; background:white; overflow-wrap:anywhere; }
+.rtk-status-grid span { font-size:11px; color:#59736b; }
+.rtk-status-grid strong { font-size:13px; }
+.rtk-packet-panel [data-state=NO_FIX], .rtk-packet-panel [data-state=ZERO], .rtk-packet-panel [data-state=UNCONFIRMED], .rtk-packet-panel [data-state=DELAYED] { color:#9b5a00; }
+.rtk-packet-panel [data-state=RTK_FIXED], .rtk-packet-panel [data-state=VALID], .rtk-packet-panel [data-state=RECEIVING] { color:#14734f; }
+.rtk-packet-panel [data-state=INVALID], .rtk-packet-panel [data-state=NO_RECENT_RECEPTION], .rtk-packet-error { color:#a02d2d; }
+.rtk-packet-panel .rtk-state-explanation { font-size:11px; line-height:1.7; color:#526d65; margin:10px 0; }
+.rtk-packet-counts { display:flex; flex-wrap:wrap; gap:7px; }
+.rtk-packet-counts span { background:#e6efeb; padding:7px 9px; border-radius:5px; font-size:12px; }
+.rtk-latest-meta { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:11px; margin:10px 0; }
+.rtk-packet-table { max-height:400px; overflow:auto; border:1px solid #c3d5d0; border-radius:6px; background:white; }
+.rtk-packet-table table { width:100%; min-width:1020px; border-collapse:collapse; font-size:11px; text-align:left; }
+.rtk-packet-table th { position:sticky; top:0; background:#e7efeb; color:#244e40; z-index:1; }
+.rtk-packet-table th,.rtk-packet-table td { padding:9px; border-bottom:1px solid #dae6df; vertical-align:top; }
+.rtk-packet-table td strong { font-size:11px; }
+.rtk-packet-table pre { max-height:220px; overflow:auto; background:#101f1c; color:#dceee6; padding:12px; font-size:11px; text-align:left; }
+@media(max-width:600px) { .rtk-status-grid {grid-template-columns:1fr;} .rtk-packet-panel {padding:10px;} }
