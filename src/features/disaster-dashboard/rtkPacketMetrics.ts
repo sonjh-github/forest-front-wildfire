@@ -62,8 +62,11 @@ export function rtkIndicatorStates(metrics:ReturnType<typeof rtkPacketMetrics>|n
     : latestReceivedAgeMs!==null && latestReceivedAgeMs>5000 ? "DELAYED"
     : metrics.latestCounterObservedSpanMs!==null && metrics.latestCounterObservedSpanMs>5000 ? "STALLED"
     : metrics.frameIntervalMs===null ? "UNKNOWN" : metrics.frameIntervalMs<=5000 ? "NORMAL" : "DELAYED";
-  const sharing=hasError ? "UNKNOWN" : !metrics ? "LOADING" : !sharingWindow ? "UNKNOWN"
+  const deliveryActive=metrics!==null && receiverState==="RECEIVING" && metrics.frameIntervalMs!==null
+    && (metrics.latestCounterObservedSpanMs===null || metrics.latestCounterObservedSpanMs<=5000)
+    && (latestReceivedAgeMs===null || (Number.isFinite(latestReceivedAgeMs) && latestReceivedAgeMs<=5000));
+  const sharing=hasError ? "UNKNOWN" : !metrics ? "LOADING" : !deliveryActive ? "UNCONFIRMED" : !sharingWindow ? "UNKNOWN"
     : !Number.isFinite(sharingWindow.successRatePercent) || sharingWindow.successRatePercent<0 || sharingWindow.successRatePercent>100 ? "UNKNOWN"
-    : sharingWindow.expectedCount<100 ? "INSUFFICIENT" : sharingWindow.successRatePercent>=98 ? "PASS" : "FAIL";
+    : sharingWindow.expectedCount<2 ? "UNCONFIRMED" : sharingWindow.successRatePercent>=98 ? "PASS" : "FAIL";
   return {update,sharing} as const;
 }

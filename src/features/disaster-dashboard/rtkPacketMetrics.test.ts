@@ -39,26 +39,36 @@ describe("두 지표의 상태를 독립적으로 판정한다",()=>{
   it("갱신 5초와 성공률 98%를 각각 포함해 목표 충족으로 본다",()=>{
     expect(rtkIndicatorStates(receiving,"RECEIVING",{expectedCount:100,successRatePercent:98})).toEqual({update:"NORMAL",sharing:"PASS"});
   });
-  it("FCnt가 정체돼도 과거 번호 구간의 수신율 상태와 섞지 않는다",()=>{
+  it("FCnt 정체 시 과거 수신율이 100%라도 현재 성공으로 판정하지 않는다",()=>{
     const stalled=rtkPacketMetrics([sample(2,10),sample(2,0)]);
-    expect(rtkIndicatorStates(stalled,"RECEIVING",{expectedCount:100,successRatePercent:100})).toEqual({update:"STALLED",sharing:"PASS"});
+    expect(rtkIndicatorStates(stalled,"RECEIVING",{expectedCount:100,successRatePercent:100})).toEqual({update:"STALLED",sharing:"UNCONFIRMED"});
   });
   it("갱신이 정상이어도 수신율 97%는 별도로 목표 미달이다",()=>{
     expect(rtkIndicatorStates(receiving,"RECEIVING",{expectedCount:100,successRatePercent:97})).toEqual({update:"NORMAL",sharing:"FAIL"});
   });
   it("최근 수신이 없으면 과거 평균이 빨라도 갱신 지연이다",()=>{
-    expect(rtkIndicatorStates(receiving,"NO_RECENT_RECEPTION",{expectedCount:100,successRatePercent:99}).update).toBe("DELAYED");
+    expect(rtkIndicatorStates(receiving,"NO_RECENT_RECEPTION",{expectedCount:100,successRatePercent:99})).toEqual({update:"DELAYED",sharing:"UNCONFIRMED"});
   });
   it("최근 수신 중이어도 마지막 패킷이 5초를 넘으면 갱신 지연이다",()=>{
     const window={expectedCount:100,successRatePercent:99};
     expect(rtkIndicatorStates(receiving,"RECEIVING",window,false,5000).update).toBe("NORMAL");
-    expect(rtkIndicatorStates(receiving,"RECEIVING",window,false,5001).update).toBe("DELAYED");
+    expect(rtkIndicatorStates(receiving,"RECEIVING",window,false,5001)).toEqual({update:"DELAYED",sharing:"UNCONFIRMED"});
   });
-  it("초기 10개만 받은 100%는 100개 구간 목표 판정을 보류한다",()=>{
-    expect(rtkIndicatorStates(receiving,"RECEIVING",{expectedCount:10,successRatePercent:100}).sharing).toBe("INSUFFICIENT");
+  it("번호 범위가 10개이면 그 범위의 수신율을 평가한다",()=>{
+    expect(rtkIndicatorStates(receiving,"RECEIVING",{expectedCount:10,successRatePercent:100}).sharing).toBe("PASS");
   });
   it("로딩과 오류를 구분하고 오류 시 과거 결과를 정상으로 판정하지 않는다",()=>{
     expect(rtkIndicatorStates(null,undefined,null)).toEqual({update:"LOADING",sharing:"LOADING"});
     expect(rtkIndicatorStates(receiving,"RECEIVING",{expectedCount:100,successRatePercent:100},true)).toEqual({update:"UNKNOWN",sharing:"UNKNOWN"});
   });
+});
+
+it("새 번호가 계속 수신되면 평균 간격 목표와 전달률 목표는 각각 평가한다",()=>{
+  const slow=rtkPacketMetrics([sample(2,6),sample(1,0)]);
+  expect(rtkIndicatorStates(slow,"RECEIVING",{expectedCount:100,successRatePercent:100},false,0)).toEqual({update:"DELAYED",sharing:"PASS"});
+});
+
+it("같은 번호만 반복되면 번호 구간이 없으므로 현재 전달을 성공 처리하지 않는다",()=>{
+  const repeated=rtkPacketMetrics(Array.from({length:100},(_,i)=>sample(412,200-i*2)));
+  expect(rtkIndicatorStates(repeated,"RECEIVING",null).sharing).toBe("UNCONFIRMED");
 });
