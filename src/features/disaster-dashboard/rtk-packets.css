@@ -69,3 +69,9 @@
 .rtk-performance-targets .rtk-delivery-counts { margin:6px 0 10px; font-size:16px; color:#233e39; }
 
 .rtk-performance-targets .rtk-indicator-state[data-state=UNCONFIRMED] { background:#fff0d7; color:#885000; }
+
+.rtk-counter-comparison { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:10px; align-items:center; margin:0 0 12px; padding:10px; border:1px solid #e0e8e4; border-radius:6px; background:#f7faf8; }
+.rtk-counter-comparison strong { display:block; font-size:22px; color:#244b3d; }
+.rtk-counter-comparison > span { color:#7c9188; }
+.rtk-missing-numbers { max-height:110px; overflow:auto; overflow-wrap:anywhere; margin-bottom:10px; padding:9px; border-radius:5px; background:#f0f4f2; font-size:13px; line-height:1.6; }
+.rtk-missing-numbers[data-missing=true] { background:#fff0e4; color:#8a3e00; }

@@ -72,3 +72,9 @@ it("같은 번호만 반복되면 번호 구간이 없으므로 현재 전달을
   const repeated=rtkPacketMetrics(Array.from({length:100},(_,i)=>sample(412,200-i*2)));
   expect(rtkIndicatorStates(repeated,"RECEIVING",null).sharing).toBe("UNCONFIRMED");
 });
+
+it("웹의 최신 패킷으로부터 100건 전 기록이 없으면 대기 상태를 우선 표시한다",()=>{
+  const metrics=rtkPacketMetrics([sample(412,10),sample(412,0)]);
+  expect(rtkIndicatorStates(metrics,"RECEIVING",null,false,0,"WAITING_HISTORY").sharing).toBe("WAITING");
+  expect(rtkIndicatorStates(metrics,"RECEIVING",null,true,0,"WAITING_HISTORY").sharing).toBe("UNKNOWN");
+});
