@@ -66,15 +66,15 @@ export default function CameraPanel() {
   }
 
   return <section className="camera-panel" aria-label="카메라 영상">
-    <p>RTSP 주소를 입력해 현장 카메라 영상을 확인하세요.</p>
+    <p>RTSP 주소를 입력해 현장 카메라 영상을 확인하세요. 연결 중에도 주소를 편집하고 변경한 주소로 다시 연결할 수 있습니다.</p>
     <form onSubmit={connect}>
       <label htmlFor="camera-rtsp">RTSP 주소</label>
       <input id="camera-rtsp" type={showAddress ? "text" : "password"} value={uri}
         onChange={(event) => setUri(event.target.value)} placeholder="rtsp://카메라주소:554/경로"
-        autoComplete="off" spellCheck={false} required disabled={Boolean(requestedUri)} />
+        autoComplete="off" spellCheck={false} required />
       <label className="camera-address-toggle"><input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />주소 표시</label>
       <div className="camera-actions">
-        <button type="submit" disabled={!uri.trim() || Boolean(requestedUri)}>{connecting ? "연결 중…" : "영상 연결"}</button>
+        <button type="submit" disabled={!uri.trim() || uri.trim() === requestedUri}>{connecting && uri.trim() === requestedUri ? "연결 중…" : requestedUri ? "변경한 주소로 연결" : "영상 연결"}</button>
         <button type="button" disabled={!requestedUri} onClick={() => { setRequestedUri(""); setPlaybackUri(""); setConnecting(false); }}>연결 중지</button>
       </div>
     </form>
