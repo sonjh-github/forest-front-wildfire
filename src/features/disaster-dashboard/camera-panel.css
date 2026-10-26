@@ -19,9 +19,15 @@
 .camera-screen .video-playback__status,
 .camera-screen .video-playback__error { pointer-events:none; }
 
-.camera-reception { display:grid; gap:6px; padding:12px; border:1px solid #ccdcd5; border-radius:8px; background:#f5f9f7; }
-.camera-reception header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; font-size:13px; }
-.camera-reception header b { padding:4px 6px; border-radius:4px; background:#edf0f3; color:#536c7d; font-size:11px; }
-.camera-reception header b[data-state=READY] { background:#dfefe6; color:#226344; }
-.camera-reception header b[data-state=STALLED],.camera-reception header b[data-state=FAILED] { background:#fff0dc; color:#8a4a00; }
-.camera-panel .camera-reception-rate { font-size:26px; font-weight:700; line-height:1.3; }
+.camera-performance-targets {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;}
+.camera-performance-targets > div {display:grid;gap:8px;padding:13px;border:1px solid #ccdcd5;border-radius:8px;background:#f5f9f7;}
+.camera-performance-targets header {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px;}
+.camera-performance-targets header b {font-size:11px;padding:5px 7px;border-radius:4px;background:#e5f1eb;color:#14583d;}
+.camera-performance-targets > div > span {font-size:12px;color:#59736b;}
+.camera-performance-targets span strong {display:block;font-size:22px;color:#164f3b;}
+.camera-indicator-state {padding:8px;border-radius:5px;background:#edf0f3;color:#536c7d;font-size:13px;font-weight:700;}
+.camera-indicator-state[data-state=NORMAL],.camera-indicator-state[data-state=PASS] {background:#dfefe6;color:#226344;}
+.camera-indicator-state[data-state=STALLED],.camera-indicator-state[data-state=DELAYED],.camera-indicator-state[data-state=FAIL],.camera-indicator-state[data-state=UNCONFIRMED] {background:#fff0dc;color:#8a4a00;}
+.camera-performance-targets details {border-top:1px solid #dce5e2;padding-top:8px;}
+.camera-performance-targets summary {cursor:pointer;font-size:12px;color:#536c7d;}
+.camera-panel .camera-metric-note {font-size:12px;background:#fff0dc;color:#8a4a00;padding:8px;border-radius:4px;}
