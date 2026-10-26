@@ -3,6 +3,8 @@ import { dashboardApi, DASHBOARD_API_BASE_URL } from "../../http-api/client";
 import VideoPlayback from "./VideoPlayback";
 import "./camera-panel.css";
 
+type ReceptionState = "READY" | "CONNECTING" | "STALLED" | "FAILED";
+const receptionLabels = {READY:"정상 수신",CONNECTING:"연결 준비 중",STALLED:"영상 수신 지연",FAILED:"수신 실패",IDLE:"점검 대기",STOPPED:"연결 중지"};
 type CameraSession = { id: string; playbackPath: string };
 export default function CameraPanel() {
   const [uri, setUri] = useState("rtsp://210.99.70.120:1935/live/cctv001.stream");
@@ -12,6 +14,11 @@ export default function CameraPanel() {
   const [connecting, setConnecting] = useState(false);
   const [showAddress, setShowAddress] = useState(false);
 
+  const [checks, setChecks] = useState<ReceptionState[]>([]);
+  const [receptionState, setReceptionState] = useState<ReceptionState | "IDLE" | "STOPPED">("IDLE");
+  const [checkedAt, setCheckedAt] = useState<number | null>(null);
+  const successfulChecks = checks.filter(state => state === "READY").length;
+
   useEffect(() => {
     if (!requestedUri) return;
     let active = true;
@@ -19,6 +26,14 @@ export default function CameraPanel() {
     const stop = () => {
       if (id) void dashboardApi(`/api/v1/dashboard/cameras/sessions/${id}/stop`, {method:"POST"}).catch(() => {});
       id = undefined;
+    };
+    setChecks([]);
+    setCheckedAt(null);
+    setReceptionState("CONNECTING");
+    const recordCheck = (state: ReceptionState) => {
+      setChecks(previous => [...previous,state].slice(-100));
+      setReceptionState(state);
+      setCheckedAt(Date.now());
     };
     setConnecting(true);
     setPlaybackUri("");
@@ -31,21 +46,25 @@ export default function CameraPanel() {
         id = response.data.id;
         if (!active) { stop(); return; }
         const deadline = Date.now() + 30_000;
-        while (active && Date.now() < deadline) {
-          const status = await dashboardApi<{data:{status:string;message?:string}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
+        let ready = false;
+        while (active) {
+          const status = await dashboardApi<{data:{status:ReceptionState;message?:string}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
           if (!active) return;
           if (status.data.status === "FAILED") throw new Error(status.data.message);
-          if (status.data.status === "READY") {
+          if (!ready && status.data.status !== "READY" && Date.now() >= deadline) throw new Error("영상 연결 시간이 초과됐습니다. 카메라 주소와 네트워크를 확인하세요.");
+          recordCheck(status.data.status);
+          if (status.data.status === "READY" && !ready) {
+            ready = true;
             setPlaybackUri(`${DASHBOARD_API_BASE_URL}${response.data.playbackPath}`);
             setConnecting(false);
-            return;
           }
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 5000));
         }
-        if (active) throw new Error("영상 연결 시간이 초과됐습니다. 카메라 주소와 네트워크를 확인하세요.");
       } catch (caught) {
         stop();
         if (active) {
+          recordCheck("FAILED");
+          setPlaybackUri("");
           setError(caught instanceof Error ? caught.message : "카메라 연결에 실패했습니다.");
           setConnecting(false);
           setRequestedUri("");
@@ -75,10 +94,18 @@ export default function CameraPanel() {
       <label className="camera-address-toggle"><input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />주소 표시</label>
       <div className="camera-actions">
         <button type="submit" disabled={!uri.trim() || uri.trim() === requestedUri}>{connecting && uri.trim() === requestedUri ? "연결 중…" : requestedUri ? "변경한 주소로 연결" : "영상 연결"}</button>
-        <button type="button" disabled={!requestedUri} onClick={() => { setRequestedUri(""); setPlaybackUri(""); setConnecting(false); }}>연결 중지</button>
+        <button type="button" disabled={!requestedUri} onClick={() => { setRequestedUri(""); setPlaybackUri(""); setConnecting(false); setReceptionState("STOPPED"); }}>연결 중지</button>
       </div>
     </form>
     {error && <p className="camera-error" role="alert">{error}</p>}
+    <section className="camera-reception" aria-label="RTSP 통신 성공률">
+      <header><strong>RTSP 통신 성공률</strong><b data-state={receptionState}>{receptionLabels[receptionState]}</b></header>
+      <p className="camera-reception-rate">{checks.length ? `${(successfulChecks / checks.length * 100).toFixed(1)}%` : "—"}</p>
+      <p>최근 {checks.length}/100회 점검 · 정상 {successfulChecks}회</p>
+      <small>준비 {checks.filter(state => state === "CONNECTING").length} · 지연 {checks.filter(state => state === "STALLED").length} · 실패 {checks.filter(state => state === "FAILED").length}</small>
+      <small>5초마다 중계 서버 영상 갱신 확인 · 10초 이내 갱신 시 정상. 정상 횟수 ÷ 전체 점검 횟수이며 준비 중도 포함합니다.</small>
+      <small>{checkedAt ? `마지막 점검: ${new Date(checkedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false})}` : "영상 연결 후 집계를 시작합니다."} 주소 변경·새 연결 시 집계를 초기화합니다. 패킷 손실률과는 다릅니다.</small>
+    </section>
     <div className="camera-screen" aria-live="polite">
       {playbackUri ? <VideoPlayback streamUri={playbackUri} enabled label="현장 카메라" />
         : <p>{connecting ? "카메라에서 영상을 수신하고 있습니다…" : "연결된 카메라가 없습니다."}</p>}

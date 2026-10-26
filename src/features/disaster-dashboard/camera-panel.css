@@ -18,3 +18,10 @@
 .camera-screen .video-playback { position:relative; overflow:hidden; isolation:isolate; }
 .camera-screen .video-playback__status,
 .camera-screen .video-playback__error { pointer-events:none; }
+
+.camera-reception { display:grid; gap:6px; padding:12px; border:1px solid #ccdcd5; border-radius:8px; background:#f5f9f7; }
+.camera-reception header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; font-size:13px; }
+.camera-reception header b { padding:4px 6px; border-radius:4px; background:#edf0f3; color:#536c7d; font-size:11px; }
+.camera-reception header b[data-state=READY] { background:#dfefe6; color:#226344; }
+.camera-reception header b[data-state=STALLED],.camera-reception header b[data-state=FAILED] { background:#fff0dc; color:#8a4a00; }
+.camera-panel .camera-reception-rate { font-size:26px; font-weight:700; line-height:1.3; }
