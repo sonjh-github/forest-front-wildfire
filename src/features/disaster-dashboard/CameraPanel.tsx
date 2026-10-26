@@ -1,4 +1,4 @@
-import { NetworkAvailability, type Availability } from "./NetworkAvailability";
+import { ReceptionRecoveryLog, type Availability } from "./NetworkAvailability";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { dashboardApi, DASHBOARD_API_BASE_URL } from "../../http-api/client";
 import VideoPlayback from "./VideoPlayback";
@@ -59,7 +59,7 @@ export default function CameraPanel() {
           setAvailability(status.data.availability ?? null);
           if (status.data.status === "FAILED") {setError(status.data.message ?? "영상 수신 실패");setPlaybackUri("");setConnecting(false);ready=false;recordCheck("FAILED");await new Promise(resolve=>setTimeout(resolve,100));continue;}
           setError("");
-          if (!ready && status.data.status !== "READY" && Date.now() >= deadline) {setError("영상 수신이 지연되고 있습니다. 중단시간 측정은 계속됩니다.");setConnecting(false);}
+          if (!ready && status.data.status !== "READY" && Date.now() >= deadline) {setError("영상 수신이 지연되고 있습니다. 수신 재개 시각을 기다리고 있습니다.");setConnecting(false);}
           recordCheck(status.data.status);
           if (status.data.status === "READY" && !ready) {
             ready = true;
@@ -106,7 +106,7 @@ export default function CameraPanel() {
       </div>
     </form>
     {error && <p className="camera-error" role="alert">{error}</p>}
-    <NetworkAvailability network="TVWS" data={availability} />
+    <ReceptionRecoveryLog network="TVWS" data={availability} />
     <section className="camera-reception" aria-label="RTSP 통신 성공률">
       <header><strong>RTSP 통신 성공률</strong><b data-state={receptionState}>{receptionLabels[receptionState]}</b></header>
       <p className="camera-reception-rate">{checks.length ? `${(successfulChecks / checks.length * 100).toFixed(1)}%` : "—"}</p>
