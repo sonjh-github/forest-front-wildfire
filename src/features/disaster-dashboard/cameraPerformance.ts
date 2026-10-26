@@ -4,6 +4,5 @@ export function cameraPerformance(rtp:RtpMetrics|null,receptionState:string,conn
   const update=receptionState==="STOPPED" ? "STOPPED" : rtp && !rtp.available ? "UNAVAILABLE" : receptionState==="FAILED" ? "STALLED" : rtp?.lastPacketReceivedAt==null ? connecting ? "LOADING" : "WAITING"
     : rtp.silenceMs===null || rtp.silenceMs>5000 || rtp.sequenceSilenceMs===null || rtp.sequenceSilenceMs>5000 ? "STALLED"
     : rtp.averageIntervalMs===null ? "WAITING" : rtp.averageIntervalMs>5000 || (rtp.maxIntervalMs!==null && rtp.maxIntervalMs>5000) ? "DELAYED" : "NORMAL";
-  const sharing=update==="STOPPED" ? "STOPPED" : update==="UNAVAILABLE" ? "UNAVAILABLE" : update==="STALLED" || rtp?.sequenceStatus==="RESET_PENDING" ? "UNCONFIRMED" : !rtp || rtp.observedMs<200000 || rtp.sequenceStatus!=="READY" ? "WAITING" : rtp.successPercent!==null && rtp.successPercent>=98 ? "PASS" : "FAIL";
-  return {update,sharing} as const;
+  return {update} as const;
 }
