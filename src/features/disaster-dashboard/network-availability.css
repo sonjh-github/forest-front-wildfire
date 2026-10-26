@@ -1,0 +1,12 @@
+.network-availability {display:grid;gap:8px;padding:14px;border:1px solid #ccdcd5;border-radius:8px;background:#f5f9f7;color:#213c4c;margin:12px 0;}
+.network-availability header {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px;}
+.network-availability header b {font-size:11px;background:#edf0f3;color:#536c7d;padding:5px 7px;border-radius:4px;}
+.network-availability header b[data-state=UP] {background:#dfefe6;color:#226344;}
+.network-availability header b[data-state=DOWN] {background:#fff0dc;color:#8a4a00;}
+.network-availability-value {font-size:26px;}
+.network-availability-times {display:flex;gap:12px;flex-wrap:wrap;font-size:12px;}
+.network-availability-times b {margin-left:6px;}
+.network-availability small {font-size:11px;line-height:1.6;color:#536c7d;}
+.network-availability-actions {display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.network-availability-actions button {border:1px solid #486480;background:#203f5d;color:white;padding:8px 12px;border-radius:6px;cursor:pointer;}
+.network-availability-actions button:disabled {opacity:.5;cursor:default;}

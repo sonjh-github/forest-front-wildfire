@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { NetworkAvailability, type Availability } from "./NetworkAvailability";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { dashboardApi, DASHBOARD_API_BASE_URL } from "../../http-api/client";
 import VideoPlayback from "./VideoPlayback";
 import "./camera-panel.css";
@@ -14,6 +15,8 @@ export default function CameraPanel() {
   const [connecting, setConnecting] = useState(false);
   const [showAddress, setShowAddress] = useState(false);
 
+  const measurementGeneration=useRef(0);
+  const [availability,setAvailability]=useState<Availability|null>(null);
   const [checks, setChecks] = useState<ReceptionState[]>([]);
   const [receptionState, setReceptionState] = useState<ReceptionState | "IDLE" | "STOPPED">("IDLE");
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
@@ -21,12 +24,14 @@ export default function CameraPanel() {
 
   useEffect(() => {
     if (!requestedUri) return;
+    const generation=++measurementGeneration.current;
     let active = true;
     let id: string | undefined;
     const stop = () => {
-      if (id) void dashboardApi(`/api/v1/dashboard/cameras/sessions/${id}/stop`, {method:"POST"}).catch(() => {});
+      if (id) void dashboardApi<{data:{availability:Availability|null}}>(`/api/v1/dashboard/cameras/sessions/${id}/stop`, {method:"POST"}).then(response=>{if(generation===measurementGeneration.current)setAvailability(response.data.availability);}).catch(() => {});
       id = undefined;
     };
+    setAvailability(null);
     setChecks([]);
     setCheckedAt(null);
     setReceptionState("CONNECTING");
@@ -49,10 +54,12 @@ export default function CameraPanel() {
         let ready = false;
         while (active) {
           const checkStartedAt = performance.now();
-          const status = await dashboardApi<{data:{status:ReceptionState;message?:string}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
+          const status = await dashboardApi<{data:{status:ReceptionState;message?:string;availability?:Availability|null}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
           if (!active) return;
-          if (status.data.status === "FAILED") throw new Error(status.data.message);
-          if (!ready && status.data.status !== "READY" && Date.now() >= deadline) throw new Error("영상 연결 시간이 초과됐습니다. 카메라 주소와 네트워크를 확인하세요.");
+          setAvailability(status.data.availability ?? null);
+          if (status.data.status === "FAILED") {setError(status.data.message ?? "영상 수신 실패");setPlaybackUri("");setConnecting(false);ready=false;recordCheck("FAILED");await new Promise(resolve=>setTimeout(resolve,100));continue;}
+          setError("");
+          if (!ready && status.data.status !== "READY" && Date.now() >= deadline) {setError("영상 수신이 지연되고 있습니다. 중단시간 측정은 계속됩니다.");setConnecting(false);}
           recordCheck(status.data.status);
           if (status.data.status === "READY" && !ready) {
             ready = true;
@@ -99,6 +106,7 @@ export default function CameraPanel() {
       </div>
     </form>
     {error && <p className="camera-error" role="alert">{error}</p>}
+    <NetworkAvailability network="TVWS" data={availability} />
     <section className="camera-reception" aria-label="RTSP 통신 성공률">
       <header><strong>RTSP 통신 성공률</strong><b data-state={receptionState}>{receptionLabels[receptionState]}</b></header>
       <p className="camera-reception-rate">{checks.length ? `${(successfulChecks / checks.length * 100).toFixed(1)}%` : "—"}</p>

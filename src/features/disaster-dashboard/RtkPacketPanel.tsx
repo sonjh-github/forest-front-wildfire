@@ -1,3 +1,4 @@
+import { LpwaAvailability } from "./NetworkAvailability";
 import { Fragment, useEffect, useState } from "react";
 import { dashboardApi } from "../../http-api/client";
 import "./rtk-packets.css";
@@ -102,6 +103,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
         <details className="rtk-metric-evidence"><summary>비교 방법</summary><small>동일한 조회 결과에서 최신 기록과 100건 전인 101번째 기록을 가져옵니다.</small><small>100건 전 번호 다음부터 최신 번호까지 실제 수신하지 못한 번호를 찾습니다. 같은 번호는 한 번만 셉니다.</small>{sharingWindow && <small>평가 번호 {sharingWindow.fromCounter}~{sharingWindow.toCounter} · {sharingWindow.expectedCount}개 중 {sharingWindow.receivedCount}개 수신</small>}</details>
       </div>
     </section>
+    {data?.selectedDevice?.type==="RTK_TERMINAL" && <LpwaAvailability key={assetId} assetId={assetId} />}
     {data && <>
       <h3 className="rtk-history-heading">패킷 이력 · 최근 100개</h3>
       <p className="rtk-state-explanation">수신 중: 30초 이내 · 지연: 30~120초 · 이후 최근 수신 없음. 통신 수신과 측위 확정은 별개입니다. 좌표가 있어도 Fix 미확정이면 정상 측위로 계산하지 않습니다.</p>
