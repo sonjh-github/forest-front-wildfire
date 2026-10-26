@@ -4,10 +4,10 @@ import "./network-availability.css";
 export type Availability = {receptionBasis?:"RTP"|null;id:string;network:"LPWA"|"TVWS";startedAt:string;endedAt:string|null;checkedAt:string;state:"UP"|"DOWN";firstReceivedAt?:string|null;recoveries?:Array<{receivedAt:string;frameCounter:number|null}>};
 const clock=(date:string)=>new Date(date).toLocaleString("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",fractionalSecondDigits:3,hour12:false});
 export function ReceptionRecoveryLog({network,data,children}:{network:"LPWA"|"TVWS";data:Availability|null;children?:ReactNode}) {
-  const latest=data?.recoveries?.at(-1);
+  const receivedAt=data?.recoveries?.at(-1)?.receivedAt ?? data?.firstReceivedAt;
   return <section className="network-availability" aria-label={`${network} 수신 재개 시각`}>
     <header><strong>{network} 재개 시각</strong></header>
-    {latest ? <time className="network-recovery-time" dateTime={latest.receivedAt}>{clock(latest.receivedAt)}</time> : <span className="network-recovery-time">—</span>}
+    {receivedAt ? <time className="network-recovery-time" dateTime={receivedAt}>{clock(receivedAt)}</time> : <span className="network-recovery-time">—</span>}
     {children}
   </section>;
 }
