@@ -48,6 +48,7 @@ export default function CameraPanel() {
         const deadline = Date.now() + 30_000;
         let ready = false;
         while (active) {
+          const checkStartedAt = performance.now();
           const status = await dashboardApi<{data:{status:ReceptionState;message?:string}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
           if (!active) return;
           if (status.data.status === "FAILED") throw new Error(status.data.message);
@@ -58,7 +59,7 @@ export default function CameraPanel() {
             setPlaybackUri(`${DASHBOARD_API_BASE_URL}${response.data.playbackPath}`);
             setConnecting(false);
           }
-          await new Promise((resolve) => setTimeout(resolve, 5000));
+          await new Promise((resolve) => setTimeout(resolve, Math.max(0,100 - (performance.now() - checkStartedAt))));
         }
       } catch (caught) {
         stop();
@@ -103,7 +104,7 @@ export default function CameraPanel() {
       <p className="camera-reception-rate">{checks.length ? `${(successfulChecks / checks.length * 100).toFixed(1)}%` : "—"}</p>
       <p>최근 {checks.length}/100회 점검 · 정상 {successfulChecks}회</p>
       <small>준비 {checks.filter(state => state === "CONNECTING").length} · 지연 {checks.filter(state => state === "STALLED").length} · 실패 {checks.filter(state => state === "FAILED").length}</small>
-      <small>5초마다 중계 서버 영상 갱신 확인 · 10초 이내 갱신 시 정상. 정상 횟수 ÷ 전체 점검 횟수이며 준비 중도 포함합니다.</small>
+      <small>0.1초 간격 · 최근 100회(약 10초) 중계 서버 영상 갱신 확인 · 10초 이내 갱신 시 정상. 정상 횟수 ÷ 전체 점검 횟수이며 준비 중도 포함합니다.</small>
       <small>{checkedAt ? `마지막 점검: ${new Date(checkedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false})}` : "영상 연결 후 집계를 시작합니다."} 주소 변경·새 연결 시 집계를 초기화합니다. 패킷 손실률과는 다릅니다.</small>
     </section>
     <div className="camera-screen" aria-live="polite">
