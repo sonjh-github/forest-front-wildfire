@@ -116,18 +116,19 @@ export default function CameraPanel() {
         <small>마지막 RTP 패킷 수신: {frameTime(rtpMetrics?.lastPacketReceivedAt)}</small>
         <small>{receptionState==="STOPPED" ? "종료 시 미수신 경과" : "현재 미수신 경과"}: {frameSeconds(rtpMetrics?.silenceMs)}</small>
         {indicators.update==="STALLED" && <p className="camera-metric-note">새 RTP 순서번호가 확인되지 않고 있습니다. 이전 평균값과 현재 수신 상태는 별개입니다.</p>}
-        <details><summary>계산 근거</summary><small>중계 서버가 TCP에서 원본 영상 RTP 패킷을 읽은 시각으로 최근 {rtpMetrics?.sampleCount ?? 0}/100개 간격을 계산합니다. 누적 {rtpMetrics?.packetCount ?? 0}패킷. 프레임 간격과는 다릅니다.</small><small>순서번호가 5초 넘게 증가하지 않으면 수신 중으로 판정하지 않습니다. 지터 {frameSeconds(rtpMetrics?.jitterMs)} · RTCP 송신 보고 {rtpMetrics?.rtcpSenderReports ?? 0}건.</small></details>
+        <details><summary>계산 근거</summary><small>중계 서버가 TCP에서 원본 영상 RTP 패킷을 읽은 시각으로 최근 200초 동안의 {rtpMetrics?.sampleCount ?? 0}개 간격을 계산합니다. 누적 {rtpMetrics?.packetCount ?? 0}패킷. 프레임 간격과는 다릅니다.</small><small>순서번호가 5초 넘게 증가하지 않으면 수신 중으로 판정하지 않습니다. 지터 {frameSeconds(rtpMetrics?.jitterMs)} · RTCP 송신 보고 {rtpMetrics?.rtcpSenderReports ?? 0}건.</small></details>
       </div>
       <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header>
-        <p>현재 세션의 최신 RTP 순서번호 100개 구간에서 누락을 확인합니다.</p>
+        <p>현재 연결의 최근 200초 동안 RTP 순서번호 누락을 확인합니다.</p>
         <div className="camera-indicator-state" data-state={indicators.sharing} role="status">{sharingLabels[indicators.sharing]}</div>
         <span>RTP 패킷 수신율 <strong>{indicators.sharing==="PASS" || indicators.sharing==="FAIL" ? `${rtpMetrics!.successPercent!.toFixed(1)}%` : "—"}</strong></span>
         <small>순서번호 {rtpMetrics?.fromSequence ?? "—"} ~ {rtpMetrics?.toSequence ?? "—"} · 수신 {rtpMetrics?.receivedCount ?? 0} / {rtpMetrics?.expectedCount ?? 0}개 · 누락 {rtpMetrics?.missingCount ?? 0}개</small>
+        <small>집계 {Math.floor((rtpMetrics?.observedMs ?? 0)/1000)} / 200초</small>
         <small>중복 {rtpMetrics?.duplicateCount ?? 0}개 · 중복은 한 번만 집계</small>
-        {indicators.sharing==="WAITING" && <small>순서번호 100개 구간이 쌓이면 판정합니다. 재접속·송신원 변경 시 새로 수집합니다.</small>}
-        {rtpMetrics?.missingSequences.length ? <small>누락 번호: {rtpMetrics.missingSequences.join(", ")}</small> : null}
+        {indicators.sharing==="WAITING" && <small>200초 분량이 쌓이면 판정합니다. 재접속·송신원 변경 시 새로 수집합니다.</small>}
+        {rtpMetrics?.missingSequences.length ? <small>누락 번호: {rtpMetrics.missingSequences.join(", ")}{rtpMetrics.missingSequencesTruncated ? " 외 추가 누락" : ""}</small> : null}
         {rtpMetrics?.error && <small role="alert">{rtpMetrics.error}</small>}
-        <details><summary>비교 방법</summary><small>고유 수신 번호 ÷ 기대 번호 100개 × 100. RTP 16비트 순서번호의 순환과 지연 도착을 반영합니다. SSRC {rtpMetrics?.ssrc ?? "—"} · 연결 {rtpMetrics?.connections ?? 0}회.</small><small>현재 RTSP/TCP 연결에서 관측한 수신율입니다. TCP 재전송으로 복구된 손실과 단절 중 전송되지 않은 구간은 확인할 수 없어 TVWS 무선망 자체의 손실률을 뜻하지 않습니다.</small></details>
+        <details><summary>비교 방법</summary><small>최근 200초의 고유 수신 번호 ÷ 해당 번호 범위의 기대 개수 × 100. RTP 16비트 순서번호의 순환과 지연 도착을 반영합니다. SSRC {rtpMetrics?.ssrc ?? "—"} · 연결 {rtpMetrics?.connections ?? 0}회.</small><small>현재 RTSP/TCP 연결에서 관측한 수신율입니다. TCP 재전송으로 복구된 손실과 단절 중 전송되지 않은 구간은 확인할 수 없어 TVWS 무선망 자체의 손실률을 뜻하지 않습니다.</small></details>
       </div>
     </section>
     <ReceptionRecoveryLog network="TVWS" data={availability} />
