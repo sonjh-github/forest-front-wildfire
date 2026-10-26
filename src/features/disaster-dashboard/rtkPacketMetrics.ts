@@ -38,7 +38,7 @@ export function rtkPacketMetrics(packets:Sample[]) {
     // Retries with a rewritten timestamp must not count as new frames.
     frames.set(counter, previous==null ? measured : measured===null ? previous : Math.min(previous,measured));
   }
-  const measuredTimes=[...frames.values()].filter((time):time is number=>time!==null);
+  const measuredTimes=[...frames.values()].filter((time):time is number=>time!==null).sort((a,b)=>a-b);
   const counters=[...frames.keys()];
   return {
     lastNewFrameReceivedAt:priorCounterObserved && latestRun.length ? new Date(Math.min(...latestRun)).toISOString() : null,
@@ -47,6 +47,7 @@ export function rtkPacketMetrics(packets:Sample[]) {
     missingCounterCount:packets.length-validCounterCount,
     minCounter:counters.length ? Math.min(...counters) : null,
     maxCounter:counters.length ? Math.max(...counters) : null,
+    maxFrameIntervalMs:measuredTimes.length<2 ? null : Math.max(...measuredTimes.slice(1).map((time,index)=>time-measuredTimes[index])),
     frameIntervalMs:meanInterval(measuredTimes),frameIntervalSamples:Math.max(0,measuredTimes.length-1),
     measuredIntervalMs:meanInterval(allMeasuredTimes),measuredIntervalSamples:Math.max(0,allMeasuredTimes.length-1),
     receivedIntervalMs:meanInterval(receivedTimes),receivedIntervalSamples:Math.max(0,receivedTimes.length-1),

@@ -78,6 +78,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
         <p>지금 새 위치 데이터가 계속 들어오는지 확인합니다.</p>
         <div className="rtk-indicator-state" data-state={indicatorStates.update} role="status">{updateLabels[indicatorStates.update]}</div>
         <span>평균 갱신 간격 <strong>{metrics?.frameIntervalMs!=null ? delay(metrics.frameIntervalMs) : "—"}</strong></span>
+        <span>최대 갱신 간격 <strong>{metrics?.maxFrameIntervalMs!=null ? delay(metrics.maxFrameIntervalMs) : "—"}</strong></span>
         <small>마지막 새 데이터 수신: {metrics?.lastNewFrameReceivedAt ? time(metrics.lastNewFrameReceivedAt) : "현재 조회 기록만으로 확인 불가"}</small>
         {indicatorStates.update==="STALLED" && metrics && <p className="rtk-frame-stalled">수신은 계속되고 있지만, 최신 {metrics.latestCounterRepeatedCount}건의 데이터 번호가 같습니다.</p>}
         <details className="rtk-metric-evidence"><summary>계산 근거</summary><small>서로 다른 데이터 번호의 최초 측정 시각으로 간격을 계산합니다.</small>{metrics && latest && <><small>최신 FCnt {latest.frameCounter} · 동일 번호 연속 {metrics.latestCounterRepeatedCount}건</small><small>조회 기록 범위 {delay(metrics.latestCounterObservedSpanMs)} · 실제 정체 시작 시각을 뜻하지 않습니다.</small><small>중복 포함 로그 간격: {metrics.measuredIntervalMs===null ? "" : delay(metrics.measuredIntervalMs)}</small></>}</details>

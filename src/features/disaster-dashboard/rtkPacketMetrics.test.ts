@@ -6,12 +6,12 @@ describe("RTK FCnt 핵심 지표",()=>{
     const result=rtkPacketMetrics(Array.from({length:100},(_,i)=>sample(11320,i*2)));
     expect(result.uniqueCount).toBe(1);expect(result.duplicateCount).toBe(99);
     expect(result.lastNewFrameReceivedAt).toBeNull();expect(result.latestCounterObservedSpanMs).toBe(198000);expect(result.latestCounterRepeatedCount).toBe(100);
-    expect(result.frameIntervalMs).toBeNull();expect(result.receivedIntervalMs).toBe(2000);expect(result.measuredIntervalMs).toBe(2000);
+    expect(result.maxFrameIntervalMs).toBeNull();expect(result.frameIntervalMs).toBeNull();expect(result.receivedIntervalMs).toBe(2000);expect(result.measuredIntervalMs).toBe(2000);
   });
   it("순서와 재전송에 관계없이 FCnt별 최초 측정으로 평균 간격을 계산한다",()=>{
     const result=rtkPacketMetrics([sample(2,14,40),sample(1,100,35),sample(0,0,30),sample(1,4,20)]);
     expect(result.uniqueCount).toBe(3);expect(result.duplicateCount).toBe(1);
-    expect(result.frameIntervalMs).toBe(7000);expect(result.frameIntervalSamples).toBe(2);
+    expect(result.maxFrameIntervalMs).toBe(10000);expect(result.frameIntervalMs).toBe(7000);expect(result.frameIntervalSamples).toBe(2);
     expect(result.receivedIntervalMs).toBeCloseTo(20000/3);
   });
   it("과거 프레임이 섞여 있어도 최신 FCnt가 정체된 구간을 따로 센다",()=>{
@@ -26,11 +26,13 @@ describe("RTK FCnt 핵심 지표",()=>{
   });
   it("빈 목록·잘못된 시각은 간격을 0초로 오인하지 않는다",()=>{
     expect(rtkPacketMetrics([]).receivedIntervalMs).toBeNull();
+    expect(rtkPacketMetrics([]).maxFrameIntervalMs).toBeNull();
     const result=rtkPacketMetrics([{frameCounter:1,occurredAt:"invalid",receivedAt:null},sample(2,2)]);
-    expect(result.uniqueCount).toBe(2);expect(result.frameIntervalMs).toBeNull();
+    expect(result.uniqueCount).toBe(2);expect(result.frameIntervalMs).toBeNull();expect(result.maxFrameIntervalMs).toBeNull();
   });
   it("서로 다른 FCnt의 동일 측정 시각은 실제 0초 간격으로 보존한다",()=>{
     expect(rtkPacketMetrics([sample(0,1),sample(1,1)]).frameIntervalMs).toBe(0);
+    expect(rtkPacketMetrics([sample(0,1),sample(1,1)]).maxFrameIntervalMs).toBe(0);
   });
 });
 
