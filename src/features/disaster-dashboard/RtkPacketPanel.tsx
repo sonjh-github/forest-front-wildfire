@@ -36,13 +36,14 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
     let timer:ReturnType<typeof setTimeout>|undefined;
     setRefreshing(true);
     async function refresh() {
+      const startedAt=performance.now();
       try {
         const response = await dashboardApi<{data:RtkData}>(`/api/v1/dashboard/rtk/packets?assetId=${encodeURIComponent(assetId)}`,{signal:controller.signal});
         if (!controller.signal.aborted) {setData(response.data);setError("");}
       } catch(reason) {
         if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "RTK 패킷을 불러오지 못했습니다.");
       } finally {
-        if (!controller.signal.aborted) {setRefreshing(false);timer = setTimeout(refresh,5000);}
+        if (!controller.signal.aborted) {setRefreshing(false);timer = setTimeout(refresh,Math.max(0,3000-(performance.now()-startedAt)));}
       }
     }
     void refresh();
@@ -59,7 +60,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
   const sharingLabels={WAITING:"대기 중",LOADING:"조회 중",UNKNOWN:"계산 불가",PASS:"수신율 목표 충족",FAIL:"수신율 목표 미달",UNCONFIRMED:sharingIssue==="NO_PROGRESS" ? "번호 변화 없음" : "현재 전달 확인 안 됨"};
   const sharingEvaluable=indicatorStates.sharing==="PASS" || indicatorStates.sharing==="FAIL";
   return <section className="rtk-packet-panel" aria-busy={refreshing} aria-label="RTK 최근 100개 패킷">
-    <header className="rtk-packet-heading"><div><strong>현재 상태</strong><small>수신·측위·좌표·측정 시각 · 5초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
+    <header className="rtk-packet-heading"><div><strong>현재 상태</strong><small>수신·측위·좌표·측정 시각 · 3초마다 갱신</small></div><button type="button" disabled={refreshing} onClick={() => setRevision(v=>v+1)}>{refreshing ? "조회 중…" : "새로고침"}</button></header>
     {data && <>
       <div className="rtk-status-grid" role="group" aria-label="현재 상태">
         <div><span>서버 수신 상태</span><strong data-state={error ? "UNKNOWN" : data.receiverState}>{error ? "확인 불가" : reception[data.receiverState] ?? data.receiverState}</strong><small>{time(data.latestReceivedAt)}</small></div>

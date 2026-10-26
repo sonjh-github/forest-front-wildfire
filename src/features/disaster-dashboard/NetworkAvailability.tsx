@@ -18,9 +18,10 @@ export function LpwaRecoveryLog({assetId}:{assetId:string}) {
   useEffect(()=>{
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;
     async function refresh() {
+      const startedAt=performance.now();
       try {const response=await dashboardApi<{data:Availability|null}>(`/api/v1/dashboard/network-availability/lpwa/${encodeURIComponent(assetId)}`,{signal:controller.signal});if(!controller.signal.aborted){setData(response.data);setError("");}}
       catch(reason){if(!controller.signal.aborted)setError(reason instanceof Error ? reason.message : "기록 조회 실패");}
-      finally {if(!controller.signal.aborted)timer=setTimeout(refresh,2000);}
+      finally {if(!controller.signal.aborted)timer=setTimeout(refresh,Math.max(0,3000-(performance.now()-startedAt)));}
     }
     void refresh();return()=>{controller.abort();clearTimeout(timer);};
   },[assetId]);

@@ -60,13 +60,14 @@ export default function CameraPanel() {
       let playbackPath="",ready=false;
       const deadline=Date.now()+30000;
       while(active) {
-        const checkStartedAt=performance.now();
+        let checkStartedAt=performance.now();
         try {
           if(!id) {
             const response=await dashboardApi<{data:CameraSession}>("/api/v1/dashboard/cameras/sessions",{method:"POST",body:JSON.stringify({uri:requestedUri})});
             id=response.data.id;playbackPath=response.data.playbackPath;
             if(!active){stop();return;}
           }
+          checkStartedAt=performance.now();
           const status=await dashboardApi<{data:{status:ReceptionState;message?:string;availability?:Availability|null;rtpMetrics?:RtpMetrics|null}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
           if(!active)return;
           setAvailability(status.data.availability ?? null);setRtpMetrics(status.data.rtpMetrics ?? null);recordCheck(status.data.status);
@@ -84,9 +85,9 @@ export default function CameraPanel() {
           if(caught instanceof HttpApiError && [400,429].includes(caught.status)) {
             setError(caught.message);recordCheck("FAILED");stop();setRequestedUri("");return;
           }
-          await new Promise(resolve=>setTimeout(resolve,1000));continue;
+          await new Promise(resolve=>setTimeout(resolve,Math.max(0,3000-(performance.now()-checkStartedAt))));continue;
         }
-        await new Promise(resolve=>setTimeout(resolve,Math.max(0,100-(performance.now()-checkStartedAt))));
+        await new Promise(resolve=>setTimeout(resolve,Math.max(0,3000-(performance.now()-checkStartedAt))));
       }
     })();
     return () => { active = false; stop(); };

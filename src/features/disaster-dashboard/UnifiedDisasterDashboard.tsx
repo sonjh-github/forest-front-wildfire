@@ -39,7 +39,7 @@ import "./unified-disaster-dashboard.css";
 import "./field-header-hotfix.css";
 import "./field-interaction-hotfix.css";
 
-const POLL_INTERVAL_MS = 1_000;
+const POLL_INTERVAL_MS = 3_000;
 const DEFAULT_CHANGE_HIGHLIGHT_MS = POLL_INTERVAL_MS * 0.3;
 const DEFAULT_EVENT_ID =
   import.meta.env.VITE_DEFAULT_EVENT_ID?.trim() ||
@@ -1223,8 +1223,8 @@ export default function UnifiedDisasterDashboard() {
     failedIntegrations: failedExternalIntegrations,
     totalIntegrations: externalIntegrationItems.length,
     retrying,
-    staleAfterMs: POLL_INTERVAL_MS * 5,
-    offlineAfterMs: POLL_INTERVAL_MS * 15,
+    staleAfterMs: 5_000,
+    offlineAfterMs: 15_000,
   });
 
   const fieldApiHealthText = fieldApiHealthLabel(fieldApiHealth);
