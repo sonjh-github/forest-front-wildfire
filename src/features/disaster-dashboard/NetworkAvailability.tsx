@@ -1,7 +1,7 @@
 import {useEffect,useState,type ReactNode} from "react";
 import {dashboardApi} from "../../http-api/client";
 import "./network-availability.css";
-export type Availability = {id:string;network:"LPWA"|"TVWS";startedAt:string;endedAt:string|null;checkedAt:string;state:"UP"|"DOWN";firstReceivedAt?:string|null;recoveries?:Array<{receivedAt:string;frameCounter:number|null}>};
+export type Availability = {receptionBasis?:"RTP"|null;id:string;network:"LPWA"|"TVWS";startedAt:string;endedAt:string|null;checkedAt:string;state:"UP"|"DOWN";firstReceivedAt?:string|null;recoveries?:Array<{receivedAt:string;frameCounter:number|null}>};
 const clock=(date:string)=>new Date(date).toLocaleString("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",fractionalSecondDigits:3,hour12:false});
 export function ReceptionRecoveryLog({network,data,children}:{network:"LPWA"|"TVWS";data:Availability|null;children?:ReactNode}) {
   const stale=data && !data.endedAt && Date.now()-Date.parse(data.checkedAt)>5000;
@@ -10,11 +10,11 @@ export function ReceptionRecoveryLog({network,data,children}:{network:"LPWA"|"TV
   const latest=recoveries.at(-1);
   return <section className="network-availability" aria-label={`${network} 수신 재개 기록`}>
     <header><strong>{network} 수신 재개 시각</strong><b data-state={data?.endedAt || stale ? "ENDED" : data?.state}>{state}</b></header>
-    <span>{network==="LPWA" ? "중단 후 첫 새 FCnt 수신 시각" : "중단 후 첫 새 영상 수신 시각"}</span>
+    <span>{network==="LPWA" ? "중단 후 첫 새 FCnt 수신 시각" : "중단 후 첫 RTP 패킷 수신 시각"}</span>
     <strong className="network-recovery-time">{latest ? clock(latest.receivedAt) : "아직 수신 재개 기록이 없습니다."}</strong>
     {latest?.frameCounter!=null && <small>수신 FCnt {latest.frameCounter}</small>}
     <small>서버 시각 · KST · 밀리초 표시</small>
-    <small>{network==="LPWA" ? "새 FCnt가 6초간 없으면 중단으로 판정합니다. 재개 시 서버에 실제 저장된 첫 새 FCnt 수신 시각을 기록합니다." : "새 영상 프레임이 10초간 없으면 중단으로 판정합니다. 재개 시 중계 서버가 첫 영상 프레임을 확인한 시각을 기록합니다."}</small>
+    <small>{network==="LPWA" ? "새 FCnt가 6초간 없으면 중단으로 판정합니다. 재개 시 서버에 실제 저장된 첫 새 FCnt 수신 시각을 기록합니다." : "영상 RTP 패킷이 10초간 없으면 중단으로 판정합니다. 재개 시 디코딩 전 첫 RTP 패킷을 수신한 서버 시각을 기록합니다."}</small>
     {data?.firstReceivedAt && <small>최초 연결 수신: {clock(data.firstReceivedAt)} · 중단 후 재수신과 별도</small>}
     {recoveries.length>0 && <ol className="network-recovery-list" aria-label="수신 재개 이력">{recoveries.map((item,index)=><li key={`${item.receivedAt}-${index}`}><time dateTime={item.receivedAt}>{clock(item.receivedAt)}</time>{item.frameCounter!=null && <span>FCnt {item.frameCounter}</span>}</li>)}</ol>}
     {data && <small>기록 시작 {clock(data.startedAt)}{data.endedAt ? ` · 종료 ${clock(data.endedAt)}` : ""}</small>}

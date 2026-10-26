@@ -1,4 +1,4 @@
-import { cameraPerformance, type FrameMetrics } from "./cameraPerformance";
+import { cameraPerformance, type RtpMetrics } from "./cameraPerformance";
 import { ReceptionRecoveryLog, type Availability } from "./NetworkAvailability";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { dashboardApi, DASHBOARD_API_BASE_URL } from "../../http-api/client";
@@ -18,14 +18,12 @@ export default function CameraPanel() {
   const [showAddress, setShowAddress] = useState(false);
 
   const measurementGeneration=useRef(0);
-  const [frameMetrics,setFrameMetrics]=useState<FrameMetrics|null>(null);
+  const [rtpMetrics,setRtpMetrics]=useState<RtpMetrics|null>(null);
   const [availability,setAvailability]=useState<Availability|null>(null);
-  const [checks, setChecks] = useState<ReceptionState[]>([]);
   const [receptionState, setReceptionState] = useState<ReceptionState | "IDLE" | "STOPPED">("IDLE");
-  const [checkedAt, setCheckedAt] = useState<number | null>(null);
-  const indicators=cameraPerformance(frameMetrics,receptionState,checks,connecting);
-  const updateLabels={WAITING:"영상 수신 대기",LOADING:"조회 중",NORMAL:"새 영상 수신 중",DELAYED:"영상 갱신 지연",STALLED:"새 영상 확인 안 됨",STOPPED:"연결 중지"};
-  const sharingLabels={WAITING:"점검 기록 수집 중",PASS:"수신 확인 목표 충족",FAIL:"수신 확인 목표 미달",UNCONFIRMED:"현재 영상 수신 확인 안 됨",STOPPED:"연결 중지"};
+  const indicators=cameraPerformance(rtpMetrics,receptionState,connecting);
+  const updateLabels={WAITING:"영상 수신 대기",LOADING:"조회 중",NORMAL:"새 영상 수신 중",DELAYED:"영상 갱신 지연",STALLED:"새 영상 확인 안 됨",STOPPED:"연결 중지",UNAVAILABLE:"RTP 계측 불가"};
+  const sharingLabels={WAITING:"순서번호 구간 수집 중",PASS:"RTP 수신율 목표 충족",FAIL:"RTP 수신율 목표 미달",UNCONFIRMED:"현재 영상 수신 확인 안 됨",STOPPED:"연결 중지",UNAVAILABLE:"RTP 계측 불가"};
 
   useEffect(() => {
     if (!requestedUri) return;
@@ -33,18 +31,14 @@ export default function CameraPanel() {
     let active = true;
     let id: string | undefined;
     const stop = () => {
-      if (id) void dashboardApi<{data:{availability:Availability|null;frameMetrics?:FrameMetrics|null}}>(`/api/v1/dashboard/cameras/sessions/${id}/stop`, {method:"POST"}).then(response=>{if(generation===measurementGeneration.current){setAvailability(response.data.availability);setFrameMetrics(response.data.frameMetrics ?? null);}}).catch(() => {});
+      if (id) void dashboardApi<{data:{availability:Availability|null;rtpMetrics?:RtpMetrics|null}}>(`/api/v1/dashboard/cameras/sessions/${id}/stop`, {method:"POST"}).then(response=>{if(generation===measurementGeneration.current){setAvailability(response.data.availability);setRtpMetrics(response.data.rtpMetrics ?? null);}}).catch(() => {});
       id = undefined;
     };
     setAvailability(null);
-    setFrameMetrics(null);
-    setChecks([]);
-    setCheckedAt(null);
+    setRtpMetrics(null);
     setReceptionState("CONNECTING");
     const recordCheck = (state: ReceptionState) => {
-      setChecks(previous => [...previous,state].slice(-100));
       setReceptionState(state);
-      setCheckedAt(Date.now());
     };
     setConnecting(true);
     setPlaybackUri("");
@@ -60,10 +54,10 @@ export default function CameraPanel() {
         let ready = false;
         while (active) {
           const checkStartedAt = performance.now();
-          const status = await dashboardApi<{data:{status:ReceptionState;message?:string;availability?:Availability|null;frameMetrics?:FrameMetrics|null}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
+          const status = await dashboardApi<{data:{status:ReceptionState;message?:string;availability?:Availability|null;rtpMetrics?:RtpMetrics|null}}>(`/api/v1/dashboard/cameras/sessions/${id}`);
           if (!active) return;
           setAvailability(status.data.availability ?? null);
-          setFrameMetrics(status.data.frameMetrics ?? null);
+          setRtpMetrics(status.data.rtpMetrics ?? null);
           if (status.data.status === "FAILED") {setError(status.data.message ?? "영상 수신 실패");setPlaybackUri("");setConnecting(false);ready=false;recordCheck("FAILED");await new Promise(resolve=>setTimeout(resolve,100));continue;}
           setError("");
           if (!ready && status.data.status !== "READY" && Date.now() >= deadline) {setError("영상 수신이 지연되고 있습니다. 수신 재개 시각을 기다리고 있습니다.");setConnecting(false);}
@@ -115,22 +109,25 @@ export default function CameraPanel() {
     {error && <p className="camera-error" role="alert">{error}</p>}
     <section className="camera-performance-targets" aria-label="TVWS 영상 성능 지표">
       <div><header><strong>영상정보 갱신주기</strong><b>목표 5초 이하</b></header>
-        <p>지금 새 영상 데이터가 계속 들어오는지 확인합니다.</p>
+        <p>디코딩 전 영상 RTP 패킷이 계속 들어오는지 확인합니다.</p>
         <div className="camera-indicator-state" data-state={indicators.update} role="status">{updateLabels[indicators.update]}</div>
-        <span>평균 갱신 간격 <strong>{frameSeconds(frameMetrics?.averageIntervalMs)}</strong></span>
-        <span>최대 갱신 간격 <strong>{frameSeconds(frameMetrics?.maxIntervalMs)}</strong></span>
-        <small>마지막 새 영상 수신: {frameTime(frameMetrics?.lastFrameReceivedAt)}</small>
-        <small>{receptionState==="STOPPED" ? "종료 시 미수신 경과" : "현재 미수신 경과"}: {frameSeconds(frameMetrics?.silenceMs)}</small>
-        {indicators.update==="STALLED" && <p className="camera-metric-note">새 영상 프레임이 확인되지 않고 있습니다. 이전 평균값과 현재 수신 상태는 별개입니다.</p>}
-        <details><summary>계산 근거</summary><small>15fps 변환 전 원본 프레임을 서버에서 하나씩 확인한 시각으로 최근 {frameMetrics?.sampleCount ?? 0}/100개 간격을 계산합니다. 누적 {frameMetrics?.frameCount ?? 0}프레임.</small><small>디코딩·일괄 수신의 영향을 포함합니다. 0.1초 상태 점검 간격을 영상 갱신 간격으로 사용하지 않습니다.</small></details>
+        <span>평균 패킷 수신 간격 <strong>{frameSeconds(rtpMetrics?.averageIntervalMs)}</strong></span>
+        <span>최대 패킷 수신 간격 <strong>{frameSeconds(rtpMetrics?.maxIntervalMs)}</strong></span>
+        <small>마지막 RTP 패킷 수신: {frameTime(rtpMetrics?.lastPacketReceivedAt)}</small>
+        <small>{receptionState==="STOPPED" ? "종료 시 미수신 경과" : "현재 미수신 경과"}: {frameSeconds(rtpMetrics?.silenceMs)}</small>
+        {indicators.update==="STALLED" && <p className="camera-metric-note">새 RTP 순서번호가 확인되지 않고 있습니다. 이전 평균값과 현재 수신 상태는 별개입니다.</p>}
+        <details><summary>계산 근거</summary><small>중계 서버가 TCP에서 원본 영상 RTP 패킷을 읽은 시각으로 최근 {rtpMetrics?.sampleCount ?? 0}/100개 간격을 계산합니다. 누적 {rtpMetrics?.packetCount ?? 0}패킷. 프레임 간격과는 다릅니다.</small><small>순서번호가 5초 넘게 증가하지 않으면 수신 중으로 판정하지 않습니다. 지터 {frameSeconds(rtpMetrics?.jitterMs)} · RTCP 송신 보고 {rtpMetrics?.rtcpSenderReports ?? 0}건.</small></details>
       </div>
       <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header>
-        <p>최근 100회 영상 수신 상태 점검을 기준으로 확인합니다.</p>
+        <p>현재 세션의 최신 RTP 순서번호 100개 구간에서 누락을 확인합니다.</p>
         <div className="camera-indicator-state" data-state={indicators.sharing} role="status">{sharingLabels[indicators.sharing]}</div>
-        <span>영상 수신 확인율 <strong>{indicators.sharing==="PASS" || indicators.sharing==="FAIL" ? `${indicators.successPercent!.toFixed(1)}%` : "—"}</strong></span>
-        <small>점검 {indicators.sampleCount}/100회 · 수신 확인 {indicators.successes}회 · 미확인 {indicators.sampleCount-indicators.successes}회</small>
-        {indicators.sharing==="WAITING" && <small>100회 점검이 쌓이면 판정합니다.</small>}
-        <details><summary>비교 방법</summary><small>0.1초 간격으로 RTSP 영상 수신 상태를 확인한 최근 100회 중 정상 확인된 비율입니다. 준비·실패도 포함합니다.</small><small>원본 프레임 연속번호가 제공되지 않아 FCnt 번호 비교나 프레임 전달률을 계산하는 값은 아닙니다.</small><small>{checkedAt ? `마지막 점검: ${new Date(checkedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false})}` : "점검 대기"} · 주소 변경·새 연결 시 초기화합니다.</small></details>
+        <span>RTP 패킷 수신율 <strong>{indicators.sharing==="PASS" || indicators.sharing==="FAIL" ? `${rtpMetrics!.successPercent!.toFixed(1)}%` : "—"}</strong></span>
+        <small>순서번호 {rtpMetrics?.fromSequence ?? "—"} ~ {rtpMetrics?.toSequence ?? "—"} · 수신 {rtpMetrics?.receivedCount ?? 0} / {rtpMetrics?.expectedCount ?? 0}개 · 누락 {rtpMetrics?.missingCount ?? 0}개</small>
+        <small>중복 {rtpMetrics?.duplicateCount ?? 0}개 · 중복은 한 번만 집계</small>
+        {indicators.sharing==="WAITING" && <small>순서번호 100개 구간이 쌓이면 판정합니다. 재접속·송신원 변경 시 새로 수집합니다.</small>}
+        {rtpMetrics?.missingSequences.length ? <small>누락 번호: {rtpMetrics.missingSequences.join(", ")}</small> : null}
+        {rtpMetrics?.error && <small role="alert">{rtpMetrics.error}</small>}
+        <details><summary>비교 방법</summary><small>고유 수신 번호 ÷ 기대 번호 100개 × 100. RTP 16비트 순서번호의 순환과 지연 도착을 반영합니다. SSRC {rtpMetrics?.ssrc ?? "—"} · 연결 {rtpMetrics?.connections ?? 0}회.</small><small>현재 RTSP/TCP 연결에서 관측한 수신율입니다. TCP 재전송으로 복구된 손실과 단절 중 전송되지 않은 구간은 확인할 수 없어 TVWS 무선망 자체의 손실률을 뜻하지 않습니다.</small></details>
       </div>
     </section>
     <ReceptionRecoveryLog network="TVWS" data={availability} />
