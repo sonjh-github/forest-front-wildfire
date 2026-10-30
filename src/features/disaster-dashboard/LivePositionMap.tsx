@@ -1587,7 +1587,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !(focusCenter ?? eventCenter)) return;
+    if (!map || !mapReady || !(focusCenter ?? eventCenter)) return;
 
     const targetCenter = (focusCenter ?? eventCenter)!;
 
@@ -1617,7 +1617,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     } else {
       map.easeTo({ center: targetCenter, zoom: 14, duration: 700 });
     }
-  }, [eventCenter, focusCenter, eventId, locations, false]);
+  }, [eventCenter, focusCenter, eventId, locations, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
