@@ -8,6 +8,7 @@ import SlenoNetworkQualityPanel from "./SlenoNetworkQualityPanel";
 import { fieldCoreStatusLabel, fieldEvent, isLocalFieldMode } from "../../http-api/field-mode";
 import { decideSemanticFallback } from "./semanticFallback";
 import LivePositionMap from "./LivePositionMap";
+import { pickSlenoRtkFocusCenter } from "./slenoMapFocus";
 import MapTimelinePlayer, { type MapTimelineSnapshot } from "./MapTimelinePlayer";
 import {
   OperationsPanel,
@@ -292,7 +293,7 @@ function locationFrom(item: Record<string, unknown>, kind: LiveLocation["kind"])
     latencyMs: (item.latencyMs != null && Number.isFinite(Number(item.latencyMs))) ? Number(item.latencyMs) : null,
     packetLossPct: (item.packetLossPct != null && Number.isFinite(Number(item.packetLossPct))) ? Number(item.packetLossPct) : null,
     safetyStatus: korean(item.safetyStatus ?? "UNKNOWN"),
-    sourceSystem: String(item.sourceSystem ?? ""),
+    sourceSystem: String(item.sourceSystem ?? attributes.sourceSystem ?? ""),
     positioningMethod: item.positioningMethod || attributes.positionFix
       ? String(item.positioningMethod ?? attributes.positionFix)
       : null,
@@ -1153,9 +1154,10 @@ export default function UnifiedDisasterDashboard() {
   const focusedLocation = selectedLocationKey
     ? mapLocations.find(location => locationKey(location) === selectedLocationKey)
     : undefined;
+  const latestRtkCenter = pickSlenoRtkFocusCenter(visibleLocations);
   const mapFocusCenter: [number, number] | null = focusedLocation
     ? [focusedLocation.longitude, focusedLocation.latitude]
-    : eventCenter ?? liveCenter;
+    : latestRtkCenter ?? eventCenter ?? liveCenter;
   const coordinateOutlierKeys = new Set(
     liveCenter
       ? mapLocations
