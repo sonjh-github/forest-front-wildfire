@@ -2530,10 +2530,9 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         "wildfire-incident-area-fill",
         "wildfire-incident-area-outline",
         "communication-topology-active", "communication-topology-delayed", "communication-topology-disconnected", "communication-topology-label",
-        "event-origin-halo", "event-origin-ring", "event-origin-point",
+        "event-origin-halo", "event-origin-ring", "event-origin-point", "event-origin-label",
         "field-resource-halo", "field-resource-pulse-1", "field-resource-pulse-2", "field-resource-pulse-3",
         "field-resource-point", "field-resource-icon", "field-resource-label",
-        "event-origin-label",
       ]) {
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
