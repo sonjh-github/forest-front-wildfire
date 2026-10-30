@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AssetRegistryModal from "../../features/disaster-dashboard/AssetRegistryModal";
 import DeviceLogList from "./DeviceLogList";
+import VendorRequestLogList from "./VendorRequestLogList";
 import "./device-management-page.css";
 
 export default function DeviceManagementPage() {
@@ -35,6 +36,7 @@ export default function DeviceManagementPage() {
         </div>
       </header>
 
+      <VendorRequestLogList />
       <DeviceLogList lastRegisteredAt={lastRegisteredAt} />
 
       {registryOpen && (
