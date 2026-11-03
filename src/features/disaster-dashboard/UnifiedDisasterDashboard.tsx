@@ -1142,15 +1142,6 @@ export default function UnifiedDisasterDashboard() {
         ] as [number, number];
       })()
     : null;
-  const eventToLiveDistance = eventCenter && liveCenter
-    ? Math.hypot(eventCenter[0] - liveCenter[0], eventCenter[1] - liveCenter[1])
-    : 0;
-  const eventToLiveDistanceKm = eventCenter && liveCenter
-    ? Math.hypot(
-        (eventCenter[0] - liveCenter[0]) * 88.8,
-        (eventCenter[1] - liveCenter[1]) * 111,
-      )
-    : 0;
   const focusedLocation = selectedLocationKey
     ? mapLocations.find(location => locationKey(location) === selectedLocationKey)
     : undefined;
@@ -1837,12 +1828,6 @@ export default function UnifiedDisasterDashboard() {
                   onIndexChange={handleTimelineIndexChange}
                   onLive={handleTimelineLive}
                 />
-                {eventToLiveDistance > 0.08 && (
-                  <p className="map-coordinate-warning" role="status">
-                    <strong>좌표 정합성 확인 필요</strong>
-                    재난 위치와 수신 장비 좌표의 중심이 약 {eventToLiveDistanceKm.toFixed(1)}km 떨어져 있습니다. 지도는 최신 RTK 위치를 우선 표시하며, 재난 위치와의 정합성은 확인이 필요합니다.
-                  </p>
-                )}
                 {liveLocations.length === 0 && <p>수신된 위치가 없습니다.</p>}
               </div>
               <OperationsPanel
@@ -2216,7 +2201,7 @@ export default function UnifiedDisasterDashboard() {
             </div>
             {selectedLocation && <div className="resource-modal-backdrop" role="presentation" onMouseDown={() => setSelectedLocationKey(null)}>
             <section className={`selected-location-drawer resource-modal${selectedRtk ? " rtk-detail-modal" : ""}`} role="dialog" aria-modal={!hybridExhibitionMode} aria-label="선택 자산 상세" onMouseDown={(event) => event.stopPropagation()}>
-              <div className="resource-detail-heading"><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{selectedRtk ? "최근 100개 패킷 · 수신·측위 상태" : coordinateOutlierKeys.has(locationKey(selectedLocation)) ? "좌표 정합성 확인 필요" : selectedLocation.status}</small><button type="button" onClick={() => setSelectedLocationKey(null)} aria-label="자산 상세 닫기">×</button></div>
+              <div className="resource-detail-heading"><span>{assetTypeLabel(selectedLocation.category)}</span><strong>{selectedLocation.label}</strong><small>{selectedRtk ? "최근 100개 패킷 · 수신·측위 상태" : selectedLocation.status}</small><button type="button" onClick={() => setSelectedLocationKey(null)} aria-label="자산 상세 닫기">×</button></div>
               {selectedRtk ? <RtkPacketPanel key={selectedLocation.id} assetId={selectedLocation.id} /> : <dl>
                 <div>
                   <dt>통신 상태</dt>

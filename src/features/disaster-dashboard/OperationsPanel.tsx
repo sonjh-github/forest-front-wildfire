@@ -1,4 +1,5 @@
 import CameraPanel from "./CameraPanel";
+import { CHUNGNAM_VIEWSHED_CONFIG } from "./chungnamViewshedConfig";
 import { nmsSummary, receivedNumber } from "./nmsSummary";
 import { OFFICIAL_RFP_BASELINE, PROJECT_ENHANCED_TARGET } from "./officialRfpGaps";
 import { useEffect, useMemo, useState } from "react";
@@ -824,11 +825,13 @@ export function OperationsPanel({
     { id: "external-landslide-regional-risk", label: "산사태 지역위험", description: "지역 위험등급·예상피해", count: overview.domainLayers["external-landslide-regional-risk"]?.length ?? externalIntegrationStatus.landslideRegionalRisk.count },
   ];
 
+  const chungnamLayers = [CHUNGNAM_VIEWSHED_CONFIG.tvws, CHUNGNAM_VIEWSHED_CONFIG.term];
   const allLayerIds = [
     "resources",
     "topology",
     "event",
     ...domainLayers.map((layer) => layer.id),
+    ...chungnamLayers.map((layer) => layer.layerId),
     ...externalMapLayers.map((layer) => layer.id),
   ];
   const layerRows = (id: string) => id === "resources" ? [...overview.assets, ...overview.personnel]
@@ -1029,6 +1032,14 @@ export function OperationsPanel({
                   </div>;
                 })}
               </div>
+            </section>
+            <section className="layer-level-group" aria-labelledby="chungnam-layer-title">
+              <header><strong id="chungnam-layer-title">충남대학교 분석 데이터</strong></header>
+              {chungnamLayers.map((layer) => (
+                <button key={layer.layerId} type="button" className={visibleLayerIds.has(layer.layerId) ? "enabled" : ""} onClick={() => onLayerToggle(layer.layerId)} aria-pressed={visibleLayerIds.has(layer.layerId)}>
+                  <span>{layer.label}</span><i />
+                </button>
+              ))}
             </section>
             <section className="layer-level-group" aria-labelledby="analysis-layer-title">
               <header><strong id="analysis-layer-title">AI 분석 결과 레이어</strong></header>

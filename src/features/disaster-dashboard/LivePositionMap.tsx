@@ -12,6 +12,7 @@ import {
   type TerrainAnalysisResult,
 } from "./terrainAnalysis";
 import { loadChungnamViewshedRaster } from "./chungnamViewshed";
+import { CHUNGNAM_VIEWSHED_CONFIG } from "./chungnamViewshedConfig";
 import type { ExhibitionTourStage } from "./exhibitionTour";
 
 type Props = {
@@ -795,10 +796,10 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     let disposed = false;
 
     const tvwsVisible =
-      false;
+      visibleLayerIds.has(CHUNGNAM_VIEWSHED_CONFIG.tvws.layerId);
 
     const termVisible =
-      false;
+      visibleLayerIds.has(CHUNGNAM_VIEWSHED_CONFIG.term.layerId);
 
     const applyChungnamViewshed = async () => {
       const definitions = [
@@ -840,6 +841,9 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           return;
         }
 
+        const wasVisible = map.getLayer(definition.layerId)
+          && map.getLayoutProperty(definition.layerId, "visibility") !== "none";
+
         if (!map.getSource(definition.sourceId)) {
           map.addSource(definition.sourceId, {
             type: "image",
@@ -873,6 +877,9 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           "visibility",
           "visible",
         );
+        if (!wasVisible) {
+          map.fitBounds([raster.coordinates[3], raster.coordinates[1]], { padding: 60, maxZoom: 15 });
+        }
       }
     };
 
@@ -898,7 +905,6 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       map.off("load", onLoad);
     };
   }, [
-    false,
     visibleLayerIds,
   ]);
 
