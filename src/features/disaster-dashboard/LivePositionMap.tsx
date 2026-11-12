@@ -818,7 +818,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           sourceId: "chungnam-term-raster-source",
           layerId: "chungnam-term-raster-layer",
           visible: termVisible,
-          opacity: 0.58,
+          opacity: 0.78,
         },
       ];
 
@@ -1597,6 +1597,8 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || !(focusCenter ?? eventCenter)) return;
+    if (!selectedKey && (visibleLayerIds.has(CHUNGNAM_VIEWSHED_CONFIG.tvws.layerId)
+      || visibleLayerIds.has(CHUNGNAM_VIEWSHED_CONFIG.term.layerId))) return;
 
     const targetCenter = (focusCenter ?? eventCenter)!;
 
@@ -1626,7 +1628,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
     } else {
       map.easeTo({ center: targetCenter, zoom: 14, duration: 700 });
     }
-  }, [eventCenter, focusCenter, eventId, locations, mapReady]);
+  }, [eventCenter, focusCenter, eventId, locations, mapReady, selectedKey, visibleLayerIds]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -85,7 +85,7 @@ export function loadChungnamViewshedRaster(
         pixels.data[offset] = 216;
         pixels.data[offset + 1] = 74;
         pixels.data[offset + 2] = 54;
-        pixels.data[offset + 3] = 92;
+        pixels.data[offset + 3] = 180;
       } else {
         pixels.data[offset] = 0;
         pixels.data[offset + 1] = 0;
