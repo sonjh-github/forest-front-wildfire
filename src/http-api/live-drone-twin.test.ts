@@ -79,6 +79,19 @@ const row = {
 };
 
 describe("live drone twin", () => {
+  it("shows vehicle latitude and longitude when altitude is unavailable", () => {
+    for (const altitude of [null, undefined, NaN]) {
+      const result = mergeDroneTwins(
+        [{ ...assets[0], assetType: "COMMAND_VEHICLE" }],
+        [{ ...row, altitude }], "flight", now,
+      );
+      expect(result.matched).toBe(1);
+      expect(result.assets[0]).toMatchObject({
+        assetType: "COMMAND_VEHICLE",
+        geometry: { type: "Point", coordinates: [row.longitude, row.latitude] },
+      });
+    }
+  });
   it(
     "preserves canonical identity and maps GPS quality",
     () => {
