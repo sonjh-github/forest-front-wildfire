@@ -897,7 +897,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       );
     };
 
-    if (map.isStyleLoaded()) {
+    if (mapReady) {
       onLoad();
     } else {
       map.once("load", onLoad);
@@ -908,6 +908,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       map.off("load", onLoad);
     };
   }, [
+    mapReady,
     visibleLayerIds,
   ]);
 
