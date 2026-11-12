@@ -162,6 +162,7 @@ export type LiveLocation = {
   latitude: number;
   altitude: number | null;
   observedAt: string;
+  receivedAt?: string;
   category: string;
   batteryPct: number | null;
   signalStrengthDbm: number | null;
@@ -278,6 +279,7 @@ function locationFrom(item: Record<string, unknown>, kind: LiveLocation["kind"])
     latitude,
     altitude: Number.isFinite(altitudeValue) ? altitudeValue : null,
     observedAt: String(item.observedAt ?? ""),
+    receivedAt: typeof item.receivedAt === "string" ? item.receivedAt : undefined,
     category: String(kind === "personnel" ? "PERSONNEL" : item.assetType ?? "ASSET"),
     batteryPct: (item.batteryPct != null && Number.isFinite(Number(item.batteryPct))) ? Number(item.batteryPct) : null,
     signalStrengthDbm:

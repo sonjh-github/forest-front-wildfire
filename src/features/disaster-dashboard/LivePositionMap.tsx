@@ -13,6 +13,7 @@ import {
 } from "./terrainAnalysis";
 import { loadChungnamViewshedRaster } from "./chungnamViewshed";
 import { CHUNGNAM_VIEWSHED_CONFIG } from "./chungnamViewshedConfig";
+import { markerReceptionState } from "./markerReception";
 import type { ExhibitionTourStage } from "./exhibitionTour";
 
 type Props = {
@@ -655,7 +656,7 @@ function featureCollection(layerId: string, rows: ApiRecord[]): GeoJSON.FeatureC
   };
 }
 
-function locationFeatureCollection(locations: LiveLocation[], changedUntil: Record<string, number>, selectedKey: string | null): GeoJSON.FeatureCollection {
+function locationFeatureCollection(locations: LiveLocation[], changedUntil: Record<string, number>, selectedKey: string | null, now: number): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
     features: locations.map((location) => {
@@ -693,7 +694,7 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
             location.headingDeg == null || !Number.isFinite(location.headingDeg)
               ? null
               : location.headingDeg,
-          twinState: location.sourceSystem === "GCS_UPLINK" ? (location.qualityStatus || "OFFLINE") : "NONE",
+          twinState: markerReceptionState(location.receivedAt, location.observedAt, now),
           positioningMethod: location.positioningMethod ?? "UNKNOWN",
           observedAt: location.observedAt,
           signalStrengthDbm: location.signalStrengthDbm,
@@ -2137,7 +2138,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
           if (image) map.addImage(imageId, image, { pixelRatio: 2 });
         }
       }
-      const resourceData = locationFeatureCollection(locations, changedUntil, selectedKey);
+      const resourceData = locationFeatureCollection(locations, changedUntil, selectedKey, referenceTimeMs);
 
       /* PHASE_5_2C_VECTOR_LINE_REAL */
       const headingVectorFeatures = locations
@@ -2399,10 +2400,12 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         paint: {
           "circle-radius": ["case", ["==", ["get", "kind"], "personnel"], cinematicMode ? 9 : 11, cinematicMode ? 11 : 12.5],
           "circle-color": ["case",
+            ["==", ["get", "twinState"], "OFFLINE"], "#87938d",
+            ["==", ["get", "category"], "COMMAND_VEHICLE"], "#e02b20",
             ["!", ["boolean", ["get", "registeredToEvent"], true]], "#d86f31",
             cinematicMode ? cinematicResourceColor : normalResourceColor,
           ],
-          "circle-opacity": ["match", ["get", "twinState"], "STALE", 0.72, "OFFLINE", 0.35, 1],
+          "circle-opacity": 1,
           "circle-stroke-color": ["match", ["get", "twinState"], "STALE", "#d59b25", "OFFLINE", "#87938d", cinematicMode ? "#baf6ff" : "#ffffff"],
           "circle-stroke-width": ["case", ["boolean", ["get", "selected"], false], cinematicMode ? 3 : 4, cinematicMode ? 1.5 : 2],
         },
