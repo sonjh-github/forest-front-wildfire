@@ -17,6 +17,7 @@ import {
   type DashboardRegisteredAsset,
   type DashboardVendor,
 } from "../../http-api/device-registration-api";
+import { invalidateAssetCatalog } from "../../http-api/forest-api";
 
 const DEVICE_TYPE_SUGGESTIONS: Record<DashboardVendor, string[]> = {
   NDPS: [
@@ -161,6 +162,22 @@ export default function AssetRegistryModal({
     useState<RegistrationResult | null>(null);
   const [showOptional, setShowOptional] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editingName, setEditingName] = useState<{ id: string; value: string } | null>(null);
+  const [savingName, setSavingName] = useState(false);
+  const saveName = async () => {
+    if (!editingName) return;
+    setSavingName(true);
+    setMessage(null);
+    try {
+      const response = await dashboardDeviceApi.updateName(editingName.id, editingName.value.trim() || null);
+      invalidateAssetCatalog();
+      setRegisteredAssets(previous => previous.map(asset => asset.asset_id === editingName.id ? response.data : asset));
+      setEditingName(null);
+      setMessage({ kind: "success", text: "장비 이름을 저장했습니다." });
+      onRegistered?.();
+    } catch (error) { setMessage({ kind: "error", text: errorText(error, "장비 이름 저장에 실패했습니다.") }); }
+    finally { setSavingName(false); }
+  };
 
   const selectedAssetType = useMemo(
     () =>
@@ -502,6 +519,11 @@ export default function AssetRegistryModal({
                       <em data-status={String(mapping?.status ?? asset.status ?? "READY")}>{String(mapping?.status ?? asset.status ?? "READY")}</em>
                     </div>
                     <strong>{asset.asset_name || asset.asset_code || asset.asset_id}</strong>
+                    {editingName && editingName.id === asset.asset_id ? <div className="asset-name-editor">
+                      <input aria-label={`${asset.asset_code} 표시 이름`} maxLength={80} value={editingName.value} disabled={savingName} onChange={event => setEditingName(current => current ? { ...current, value: event.target.value } : null)} placeholder="비우면 관리 코드로 표시" />
+                      <button type="button" disabled={savingName} onClick={() => void saveName()}>{savingName ? "저장 중…" : "이름 저장"}</button>
+                      <button type="button" disabled={savingName} onClick={() => setEditingName(null)}>취소</button>
+                    </div> : <button type="button" disabled={savingName} onClick={() => setEditingName({ id: asset.asset_id!, value: asset.asset_name ?? "" })}>이름 수정</button>}
                     <small>{asset.asset_id}</small>
                     <dl>
                       <div><dt>관리 코드</dt><dd>{asset.asset_code ?? "-"}</dd></div>

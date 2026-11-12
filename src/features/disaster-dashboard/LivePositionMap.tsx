@@ -69,7 +69,7 @@ const shortCategoryNames: Record<string, string> = {
 
 function compactLabel(location: LiveLocation) {
   const type = shortCategoryNames[location.category] ?? "장비";
-  const name = location.label.length > 12 ? `${location.label.slice(0, 11)}…` : location.label;
+  const name = location.label;
   return `${location.registeredToEvent ? type : "미등록"} · ${name}`;
 }
 
@@ -212,7 +212,7 @@ function createLabelImage(
 
   context.font = `800 ${fontSize}px sans-serif`;
   const width = Math.min(
-    incident ? 500 : 460,
+    incident ? 500 : 1200,
     Math.ceil(context.measureText(text).width) + paddingX * 2,
   );
 
@@ -710,6 +710,7 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
 export default function LivePositionMap({ locations, changedUntil, highlightDurationMs, eventCenter, focusCenter, eventId, showResources, showEvent, selectedKey, onLocationSelect, onLocationDoubleClick, onLocationTopology, topology, topologyFocusKey, showTopology, referenceTimeMs, domainLayers, visibleLayerIds, cinematicMode = false, tourStage = null, onTerrainStateChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const labelTextsRef = useRef(new Map<string, string>());
   // DEMO 이벤트 자체도 산불 DEMO로 인식한다.
   // 운영 URL에 ?demo=1이 빠져 있어도 demo-wildfire-* 이벤트면
   // 현장 중심 줌/마커 표시 규칙을 동일하게 적용한다.
@@ -2133,12 +2134,14 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
 
       for (const location of locations) {
         const imageId = `field-label-${keyOf(location)}`;
+        const labelText = compactLabel(location);
+        if (map.hasImage(imageId) && labelTextsRef.current.get(imageId) !== labelText) map.removeImage(imageId);
         if (!map.hasImage(imageId)) {
           const image = createLabelImage(
-            compactLabel(location),
+            labelText,
             cinematicMode ? "cinematic" : "resource",
           );
-          if (image) map.addImage(imageId, image, { pixelRatio: 2 });
+          if (image) { map.addImage(imageId, image, { pixelRatio: 2 }); labelTextsRef.current.set(imageId, labelText); }
         }
       }
       const resourceData = locationFeatureCollection(locations, changedUntil, selectedKey, referenceTimeMs);
@@ -2473,7 +2476,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
             "uav-up", ["literal", [22, -34]],
             "crew-up", ["literal", [24, -22]],
             "crew-down", ["literal", [24, 24]],
-            "vehicle-down", ["literal", [20, 26]],
+            "vehicle-down", ["literal", [21, 0]],
             "rtk-left-down", ["literal", [-20, 30]],
             "relay-up", ["literal", [20, -28]],
             "fire-engine-down", ["literal", [22, 30]],

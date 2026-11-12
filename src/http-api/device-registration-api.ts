@@ -95,6 +95,11 @@ export function extractVendorMapping(
 }
 
 export const dashboardDeviceApi = {
+  updateName: (assetId: string, assetName: string | null) =>
+    dashboardApi<{ data: DashboardAssetDetail }>(
+      `/api/v1/dashboard/assets/${encodeURIComponent(assetId)}/name`,
+      { method: "PUT", body: JSON.stringify({ assetName }) },
+    ),
   assetTypes: () =>
     dashboardApi<{ data: DashboardAssetType[] }>(
       "/api/v1/dashboard/asset-types",

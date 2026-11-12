@@ -3177,6 +3177,9 @@
 .asset-catalog-row em { padding: 2px 6px; border-radius: 999px; background: #edf5f2; color: #256652; font-size: 8px; font-style: normal; font-weight: 850; }
 .asset-catalog-row em[data-status="SUSPENDED"], .asset-catalog-row em[data-status="LOST"] { background: #fff0e8; color: #b34f1b; }
 .asset-catalog-row > strong { display: block; margin-top: 3px; color: #1d342e; font-size: 12px; }
+.asset-name-editor { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.asset-name-editor input { width: 100%; min-width: 0; padding: 8px; border: 1px solid #a6b8af; border-radius: 4px; }
+.asset-name-editor button { padding: 6px 10px; }
 .asset-catalog-row > small { display: block; margin-top: 2px; color: #74857f; font-size: 9px; }
 .asset-catalog-row dl { margin: 8px 0 0; display: grid; grid-template-columns: .9fr 1.5fr .8fr; gap: 8px; }
 .asset-catalog-row dl div { min-width: 0; padding-top: 6px; border-top: 1px solid #e5ebe8; }

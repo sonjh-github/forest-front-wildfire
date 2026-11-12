@@ -448,6 +448,7 @@ let assetCatalogRequest:
 
 export function invalidateAssetCatalog() {
   assetCatalogRequest = null;
+  dashboardAssetCache.clear();
 }
 
 function loadAssetCatalog() {
