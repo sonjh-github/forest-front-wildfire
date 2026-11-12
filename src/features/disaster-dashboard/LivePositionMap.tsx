@@ -68,9 +68,7 @@ const shortCategoryNames: Record<string, string> = {
 };
 
 function compactLabel(location: LiveLocation) {
-  const type = shortCategoryNames[location.category] ?? "장비";
-  const name = location.label;
-  return `${location.registeredToEvent ? type : "미등록"} · ${name}`;
+  return location.label;
 }
 
 function resourceQualityPopupContent(location: LiveLocation) {
