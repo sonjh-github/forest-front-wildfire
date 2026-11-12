@@ -661,6 +661,7 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
     type: "FeatureCollection",
     features: locations.map((location) => {
       const key = keyOf(location);
+      const receiving = markerReceptionState(location.receivedAt, location.observedAt, now) === "LIVE";
       return {
         type: "Feature",
         id: key,
@@ -688,7 +689,7 @@ function locationFeatureCollection(locations: LiveLocation[], changedUntil: Reco
                         : location.id === "FIRE-ENG-03"
                           ? "fire-engine-down"
                           : "default",
-          changed: (changedUntil[key] ?? 0) > Date.now(),
+          changed: receiving && (changedUntil[key] ?? 0) > now,
           selected: selectedKey === key,
           headingDeg:
             location.headingDeg == null || !Number.isFinite(location.headingDeg)
@@ -2693,13 +2694,29 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       const strokeWidth = 2 + intensity * 1.2;
       const strokeColor = `rgb(255, ${Math.round(88 + intensity * 146)}, 0)`;
       if (map.getLayer("field-resource-point")) {
-        map.setPaintProperty("field-resource-point", "circle-stroke-color", strokeColor);
-        map.setPaintProperty("field-resource-point", "circle-stroke-width", strokeWidth);
+        map.setPaintProperty("field-resource-point", "circle-stroke-color", [
+          "case", ["boolean", ["get", "changed"], false], strokeColor,
+          ["==", ["get", "twinState"], "OFFLINE"], "#87938d",
+          cinematicMode ? "#baf6ff" : "#ffffff",
+        ]);
+        map.setPaintProperty("field-resource-point", "circle-stroke-width", [
+          "case", ["boolean", ["get", "changed"], false], strokeWidth,
+          ["boolean", ["get", "selected"], false], cinematicMode ? 3 : 4,
+          cinematicMode ? 1.5 : 2,
+        ]);
       }
       if (map.getLayer("field-resource-halo")) {
-        map.setPaintProperty("field-resource-halo", "circle-radius", 14 + intensity * 2);
-        map.setPaintProperty("field-resource-halo", "circle-color", "#ffb300");
-        map.setPaintProperty("field-resource-halo", "circle-opacity", 0.12 + intensity * 0.28);
+        map.setPaintProperty("field-resource-halo", "circle-radius", [
+          "case", ["boolean", ["get", "changed"], false], 14 + intensity * 2,
+          ["boolean", ["get", "selected"], false], 14, 0,
+        ]);
+        map.setPaintProperty("field-resource-halo", "circle-color", [
+          "case", ["boolean", ["get", "changed"], false], "#ffb300", "#1e77b4",
+        ]);
+        map.setPaintProperty("field-resource-halo", "circle-opacity", [
+          "case", ["boolean", ["get", "changed"], false], 0.12 + intensity * 0.28,
+          ["boolean", ["get", "selected"], false], 0.28, 0,
+        ]);
       }
       if (!reduceMotion && elapsed < highlightDurationMs) frame = requestAnimationFrame(animate);
     };
