@@ -13,7 +13,7 @@ export const CHUNGNAM_VIEWSHED_CONFIG = {
   },
   term: {
     layerId: "chungnam-term",
-    label: "단말 음영지역",
+    label: "단말 분석영역",
     url: "/chungnam-viewshed/term.tif",
     analysisRadiusM: 2000,
     antennaHeightM: 1.45,

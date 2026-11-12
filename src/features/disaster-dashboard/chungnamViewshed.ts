@@ -20,6 +20,10 @@ const cache = new Map<
   Promise<ChungnamViewshedRaster>
 >();
 
+export function chungnamCellVisible(value: number, noData: number | null) {
+  return value !== noData && value === 1;
+}
+
 export function loadChungnamViewshedRaster(
   kind: ChungnamViewshedKind,
 ): Promise<ChungnamViewshedRaster> {
@@ -53,6 +57,7 @@ export function loadChungnamViewshedRaster(
     });
 
     const values = raster as unknown as ArrayLike<number>;
+    const noData = image.getGDALNoData();
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -69,13 +74,14 @@ export function loadChungnamViewshedRaster(
     for (let index = 0; index < width * height; index += 1) {
       const value = Number(values[index]);
       const offset = index * 4;
+      if (!chungnamCellVisible(value, noData)) continue;
 
       if (kind === "tvws" && value === 1) {
         pixels.data[offset] = 18;
         pixels.data[offset + 1] = 145;
         pixels.data[offset + 2] = 155;
         pixels.data[offset + 3] = 118;
-      } else if (kind === "term" && value === 0) {
+      } else if (kind === "term" && value === 1) {
         pixels.data[offset] = 216;
         pixels.data[offset + 1] = 74;
         pixels.data[offset + 2] = 54;
@@ -123,6 +129,7 @@ export function loadChungnamViewshedRaster(
   })();
 
   cache.set(kind, promise);
+  void promise.catch(() => { if (cache.get(kind) === promise) cache.delete(kind); });
 
   return promise;
 }
