@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOperationalEvidence, buildPacketLossQualityAlerts, calculatePacketSequence, calculatePacketSequenceMetrics, calculateTelemetryMetrics, classifyLinkHealth, evaluateRiskZone } from "./operationalEvidence";
+import { buildOperationalEvidence, buildPacketLossQualityAlerts, calculatePacketSequence, calculatePacketSequenceMetrics, calculateTelemetryMetrics, classifyLinkHealth, evaluateRiskZone, distanceMeters } from "./operationalEvidence";
 
 const sample = (sequence: number, second: number, latencyMs = 200) => ({
   assetId: "DRONE-01", sequence,
@@ -9,6 +9,11 @@ const sample = (sequence: number, second: number, latencyMs = 200) => ({
 });
 
 describe("operational evidence", () => {
+  it("지도 거리는 위도에 따른 경도 길이와 같은 지점의 0m를 반영한다", () => {
+    expect(distanceMeters([127, 36], [127, 36])).toBe(0);
+    expect(distanceMeters([0, 0], [1, 0])).toBeCloseTo(111194.93, 1);
+    expect(distanceMeters([0, 60], [1, 60])).toBeCloseTo(55596.93, 1);
+  });
   it("수신시각과 목표주기로 연결·지연·두절을 판정한다", () => {
     const now = new Date("2026-09-04T00:00:10Z");
     expect(classifyLinkHealth("2026-09-04T00:00:08Z", now)).toBe("CONNECTED");

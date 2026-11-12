@@ -14,6 +14,7 @@ import {
 import { loadChungnamViewshedRaster } from "./chungnamViewshed";
 import { CHUNGNAM_VIEWSHED_CONFIG } from "./chungnamViewshedConfig";
 import { markerReceptionState } from "./markerReception";
+import DistanceMeasure from "./DistanceMeasure";
 import type { ExhibitionTourStage } from "./exhibitionTour";
 
 type Props = {
@@ -717,6 +718,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   const [terrain3d, setTerrain3d] = useState(cinematicMode);
   const [terrainFailed, setTerrainFailed] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [measuring, setMeasuring] = useState(false);
   const [riskHeatmap, setRiskHeatmap] = useState(false);
   const [terrainElevationM, setTerrainElevationM] = useState<number | null>(null);
 
@@ -2547,10 +2549,11 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
       const hovered = locations.find(item => keyOf(item) === resourceHoveredKeyRef.current);
-      if (hovered && showResources) showResourceQualityFor(hovered);
+      if (hovered && showResources && !measuring) showResourceQualityFor(hovered);
       else if (resourceHoveredKeyRef.current) hideResourceQuality();
     };
     const selectResource = (event: maplibregl.MapLayerMouseEvent) => {
+      if (measuring) return;
       const key = String(event.features?.[0]?.properties?.key ?? "");
       const location = locations.find((item) => keyOf(item) === key);
       if (!location) return;
@@ -2567,6 +2570,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       if (location) onLocationTopology(location);
     };
     const openDroneVideo = (event: maplibregl.MapLayerMouseEvent) => {
+      if (measuring) return;
       event.preventDefault();
       event.originalEvent.preventDefault();
       event.originalEvent.stopPropagation();
@@ -2600,6 +2604,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       resourceHoveredKeyRef.current = null;
     };
     const trackResourceQuality = (event: maplibregl.MapMouseEvent) => {
+      if (measuring) { map.getCanvas().style.cursor = "crosshair"; return; }
       const layers = ["field-resource-point", "field-resource-label"].filter(id => Boolean(map.getLayer(id)));
       const feature = showResources && layers.length ? map.queryRenderedFeatures(event.point, {layers})[0] : undefined;
       const key = String(feature?.properties?.key ?? "");
@@ -2650,7 +2655,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       map.off("mousemove", trackResourceQuality);
       map.off("mouseout", hideResourceQuality);
     };
-  }, [cinematicMode, locations, changedUntil, eventCenter, onLocationDoubleClick, onLocationSelect, onLocationTopology, referenceTimeMs, selectedKey, showEvent, showResources, showTopology, topology, topologyFocusKey]);
+  }, [measuring, cinematicMode, locations, changedUntil, eventCenter, onLocationDoubleClick, onLocationSelect, onLocationTopology, referenceTimeMs, selectedKey, showEvent, showResources, showTopology, topology, topologyFocusKey]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2727,6 +2732,7 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
   return (
     <div className={`live-map-shell${tileDegraded ? " is-tile-degraded" : ""}${cinematicMode ? " is-cinematic" : ""}${terrainFailed ? " is-terrain-fallback" : ""}`}>
       <div ref={containerRef} className="live-basemap" aria-label="실시간 현장 지도" />
+      <DistanceMeasure map={mapReady ? mapRef.current : null} active={measuring} onActiveChange={setMeasuring} eventId={eventId} />
       <div className="basemap-switch" aria-label="지도 표현 전환">
         <button type="button" className={!mutedBasemap && !terrain3d ? "active" : ""} aria-pressed={!mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(false); }}>2D 지도</button>
         <button type="button" className={mutedBasemap && !terrain3d ? "active emphasis" : "emphasis"} aria-pressed={mutedBasemap && !terrain3d} onClick={() => { setTerrain3d(false); setMutedBasemap(true); }}>현장 강조</button>

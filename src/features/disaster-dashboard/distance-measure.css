@@ -1,0 +1,19 @@
+.live-map-shell .distance-measure {
+  position: absolute; top: 56px; right: 12px; z-index: 45;
+  color: #203a32; font-size: 13px; max-width: min(290px, calc(100% - 24px));
+}
+.distance-measure button {
+  border: 1px solid #788e83; border-radius: 4px; background: #fff; color: #203a32;
+  padding: 8px 12px; cursor: pointer; font: inherit;
+}
+.distance-measure > button { display: block; margin-left: auto; }
+.distance-measure button[aria-pressed="true"] { background: #7f1785; color: #fff; }
+.distance-measure button:disabled { opacity: .5; cursor: default; }
+.distance-measure-panel { margin-top: 6px; padding: 12px; background: #fff; border: 1px solid #9bada3; border-radius: 5px; box-shadow: 0 3px 12px #0002; }
+.distance-measure-panel strong { display: block; font-size: 18px; }
+.distance-measure-panel small { display: block; margin-top: 6px; line-height: 1.5; }
+.distance-measure-panel ol { list-style: none; padding: 0; max-height: 130px; overflow: auto; }
+.distance-measure-panel li { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; }
+.distance-measure-actions { display: flex; gap: 6px; margin-top: 10px; }
+.distance-measure-actions button { padding: 6px; font-size: 12px; }
+.distance-measure-point { display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid #fff; border-radius: 50%; background: #a414aa; color: #fff; font: bold 12px sans-serif; pointer-events: none; box-shadow: 0 1px 4px #0005; }
