@@ -1858,12 +1858,6 @@ export default function LivePositionMap({ locations, changedUntil, highlightDura
       confidenceRow.textContent = `신뢰도: ${confidence}`;
       popupContent.appendChild(confidenceRow);
 
-      const notice = document.createElement("div");
-      notice.style.marginTop = "6px";
-      notice.style.fontSize = "11px";
-      notice.style.color = "#667";
-      notice.textContent = "위성 열원 탐지값 · 산불 확정정보 아님";
-      popupContent.appendChild(notice);
 
       new maplibregl.Popup({
         closeButton: true,

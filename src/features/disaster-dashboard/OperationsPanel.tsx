@@ -1067,7 +1067,7 @@ export function OperationsPanel({
                   ? <><strong>예측 결과 근거</strong><span>{value(latestPrediction, ["modelName"], "모델 미상")} {value(latestPrediction, ["modelVersion"], "")}</span><small>기준 {occurredAt(latestPrediction, ["baseTime"])} · 예측 {occurredAt(latestPrediction, ["forecastTime"])} · 신뢰도 {numeric(latestPrediction, ["confidence"]) == null ? "없음" : `${(numeric(latestPrediction, ["confidence"])! * 100).toFixed(0)}%`}</small></>
                   : <><strong>확산 예측</strong><span>분석 대기 또는 미제공</span><small>관측 화선은 계속 표시됩니다.</small></>
               ) : (
-                <><strong>구조 추정 후보</strong><span>{victimCandidates.length ? `${victimCandidates.length}건 · AI 추정값` : "관측 부족 · 추가 탐색 필요"}</span><small>추정 후보는 구조 지휘관 확정 전까지 실제 위치로 간주하지 않습니다.</small></>
+                <><strong>구조 추정 후보</strong><span>{victimCandidates.length ? `${victimCandidates.length}건 · AI 추정값` : "관측 부족 · 추가 탐색 필요"}</span></>
               )}
             </div>
           </section>}
@@ -1102,9 +1102,6 @@ export function OperationsPanel({
                 );
               })}
 
-              <p className="operation-readonly-note">
-                좌표가 없는 기관 행정구역 자료는 시군구 대표영역으로 공간화해 표시하며, 상세 경계 데이터가 제공되면 동일 레이어에서 교체됩니다.
-              </p>
             </section>}
 
           {activeTab === "alerts" && <section className="operations-records" aria-label="활성 경보" aria-live="polite">
@@ -1543,7 +1540,7 @@ export function OperationsPanel({
               <dl><div><dt>최저 배터리</dt><dd>{nms.minBatteryPct == null ? "미수신" : `${nms.minBatteryPct}%`}</dd></div><div><dt>잔량 ≤20%</dt><dd>{nms.lowBatteryCount == null ? "미수신" : `${nms.lowBatteryCount}대`}</dd></div><div><dt>수신 장비</dt><dd>{nms.batteriesReceived}/{overview.assets.length}</dd></div></dl>
               <small>최저 수신 전압: {nms.minVoltageV == null ? "미수신" : `${nms.minVoltageV.toFixed(2)} V`} · MAVLink 상태값</small>
               <small>온도·전원 상태: Core API 계약 미확인 · 현장 연계 대기</small>
-              <small>마지막 상태수신 {nms.lastReceivedAt ? relativeTime(nms.lastReceivedAt) : "미수신"} · 잔량 기준은 저전압 측정이 아닙니다.</small>
+              <small>마지막 상태수신 {nms.lastReceivedAt ? relativeTime(nms.lastReceivedAt) : "미수신"}</small>
             </article>
             <NetworkSequenceQualityPanel
               telemetrySamples={telemetrySamples}
@@ -1557,7 +1554,7 @@ export function OperationsPanel({
             <article data-status={telemetryStreamStatus === "CONNECTED" ? "ACTIVE" : telemetryStreamStatus === "ERROR" ? "FAILED" : "INACTIVE"} className="network-detail-card">
               <div><strong>Gateway 실시간 스트림</strong><span>{telemetryStreamStatus === "CONNECTED" ? "연결" : telemetryStreamStatus === "CONNECTING" ? "연결 중" : telemetryStreamStatus === "RECONNECTING" ? "재연결 중" : telemetryStreamStatus === "ERROR" ? "오류" : "미설정"}</span></div>
               <p>WebSocket 위치·GNSS/RTK·MAVLink 변환 텔레메트리 수신</p>
-              <small>운영 주소는 VITE_TELEMETRY_WS_URL로 주입하며 브라우저에 장비 인증키를 저장하지 않습니다.</small>
+
             </article>
             {overview.networks.length === 0 && <p className="operation-empty-state"><b>연계된 통신망 없음</b><span>측정값 0이 아닌 미연계 상태입니다.</span></p>}
             {overview.networks.map((network) => {
@@ -1689,9 +1686,6 @@ export function OperationsPanel({
               </article>;
             })}
 
-            <p className="operation-readonly-note">
-              외부 API 인증정보 누락 또는 요청 실패는 정상 상태로 표시하지 않습니다.
-            </p>
 
             <p className="operation-section-title"><strong>시스템 연계 기능 계약</strong></p>
             {overview.integrations.length === 0 && <p className="operation-empty-state"><b>등록된 연계 기능 없음</b><span>처리건 0이 아닌 연계 미등록 상태입니다.</span></p>}

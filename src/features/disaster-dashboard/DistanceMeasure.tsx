@@ -71,7 +71,7 @@ export default function DistanceMeasure({ map, active, onActiveChange, eventId }
     {(active || points.length > 0) && <div className="distance-measure-panel">
       <strong aria-live="polite">총거리 {formatDistance(total)}</strong>
       <small>{active ? "지도를 클릭해 지점을 추가하세요. Esc로 종료합니다." : "측정 완료 · 다시 켜면 지점을 이어서 추가합니다."}</small>
-      <small>지점 간 수평 직선거리 · 도로·지형 경로 제외</small>
+      <small>지점 간 수평 직선거리</small>
       {segments.length > 0 && <ol aria-label="구간별 측정 거리">{segments.map((distance, index) =>
         <li key={index}>{index + 1} → {index + 2}<b>{formatDistance(distance)}</b></li>,
       )}</ol>}

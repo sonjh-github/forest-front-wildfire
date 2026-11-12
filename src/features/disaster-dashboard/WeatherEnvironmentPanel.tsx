@@ -37,7 +37,6 @@ export default function WeatherEnvironmentPanel({ observation = null }: { observ
       <p>관측 지점: {current?.stationName ?? "미수신"}</p>
       <p>관측 시각: {current?.observedAt ? new Date(current.observedAt).toLocaleString("ko-KR") : "미수신"}</p>
       <p>데이터 출처: {current?.source ?? "미연결"}</p>
-      <p>현재 현장 기상 Core API가 연결되지 않았습니다. 모의 풍향·풍속 값을 실측값처럼 표시하지 않습니다.</p>
     </section>
   );
 }

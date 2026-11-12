@@ -1523,7 +1523,7 @@ export default function UnifiedDisasterDashboard() {
             <div>
               <p>{error ? "통합 데이터 연결을 확인해 주세요" : disasterNotFound ? "기본 재난 ID에 대응하는 등록 정보가 없습니다" : eventsLoaded ? "조회된 재난 정보가 없습니다" : "산림재난 운영 정보를 불러오고 있습니다"}</p>
               <h1>{error ? "상황판을 준비하지 못했습니다" : disasterNotFound ? "재난 미등록 · 장비 정보 별도 조회" : eventsLoaded ? "재난 조회 대기" : "상황판 준비 중"}</h1>
-              <span>{error ? "기존 데이터는 변경되지 않았습니다. 연결 복구 후 최신 상황을 다시 불러옵니다." : disasterNotFound ? "설정된 기본 재난 ID를 찾지 못했습니다. 실제 재난 발생 여부는 확인되지 않았으며, 아래 Sleno 통신 품질 정보는 별도 운영 API로 조회합니다." : eventsLoaded ? "실제 재난 목록 연동 상태를 확인해 주세요." : "사건, 현장 자원, 통신망과 경보 상태를 확인하는 중입니다."}</span>
+              <span>{error ? "기존 데이터는 변경되지 않았습니다. 연결 복구 후 최신 상황을 다시 불러옵니다." : disasterNotFound ? "설정된 재난 ID를 찾지 못했습니다." : eventsLoaded ? "실제 재난 목록 연동 상태를 확인해 주세요." : "사건, 현장 자원, 통신망과 경보 상태를 확인하는 중입니다."}</span>
               {error && <button type="button" onClick={handleRetry} disabled={retrying}>{retrying ? "다시 연결 중…" : "연결 다시 확인"}</button>}
             </div>
           </div>
@@ -1701,7 +1701,7 @@ export default function UnifiedDisasterDashboard() {
               <p>기존 관제 지도와 AI 분석 레이어를 활용합니다.</p>
               <div className="field-capability-tiles">
                 <article><b>3D 지형</b><span>기존 지도 우측 3D 지형 모드 사용</span><small>지도 기능 재사용</small></article>
-                <article><b>AI 분석 후보</b><span>관측 화선·확산 참고·위험 구역</span><small>분석 출처·시연 여부 확인 필요</small></article>
+                <article><b>AI 분석 후보</b><span>관측 화선·확산 참고·위험 구역</span></article>
                 <article><b>실기체 디지털트윈</b><span>실기체 위치 기반 표현</span><small>Core Position 데이터 수신 대기</small></article>
               </div>
               <button type="button" onClick={() => { setOperationsTab("layers"); setCapabilityMenu(null); }}>분석 레이어 열기</button>
@@ -1712,11 +1712,10 @@ export default function UnifiedDisasterDashboard() {
                 <button type="button" aria-pressed={responseSection === "vehicle"} onClick={() => setResponseSection("vehicle")}>진화 차량</button>
                 <button type="button" aria-pressed={responseSection === "hq"} onClick={() => setResponseSection("hq")}>통합지휘본부</button>
               </div>
-              {responseSection === "night" && <article><b>야간 대응 검토</b><p>현장 조명·보호장비, 풍속·시정·기상 관측값을 확인합니다.</p><small>헬기 투입 가능 여부는 자동 판정하지 않으며 관계 지침과 지휘권자 판단이 필요합니다.</small></article>}
+              {responseSection === "night" && <article><b>야간 대응 검토</b><p>현장 조명·보호장비, 풍속·시정·기상 관측값을 확인합니다.</p></article>}
               {responseSection === "vehicle" && <article><b>진화 차량</b><p>진화차·펌프차·지휘차의 장비 제원 및 투입 현황을 확인합니다.</p><small>차량별 제원·배치 원장 연동 대기</small></article>}
               {responseSection === "hq" && <article><b>통합지휘본부</b><p>상황총괄 · 지상진화 · 공중진화 · 보급지원 · 홍보대책 · 유관기관 협조</p><small>조직별 담당자·지휘명령 데이터 연동 대기</small></article>}
             </div>}
-            <footer>표시는 기능 안내 및 연동 현황입니다. 실제 현장 장비 상태를 검증한 결과가 아닙니다.</footer>
           </section>
         )}
         {SHOW_VALIDATION_UI && <section className="field-kpi-strip" aria-label="현장 통신 KPI 4종">
@@ -1758,7 +1757,7 @@ export default function UnifiedDisasterDashboard() {
               >
                 {localFieldMode
                   ? "SYNTHETIC OFF"
-                  : "API DATA · 실측 여부 개별 확인"}
+                  : "API DATA"}
               </small>
               {(
                 <div
@@ -1935,9 +1934,6 @@ export default function UnifiedDisasterDashboard() {
                       </article>
                     </div>
 
-                    <footer>
-                      마지막 관측 기반 예측 표시 · 실제 LIVE 영상 또는 관측 데이터가 아닙니다.
-                    </footer>
                   </section>
                 )}
 

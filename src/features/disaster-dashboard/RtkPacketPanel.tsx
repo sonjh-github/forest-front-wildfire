@@ -83,7 +83,7 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
         <span>최대 갱신 간격 <strong>{metrics?.maxFrameIntervalMs!=null ? delay(metrics.maxFrameIntervalMs) : "—"}</strong></span>
         <small>마지막 새 데이터 수신: {metrics?.lastNewFrameReceivedAt ? time(metrics.lastNewFrameReceivedAt) : "현재 조회 기록만으로 확인 불가"}</small>
         {indicatorStates.update==="STALLED" && metrics && <p className="rtk-frame-stalled">수신은 계속되고 있지만, 최신 {metrics.latestCounterRepeatedCount}건의 데이터 번호가 같습니다.</p>}
-        <details className="rtk-metric-evidence"><summary>계산 근거</summary><small>서로 다른 데이터 번호의 최초 측정 시각으로 간격을 계산합니다.</small>{metrics && latest && <><small>최신 FCnt {latest.frameCounter} · 동일 번호 연속 {metrics.latestCounterRepeatedCount}건</small><small>조회 기록 범위 {delay(metrics.latestCounterObservedSpanMs)} · 실제 정체 시작 시각을 뜻하지 않습니다.</small><small>중복 포함 로그 간격: {metrics.measuredIntervalMs===null ? "" : delay(metrics.measuredIntervalMs)}</small></>}</details>
+        <details className="rtk-metric-evidence"><summary>계산 근거</summary><small>서로 다른 데이터 번호의 최초 측정 시각으로 간격을 계산합니다.</small>{metrics && latest && <><small>최신 FCnt {latest.frameCounter} · 동일 번호 연속 {metrics.latestCounterRepeatedCount}건</small><small>조회 기록 범위 {delay(metrics.latestCounterObservedSpanMs)}</small><small>중복 포함 로그 간격: {metrics.measuredIntervalMs===null ? "" : delay(metrics.measuredIntervalMs)}</small></>}</details>
       </div>
       <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header>
         <p>웹에 표시된 최신 패킷과 100건 전 기록을 비교합니다.</p>
@@ -107,9 +107,8 @@ export default function RtkPacketPanel({assetId}:{assetId:string}) {
     {data?.selectedDevice?.type==="RTK_TERMINAL" && <LpwaRecoveryLog key={assetId} assetId={assetId} />}
     {data && <>
       <h3 className="rtk-history-heading">패킷 이력 · 최근 100개</h3>
-      <p className="rtk-state-explanation">수신 중: 30초 이내 · 지연: 30~120초 · 이후 최근 수신 없음. 통신 수신과 측위 확정은 별개입니다. 좌표가 있어도 Fix 미확정이면 정상 측위로 계산하지 않습니다.</p>
       <div className="rtk-packet-counts"><span>최근 <b>{data.summary.count}</b>/100건</span><span>좌표·Fix 확인 <b>{data.summary.confirmed}</b></span><span>No Fix <b>{data.summary.noFix}</b></span><span>0,0 <b>{data.summary.zero}</b></span><span>Fix 미확인 <b>{data.summary.unknownFix}</b></span></div>
-      <p className="rtk-state-explanation">아래 목록은 DB에 저장된 RTK_POSITION 패킷 기준입니다. 0,0·No Fix도 제외하지 않습니다. 서버 수신 상태는 실시간 수신 캐시를 포함합니다. 조회: {time(data.checkedAt)}</p>
+      <p className="rtk-state-explanation">아래 목록은 DB에 저장된 RTK_POSITION 패킷 기준입니다. 서버 수신 상태는 실시간 수신 캐시를 포함합니다. 조회: {time(data.checkedAt)}</p>
       {latest && <>
         <div className="rtk-latest-meta"><span>DevEUI: {latest.devEui ?? ""}</span><span>망: {latest.networkType ?? ""}</span><span>최근 저장: {time(data.lastStoredAt)}</span></div>
         <div className="rtk-packet-table" tabIndex={0} aria-label="최근 패킷 표 · 가로 스크롤 가능">

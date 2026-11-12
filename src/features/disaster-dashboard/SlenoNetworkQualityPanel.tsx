@@ -214,10 +214,6 @@ export default function SlenoNetworkQualityPanel() {
         {quality
           ? `API 출처: ${quality.source ?? "미확인"} · 시스템: ${quality.sourceSystem ?? "미확인"} · synthetic: ${String(quality.synthetic ?? "미확인")} · 산출 시각: ${quality.calculatedAt ?? "미확인"}`
           : "API 데이터 출처 미확인"}
-        {" · "}
-        장비 물리/모의 구분은 API 분류값 기준 ·
-        frameCounter 기준 참고 지표 ·
-        실제 무선 패킷 유실률 확정값 아님
       </small>
 
       <div className="sleno-device-list">

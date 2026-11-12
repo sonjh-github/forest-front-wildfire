@@ -78,7 +78,7 @@ export function DroneTwinDetail({
           {" · "}
           {state === "LIVE"
             ? "최근 위치 수신"
-            : "마지막 위치 · 현재 위치 확인 필요"}
+            : "마지막 수신 위치"}
         </dd>
       </div>
 

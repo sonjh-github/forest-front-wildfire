@@ -708,7 +708,7 @@ export default function PerformanceKpiPanel({
           <strong>현장 통신 KPI 4종</strong>
           <small>
             {sessionMode
-              ? `${session.runId} · 브라우저 참고 측정 · 공식 판정 아님`
+              ? `${session.runId} · 브라우저 측정`
               : hasApiError
                   ? "KPI API 오류 · 현재 실측값 숨김"
                   : hasOfficialMeasurement
@@ -1216,11 +1216,6 @@ export default function PerformanceKpiPanel({
           </p>
         )}
 
-        <p className="packet-sequence-notice">
-          동일 자산 기준으로 100칸을 고정 표시하며, 관측 전/대기 칸은
-          유실률 계산에 포함하지 않습니다. DEMO 데이터와 브라우저 수신표본은
-          공식 성능시험 결과로 사용하지 않습니다.
-        </p>
       </section>
 
       <details className="performance-interface-requirements">
@@ -1234,10 +1229,6 @@ export default function PerformanceKpiPanel({
         <div>
           <span>현재값 최신성</span>
           <code>{KPI_MEASUREMENT_INTERFACE_REQUIREMENTS.freshness}</code>
-        </div>
-        <div>
-          <span>원시로그 책임</span>
-          <code>{KPI_MEASUREMENT_INTERFACE_REQUIREMENTS.note}</code>
         </div>
         <div>
           <span>텔레메트리 필수</span>

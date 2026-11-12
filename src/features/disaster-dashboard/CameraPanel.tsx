@@ -126,7 +126,7 @@ export default function CameraPanel() {
         <small>마지막 RTP 패킷 수신: {frameTime(rtpMetrics?.lastPacketReceivedAt)}</small>
         <small>{receptionState==="STOPPED" ? "종료 시 미수신 경과" : "현재 미수신 경과"}: {frameSeconds(rtpMetrics?.silenceMs)}</small>
         {indicators.update==="STALLED" && <p className="camera-metric-note">새 RTP 순서번호가 확인되지 않고 있습니다. 이전 평균값과 현재 수신 상태는 별개입니다.</p>}
-        <details><summary>계산 근거</summary><small>중계 서버가 TCP에서 원본 영상 RTP 패킷을 읽은 시각으로 최근 200초 동안의 {rtpMetrics?.sampleCount ?? 0}개 간격을 계산합니다. 누적 {rtpMetrics?.packetCount ?? 0}패킷. 프레임 간격과는 다릅니다.</small><small>순서번호가 5초 넘게 증가하지 않으면 수신 중으로 판정하지 않습니다. 지터 {frameSeconds(rtpMetrics?.jitterMs)} · RTCP 송신 보고 {rtpMetrics?.rtcpSenderReports ?? 0}건.</small></details>
+        <details><summary>계산 근거</summary><small>중계 서버가 TCP에서 원본 영상 RTP 패킷을 읽은 시각으로 최근 200초 동안의 {rtpMetrics?.sampleCount ?? 0}개 간격을 계산합니다. 누적 {rtpMetrics?.packetCount ?? 0}패킷.</small><small>순서번호가 5초 넘게 증가하지 않으면 수신 중으로 판정하지 않습니다. 지터 {frameSeconds(rtpMetrics?.jitterMs)} · RTCP 송신 보고 {rtpMetrics?.rtcpSenderReports ?? 0}건.</small></details>
       </div>
       <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header>
         <p>최근 200초 중 이 웹 PC가 새 영상을 정상 수신한 시간의 비율입니다.</p>
@@ -135,7 +135,7 @@ export default function CameraPanel() {
         <small>정상 수신 {((sharing?.receivedMs ?? 0)/1000).toFixed(1)}초 · 미수신 {((sharing?.interruptedMs ?? 0)/1000).toFixed(1)}초</small>
         <small>집계 {Math.floor((sharing?.observedMs ?? 0)/1000)} / 200초 · 현재 {sharing?.stopped ? "측정 중지" : sharing?.receiving ? "영상 수신 중" : "새 영상 미수신"}</small>
         {sharingState==="WAITING" && <small>첫 영상 수신부터 자동 집계합니다. 200초가 쌓이면 판정하며, 연결이 끊겨도 집계는 유지합니다.</small>}
-        <details><summary>계산 방법 · RTP 참고</summary><small>(200초 − 웹 영상 미수신 시간) ÷ 200초 × 100. 미수신 10초이면 95%입니다. PC 오프라인, 영상 멈춤, 재연결 대기 시간을 포함합니다. 와이파이 복구 후 새 영상 데이터를 받아 재생할 때 수신을 재개합니다.</small><small>웹 PC 기준이며 서버 RTP 수신·재개 시각과 별도입니다. 주소 변경·새 연결 버튼으로 새로 시작하고, 자동 재연결 중에는 기록을 초기화하지 않습니다.</small><small>서버 RTP 참고: 번호 {rtpMetrics?.fromSequence ?? "—"} ~ {rtpMetrics?.toSequence ?? "—"} · 수신 {rtpMetrics?.receivedCount ?? 0}/{rtpMetrics?.expectedCount ?? 0}개 · 누락 {rtpMetrics?.missingCount ?? 0}개 · 중복 {rtpMetrics?.duplicateCount ?? 0}개. 이 번호 수신율을 정보 공유 성공률로 사용하지 않습니다.</small></details>
+        <details><summary>계산 방법 · RTP 참고</summary><small>(200초 − 웹 영상 미수신 시간) ÷ 200초 × 100. 미수신 10초이면 95%입니다. PC 오프라인, 영상 멈춤, 재연결 대기 시간을 포함합니다. 와이파이 복구 후 새 영상 데이터를 받아 재생할 때 수신을 재개합니다.</small><small>웹 PC 기준이며 서버 RTP 수신·재개 시각과 별도입니다. 주소 변경·새 연결 버튼으로 새로 시작하고, 자동 재연결 중에는 기록을 초기화하지 않습니다.</small><small>서버 RTP 참고: 번호 {rtpMetrics?.fromSequence ?? "—"} ~ {rtpMetrics?.toSequence ?? "—"} · 수신 {rtpMetrics?.receivedCount ?? 0}/{rtpMetrics?.expectedCount ?? 0}개 · 누락 {rtpMetrics?.missingCount ?? 0}개 · 중복 {rtpMetrics?.duplicateCount ?? 0}개.</small></details>
       </div>
     </section>
     <ReceptionRecoveryLog network="TVWS" data={availability} />
