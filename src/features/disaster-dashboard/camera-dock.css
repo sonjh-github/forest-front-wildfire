@@ -40,6 +40,12 @@
 .camera-tile.is-expanded .camera-tile-metrics > section > b { font-size: 34px; }
 .camera-expanded-details { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .camera-expanded-details .network-availability { margin: 0; padding: 5px; }
+/* Let the existing player expand above the map and operations panel. */
+.dashboard-map-stage:has(.camera-tile.is-expanded),
+.live-location-panel:has(.camera-tile.is-expanded),
+.location-map:has(.camera-tile.is-expanded) { z-index: 10000 !important; overflow: visible !important; }
+.live-location-layout:has(.camera-tile.is-expanded),
+.camera-dock:has(.camera-tile.is-expanded) { overflow: visible !important; }
 @media (max-width: 1000px) {
   .camera-tile-body { grid-template-columns: minmax(0, 1fr) 100px; }
   .camera-tile .camera-screen { height: 120px; }
