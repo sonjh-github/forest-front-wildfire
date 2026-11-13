@@ -1,0 +1,6 @@
+.asset-audio-registration { display: grid; gap: 6px; margin: 12px 14px; font-size: 12px; color: #284c3f; }
+.asset-audio-registration input { min-width: 0; width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #b4cbc0; border-radius: 5px; background: #fff; color: #213c4c; font: inherit; }
+.asset-device-row .asset-name-editor { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; font-size: 12px; color: #284c3f; }
+.asset-device-row .asset-name-editor input { padding: 8px; border: 1px solid #a6b8af; border-radius: 4px; font: inherit; }
+.asset-device-row .asset-name-editor button, .asset-device-row > button { padding: 5px 9px; border: 1px solid #b4cbc0; border-radius: 4px; background: #f5faf7; color: #176951; font: 600 11px system-ui; cursor: pointer; }
+.asset-device-row button:disabled { opacity: .5; cursor: default; }

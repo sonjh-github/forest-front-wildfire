@@ -18,6 +18,7 @@ import {
   type DashboardVendor,
 } from "../../http-api/device-registration-api";
 import { invalidateAssetCatalog } from "../../http-api/forest-api";
+import "./asset-audio-session.css";
 
 const DEVICE_TYPE_SUGGESTIONS: Record<DashboardVendor, string[]> = {
   NDPS: [
