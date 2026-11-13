@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>현장 무전</title>
+  <link rel="stylesheet" href="radio.css">
+  <script src="client.js" defer></script>
+</head>
+<body><main>
+  <section class="panel">
+    <label for="session">통화 대상</label>
+    <select id="session"><option value="01">SIM-RTK-CAR-01 · 세션 01</option><option value="03">SIM-RTK-DRONE-01 · 세션 03</option></select>
+    <p id="asset" class="hint">차량 장비 정보를 확인하고 있습니다.</p>
+    <div class="row"><button id="connect">무전 연결</button><button id="disconnect" class="secondary" disabled>연결 해제</button></div>
+  </section>
+  <section class="panel" aria-label="통화 상태">
+    <div class="row"><strong id="state" role="status">접속 대기</strong><span id="rssi">RSSI —</span></div>
+    <p id="detail">통화 대상을 선택한 뒤 무전을 연결하세요.</p>
+    <div class="meters"><label>마이크 입력 <span id="txValue">0%</span><meter id="tx" min="0" max="1" value="0" aria-label="마이크 입력"></meter></label><label>수신 음성 <span id="rxValue">0%</span><meter id="rx" min="0" max="1" value="0" aria-label="수신 음성"></meter></label></div>
+    <button id="ptt" disabled>누르고 말하기</button>
+    <p class="hint">누르는 동안 송신하고 놓으면 종료합니다. 수신 음성은 자동으로 재생됩니다.</p>
+  </section>
+  <section class="panel"><details><summary>연결 정보</summary>
+    <label for="server">중계서버</label><input id="server" value="wss://106.255.235.82:9580" readonly>
+    <span class="hint">8 kHz A-law · 250ms 음성 블록</span>
+    <pre id="log" aria-label="무전 연결 기록" aria-live="polite"></pre>
+  </details></section>
+</main></body>
+</html>

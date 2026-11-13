@@ -8,6 +8,7 @@ import { buildOperationalEvidence, buildPacketLossQualityAlerts, classifyLinkHea
 import type { TelemetryStreamStatus } from "./telemetryStream";
 import PerformanceKpiPanel from "./PerformanceKpiPanel";
 import WeatherEnvironmentPanel from "./WeatherEnvironmentPanel";
+import RadioPanel from "./RadioPanel";
 import NetworkSequenceQualityPanel from "./NetworkSequenceQualityPanel";
 import SlenoNetworkQualityPanel from "./SlenoNetworkQualityPanel";
 import {
@@ -29,7 +30,7 @@ import {
   type AlertDeliveryTrace,
 } from "./alertDeliveryTrace";
 
-export type PanelTab = "camera" | "weather" | "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
+export type PanelTab = "camera" | "radio" | "weather" | "layers" | "alerts" | "networks" | "reports" | "kpis" | "integrations";
 
 export type ExternalSourceId =
   | "firms"
@@ -97,6 +98,7 @@ const SHOW_VALIDATION_UI =
 /* weather-operations-navigation-20261011: 시작 화면은 현장 기상 */
 const tabs: Array<{ id: PanelTab; label: string; icon: string }> = [
   { id: "weather", label: "현장 기상", icon: "☀" },
+  { id: "radio", label: "무전 통화", icon: "◉" },
   { id: "layers", label: "지도 레이어", icon: "▱" },
   { id: "alerts", label: "현장 경보", icon: "!" },
   { id: "networks", label: "통신망", icon: "⌁" },
@@ -989,7 +991,7 @@ export function OperationsPanel({
         </button>
       </nav>
       <button className="operation-collapse" type="button" onClick={() => setCollapsed((current) => !current)} aria-expanded={!collapsed} aria-label={collapsed ? "운영 패널 펼치기" : "운영 패널 접기"}>{collapsed ? "›" : "‹"}</button>
-      {!collapsed && <section className="operation-drawer">
+      <section className="operation-drawer" hidden={collapsed}>
         <header>
           <div><strong>{tabs.find((tab) => tab.id === activeTab)?.label}</strong><small>{overview.event.disasterType === "LANDSLIDE" ? "산사태 구조·통신 통합" : "산불 대응·통신 통합"}</small></div>
           {activeTab === "layers" && <button type="button" className="layer-reset" onClick={resetLayers}>기본값</button>}
@@ -1005,6 +1007,7 @@ export function OperationsPanel({
           )}
         </header>
         <div className="operations-panel-body">
+          <div className="radio-panel-host" hidden={activeTab !== "radio"}><RadioPanel assets={overview.assets} active={activeTab === "radio" && !collapsed} /></div>
           {activeTab === "weather" && <WeatherEnvironmentPanel />}
           {activeTab === "layers" && <section className="layer-control-list" aria-label="지도 레이어">
             <section className="layer-level-group" aria-labelledby="resource-layer-title">
@@ -1694,7 +1697,7 @@ export function OperationsPanel({
             <p className="operation-readonly-note">송수신 대사·오류 원인·재처리는 운영자 권한과 감사로그 API가 연결된 경우에만 제공합니다.</p>
           </section>}
         </div>
-      </section>}
+      </section>
     </aside>
   );
 }
