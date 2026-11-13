@@ -45,6 +45,7 @@ type RegistrationForm = {
   assetCode: string;
   assetTypeId: string;
   assetName: string;
+  audioSession: string;
   status: string;
   productName: string;
   modelName: string;
@@ -73,6 +74,7 @@ function initialForm(): RegistrationForm {
     assetCode: "",
     assetTypeId: "",
     assetName: "",
+    audioSession: "",
     status: "READY",
     productName: "",
     modelName: "",
@@ -164,6 +166,27 @@ export default function AssetRegistryModal({
   const [copied, setCopied] = useState(false);
   const [editingName, setEditingName] = useState<{ id: string; value: string } | null>(null);
   const [savingName, setSavingName] = useState(false);
+  const [editingAudio, setEditingAudio] = useState<{ id: string; value: string } | null>(null);
+  const [savingAudio, setSavingAudio] = useState(false);
+  const saveAudio = async () => {
+    if (!editingAudio) return;
+    if (editingAudio.value && !/^\d{2}$/.test(editingAudio.value)) {
+      setMessage({kind:"error",text:"오디오 세션은 00~99 두 자리 숫자로 입력하세요."});
+      return;
+    }
+    setSavingAudio(true);
+    setMessage(null);
+    try {
+      const response = await dashboardDeviceApi.updateAudioSession(editingAudio.id, editingAudio.value || null);
+      setRegisteredAssets(previous => previous.map(asset => asset.asset_id === editingAudio.id ? response.data : asset));
+      invalidateAssetCatalog();
+      window.dispatchEvent(new Event("forest-audio-sessions-updated"));
+      setEditingAudio(null);
+      setMessage({kind:"success",text:"오디오 세션을 DB에 저장했습니다."});
+      onRegistered?.();
+    } catch(error) { setMessage({kind:"error",text:errorText(error,"오디오 세션 저장에 실패했습니다.")}); }
+    finally { setSavingAudio(false); }
+  };
   const saveName = async () => {
     if (!editingName) return;
     setSavingName(true);
@@ -337,6 +360,7 @@ export default function AssetRegistryModal({
     const payload:
       DashboardAssetRegistrationRequest = {
       assetCode: form.assetCode.trim(),
+      audioSession: form.audioSession || null,
       assetTypeId: form.assetTypeId,
       assetName:
         form.assetName.trim() || null,
@@ -524,6 +548,13 @@ export default function AssetRegistryModal({
                       <button type="button" disabled={savingName} onClick={() => void saveName()}>{savingName ? "저장 중…" : "이름 저장"}</button>
                       <button type="button" disabled={savingName} onClick={() => setEditingName(null)}>취소</button>
                     </div> : <button type="button" disabled={savingName} onClick={() => setEditingName({ id: asset.asset_id!, value: asset.asset_name ?? "" })}>이름 수정</button>}
+                    <div className="asset-name-editor">
+                      {editingAudio && editingAudio.id === asset.asset_id ? <>
+                        <input aria-label={`${asset.asset_code} 오디오 세션`} value={editingAudio.value} inputMode="numeric" maxLength={2} pattern="[0-9]{2}" placeholder="미지정" disabled={savingAudio} onChange={event => setEditingAudio({id:asset.asset_id!,value:event.target.value})} />
+                        <button type="button" disabled={savingAudio} onClick={() => void saveAudio()}>{savingAudio ? "저장 중…" : "세션 저장"}</button>
+                        <button type="button" disabled={savingAudio} onClick={() => setEditingAudio(null)}>취소</button>
+                      </> : <><span>오디오 세션 {asset.audio_session ?? "미지정"}</span><button type="button" onClick={() => setEditingAudio({id:asset.asset_id!,value:asset.audio_session ?? ""})}>오디오 세션 수정</button></>}
+                    </div>
                     <small>{asset.asset_id}</small>
                     <dl>
                       <div><dt>관리 코드</dt><dd>{asset.asset_code ?? "-"}</dd></div>
@@ -691,6 +722,7 @@ export default function AssetRegistryModal({
               </label>
             </div>
 
+            <label className="asset-audio-registration"><span>오디오 세션 (선택)</span><input aria-label="새 장비 오디오 세션" value={form.audioSession} inputMode="numeric" maxLength={2} pattern="[0-9]{2}" placeholder="예: 01, 03 · 비우면 미지정" onChange={event => setForm({...form,audioSession:event.target.value})} /></label>
             <button className="asset-optional-toggle" type="button" onClick={() => setShowOptional((value) => !value)}>
               {showOptional ? "선택 정보 닫기" : "장비명·제품명 등 선택 정보 입력"}
             </button>

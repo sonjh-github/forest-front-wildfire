@@ -108,10 +108,8 @@ function decodeAlaw(a) {
 
 const $ = id => document.getElementById(id);
 let current = null;
-try {
-  const saved = localStorage.getItem("radio.session");
-  $("session").value = ["01", "03"].includes(saved) ? saved : "01";
-} catch {}
+let channels = [];
+let channelsLoaded = false;
 function log(message) { $("log").textContent = `${new Date().toLocaleTimeString()} ${message}\n` + $("log").textContent.slice(0, 3500); }
 function state(text, detail) { $("state").textContent = text; if (detail) $("detail").textContent = detail; }
 function showStatus(c, status) {
@@ -121,7 +119,7 @@ function showStatus(c, status) {
   if (!c.talking && !c.busy) state(c.ready ? (status.voice ? "음성 수신 중" : "통화 준비") : "상대 대기", c.ready ? "버튼을 누르고 말하세요. 수신 음성은 자동 재생됩니다." : "상대가 접속할 때까지 세션을 유지합니다.");
 }
 async function connectWebSocket(c) {
-  c.ws = new WebSocket(c.base + "/ws/" + $("session").value);
+  c.ws = new WebSocket(c.base + "/ws/" + c.session);
   c.ws.binaryType = "arraybuffer"; c.commands = new Map(); c.commandSeq = 0;
   return new Promise((resolve, reject) => {
     let connected = false;
@@ -207,10 +205,13 @@ function upload(c, pcm) {
 }
 async function connect() {
   $("connect").disabled = true;
-  const c = { base: $("server").value.trim().replace(/\/$/, ""), abort: new AbortController(), seq: 0, inflight: new Set(), acks: new Map(), request: 0, ready: false, talking: false, busy: false, micAccepted: false };
+  const channel = channels.find(item => item.session === $("session").value);
+  if (!channel) { $("connect").disabled = true; return; }
+  const c = { assetId: channel.assetId, session: channel.session, base: $("server").value.trim().replace(/\/$/, ""), abort: new AbortController(), seq: 0, inflight: new Set(), acks: new Map(), request: 0, ready: false, talking: false, busy: false, micAccepted: false };
   current = c;
+  $("session").disabled = true;
   try {
-    if (!["01", "03"].includes($("session").value)) throw new Error("차량 01 또는 드론 03 세션을 선택하세요.");
+    if (!/^\d{2}$/.test(c.session)) throw new Error("장비 등록에서 오디오 세션을 지정하세요.");
     const url = new URL(c.base); if (!["ws:", "wss:", "http:", "https:"].includes(url.protocol)) throw new Error("WSS 서버 주소를 입력하세요.");
     const websocket = url.protocol === "ws:" || url.protocol === "wss:";
     if (location.protocol === "https:" && (url.protocol === "ws:" || url.protocol === "http:")) throw new Error("HTTPS 페이지에서는 wss:// 또는 https:// 서버 주소를 사용하세요.");
@@ -235,7 +236,8 @@ async function connect() {
         const level = Math.min(1, data[key] * 4); $(key).value = level; $(key + "Value").textContent = Math.round(level * 100) + "%";
       }
     };
-    const result = websocket ? await connectWebSocket(c) : await (await api(c, `/api/connect/${$("session").value}`, { method: "POST" })).json(); c.id = result.connection;
+    const result = websocket ? await connectWebSocket(c) : await (await api(c, `/api/connect/${c.session}`, { method: "POST" })).json(); c.id = result.connection;
+    if (current !== c) { c.ws?.close(); return; }
     try { localStorage.setItem("radio.server", c.base); localStorage.setItem("radio.session", $("session").value); } catch {}
     $("disconnect").disabled = false; $("server").disabled = $("session").disabled = true;
     state("상대 대기", "상대가 접속할 때까지 세션을 유지합니다."); log("세션 " + $("session").value + " 접속");
@@ -295,8 +297,8 @@ async function disconnect() {
   c.source?.disconnect(); c.node?.disconnect();
   if (c.context && c.context.state !== "closed") await c.context.close();
   if (c.id && !c.ws) fetch(c.base + `/api/session/${c.id}`, { method: "DELETE", keepalive: true }).catch(() => {});
-  $("connect").disabled = false; $("disconnect").disabled = $("ptt").disabled = true;
-  $("server").disabled = $("session").disabled = false;
+  $("connect").disabled = !channels.length; $("disconnect").disabled = $("ptt").disabled = true;
+  $("server").disabled = false; $("session").disabled = !channels.length;
   $("ptt").classList.remove("talking"); $("ptt").textContent = "누르고 말하기";
   $("tx").value = $("rx").value = 0; $("txValue").textContent = $("rxValue").textContent = "0%"; $("rssi").textContent = "RSSI —";
   state("접속 대기", "세션 연결을 해제했습니다.");
@@ -314,9 +316,29 @@ window.addEventListener("pagehide", () => {
   if (current?.ws) current.ws.close();
   else if (current?.id) fetch(current.base + `/api/session/${current.id}`, { method: "DELETE", keepalive: true }).catch(() => {});
 });
-window.addEventListener("message", event => {
+window.addEventListener("message", async event => {
   if (event.origin !== location.origin || event.source !== parent || event.data?.type !== "forest-radio-context") return;
-  $("session").options[0].textContent = `${event.data.carName} · 세션 01`;
-  $("asset").textContent = "SIM-RTK-CAR-01 → 01 · SIM-RTK-DRONE-01 → 03";
+  if (!Array.isArray(event.data.channels)) return;
+  const next = event.data.channels.filter(item => typeof item.assetId === "string" && typeof item.session === "string" && /^\d{2}$/.test(item.session));
+  const changed = !channelsLoaded || JSON.stringify(next) !== JSON.stringify(channels);
+  channelsLoaded = true;
+  channels = next;
+  if (current && !channels.some(item => item.assetId === current.assetId && item.session === current.session)) {
+    await disconnect();
+    state("연결 해제", "DB 오디오 세션이 변경되었습니다. 통화 대상을 확인하고 다시 연결하세요.");
+  }
+  if (changed) {
+  const previous = $("session").selectedOptions[0]?.dataset.assetId;
+  $("session").replaceChildren(...channels.map(item => {
+    const option = new Option(`${item.label} · 세션 ${item.session}`, item.session);
+    option.dataset.assetId = item.assetId;
+    option.selected = item.assetId === previous;
+    return option;
+  }));
+  if (!channels.length) $("session").add(new Option("지정된 오디오 세션 없음", ""));
+  }
+  $("session").disabled = !!current || !channels.length;
+  $("connect").disabled = !!current || !channels.length;
+  $("asset").textContent = channels.length ? "장비 등록·관리에 저장된 오디오 세션입니다." : "장비 등록·관리에서 오디오 세션을 지정하세요.";
   if (!event.data.active) release();
 });

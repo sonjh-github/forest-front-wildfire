@@ -10,9 +10,9 @@
 <body><main>
   <section class="panel">
     <label for="session">통화 대상</label>
-    <select id="session"><option value="01">SIM-RTK-CAR-01 · 세션 01</option><option value="03">SIM-RTK-DRONE-01 · 세션 03</option></select>
+    <select id="session" disabled><option value="">DB에서 오디오 세션 조회 중</option></select>
     <p id="asset" class="hint">차량 장비 정보를 확인하고 있습니다.</p>
-    <div class="row"><button id="connect">무전 연결</button><button id="disconnect" class="secondary" disabled>연결 해제</button></div>
+    <div class="row"><button id="connect" disabled>무전 연결</button><button id="disconnect" class="secondary" disabled>연결 해제</button></div>
   </section>
   <section class="panel" aria-label="통화 상태">
     <div class="row"><strong id="state" role="status">접속 대기</strong><span id="rssi">RSSI —</span></div>

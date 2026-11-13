@@ -18,6 +18,7 @@ export interface DashboardAssetRegistrationRequest {
   productName?: string | null;
   modelName?: string | null;
   specifications?: Record<string, unknown>;
+  audioSession?: string | null;
   vendor: DashboardVendor;
   vendorDeviceId: string;
   deviceType: string;
@@ -50,6 +51,7 @@ export interface DashboardRegisteredAsset extends Record<string, unknown> {
 }
 
 export interface DashboardAssetDetail extends Record<string, unknown> {
+  audio_session?: string | null;
   asset_id?: string;
   asset_code?: string;
   asset_name?: string | null;
@@ -95,6 +97,11 @@ export function extractVendorMapping(
 }
 
 export const dashboardDeviceApi = {
+  updateAudioSession: (assetId: string, audioSession: string | null) =>
+    dashboardApi<{ data: DashboardAssetDetail }>(
+      `/api/v1/dashboard/assets/${encodeURIComponent(assetId)}/audio-session`,
+      { method: "PUT", body: JSON.stringify({ audioSession }) },
+    ),
   updateName: (assetId: string, assetName: string | null) =>
     dashboardApi<{ data: DashboardAssetDetail }>(
       `/api/v1/dashboard/assets/${encodeURIComponent(assetId)}/name`,
