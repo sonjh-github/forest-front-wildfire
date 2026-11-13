@@ -1,7 +1,7 @@
 import {VideoSharingMetrics,type VideoSharingSnapshot} from "./videoSharingMetrics";
 import { cameraPerformance, type RtpMetrics } from "./cameraPerformance";
 import { ReceptionRecoveryLog, type Availability } from "./NetworkAvailability";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { dashboardApi, DASHBOARD_API_BASE_URL, HttpApiError } from "../../http-api/client";
 import VideoPlayback from "./VideoPlayback";
 import "./camera-panel.css";
@@ -10,8 +10,29 @@ type ReceptionState = "READY" | "CONNECTING" | "STALLED" | "FAILED";
 const frameSeconds=(ms:number|null|undefined)=>ms==null ? "—" : `${(ms/1000).toFixed(3)}초`;
 const frameTime=(date:string|null|undefined)=>date ? new Date(date).toLocaleString("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",fractionalSecondDigits:3,hour12:false}) : "—";
 type CameraSession = { id: string; playbackPath: string };
-export default function CameraPanel() {
-  const [uri, setUri] = useState("rtsp://210.99.70.120:1935/live/cctv001.stream");
+export default function CameraPanel({initialUri, title}: {initialUri: string; title: string}) {
+  const [uri, setUri] = useState(initialUri);
+  const addressId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+      if (event.key === "Tab") {
+        const controls = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), summary, video, [tabindex="0"]') ?? []).filter(node => node.getClientRects().length);
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panelRef.current)) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    window.addEventListener("keydown", keydown);
+    return () => { window.removeEventListener("keydown", keydown); document.body.style.overflow = overflow; if(previous?.isConnected) previous.focus(); else panelRef.current?.querySelector('button')?.focus(); };
+  }, [expanded]);
   const [requestedUri, setRequestedUri] = useState("");
   const [playbackUri, setPlaybackUri] = useState("");
   const [error, setError] = useState("");
@@ -103,46 +124,30 @@ export default function CameraPanel() {
     } catch { setError("rtsp:// 형식의 카메라 주소를 입력하세요."); }
   }
 
-  return <section className="camera-panel" aria-label="카메라 영상">
-    <p>RTSP 주소를 입력해 현장 카메라 영상을 확인하세요. 연결 중에도 주소를 편집하고 변경한 주소로 다시 연결할 수 있습니다.</p>
-    <form onSubmit={connect}>
-      <label htmlFor="camera-rtsp">RTSP 주소</label>
-      <input id="camera-rtsp" type={showAddress ? "text" : "password"} value={uri}
-        onChange={(event) => setUri(event.target.value)} placeholder="rtsp://카메라주소:554/경로"
-        autoComplete="off" spellCheck={false} required />
-      <label className="camera-address-toggle"><input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />주소 표시</label>
-      <div className="camera-actions">
-        <button type="submit" disabled={!uri.trim() || uri.trim() === requestedUri}>{connecting && uri.trim() === requestedUri ? "연결 중…" : requestedUri ? "변경한 주소로 연결" : "영상 연결"}</button>
-        <button type="button" disabled={!requestedUri} onClick={() => { if(sharingRecorder.current)setSharing(sharingRecorder.current.stop(performance.now())); setRequestedUri(""); setPlaybackUri(""); setConnecting(false); setReceptionState("STOPPED"); }}>연결 중지</button>
+  return <section ref={panelRef} tabIndex={-1} className={`camera-panel camera-tile${expanded ? " is-expanded" : ""}`} role={expanded ? "dialog" : "region"} aria-modal={expanded || undefined} aria-label={title}>
+    <header className="camera-tile-header"><strong>{title}</strong><button type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? `${title} 축소` : `${title} 확대`}>{expanded ? "축소 ✕" : "확대 ⛶"}</button></header>
+    <div className="camera-tile-body">
+      <div className="camera-screen">
+        {playbackUri ? <VideoPlayback streamUri={playbackUri} enabled label={title} onReceptionChange={receptionChange} />
+          : <p>{connecting ? "영상 연결 중…" : "영상을 연결하세요"}</p>}
+        {!expanded && <button type="button" className="camera-expand-surface" onClick={() => setExpanded(true)} aria-label={`${title} 영상 크게 보기`} />}
       </div>
-    </form>
-    {error && <p className="camera-error" role="alert">{error}</p>}
-    <section className="camera-performance-targets" aria-label="TVWS 영상 성능 지표">
-      <div><header><strong>영상정보 갱신주기</strong><b>목표 5초 이하</b></header>
-        <p>디코딩 전 영상 RTP 패킷이 계속 들어오는지 확인합니다.</p>
-        <div className="camera-indicator-state" data-state={indicators.update} role="status">{updateLabels[indicators.update]}</div>
-        <span>평균 패킷 수신 간격 <strong>{frameSeconds(rtpMetrics?.averageIntervalMs)}</strong></span>
-        <span>최대 패킷 수신 간격 <strong>{frameSeconds(rtpMetrics?.maxIntervalMs)}</strong></span>
-        <small>마지막 RTP 패킷 수신: {frameTime(rtpMetrics?.lastPacketReceivedAt)}</small>
-        <small>{receptionState==="STOPPED" ? "종료 시 미수신 경과" : "현재 미수신 경과"}: {frameSeconds(rtpMetrics?.silenceMs)}</small>
-        {indicators.update==="STALLED" && <p className="camera-metric-note">새 RTP 순서번호가 확인되지 않고 있습니다. 이전 평균값과 현재 수신 상태는 별개입니다.</p>}
-        <details><summary>계산 근거</summary><small>중계 서버가 TCP에서 원본 영상 RTP 패킷을 읽은 시각으로 최근 200초 동안의 {rtpMetrics?.sampleCount ?? 0}개 간격을 계산합니다. 누적 {rtpMetrics?.packetCount ?? 0}패킷.</small><small>순서번호가 5초 넘게 증가하지 않으면 수신 중으로 판정하지 않습니다. 지터 {frameSeconds(rtpMetrics?.jitterMs)} · RTCP 송신 보고 {rtpMetrics?.rtcpSenderReports ?? 0}건.</small></details>
-      </div>
-      <div><header><strong>정보 공유 성공률</strong><b>목표 98% 이상</b></header>
-        <p>최근 200초 중 이 웹 PC가 새 영상을 정상 수신한 시간의 비율입니다.</p>
-        <div className="camera-indicator-state" data-state={sharingState} role="status">{sharingLabels[sharingState]}</div>
-        <span>정보 공유 성공률 <strong>{sharing?.successPercent==null ? "—" : `${sharing.successPercent.toFixed(1)}%`}</strong></span>
-        <small>정상 수신 {((sharing?.receivedMs ?? 0)/1000).toFixed(1)}초 · 미수신 {((sharing?.interruptedMs ?? 0)/1000).toFixed(1)}초</small>
-        <small>집계 {Math.floor((sharing?.observedMs ?? 0)/1000)} / 200초 · 현재 {sharing?.stopped ? "측정 중지" : sharing?.receiving ? "영상 수신 중" : "새 영상 미수신"}</small>
-        {sharingState==="WAITING" && <small>첫 영상 수신부터 자동 집계합니다. 200초가 쌓이면 판정하며, 연결이 끊겨도 집계는 유지합니다.</small>}
-        <details><summary>계산 방법 · RTP 참고</summary><small>(200초 − 웹 영상 미수신 시간) ÷ 200초 × 100. 미수신 10초이면 95%입니다. PC 오프라인, 영상 멈춤, 재연결 대기 시간을 포함합니다. 와이파이 복구 후 새 영상 데이터를 받아 재생할 때 수신을 재개합니다.</small><small>웹 PC 기준이며 서버 RTP 수신·재개 시각과 별도입니다. 주소 변경·새 연결 버튼으로 새로 시작하고, 자동 재연결 중에는 기록을 초기화하지 않습니다.</small><small>서버 RTP 참고: 번호 {rtpMetrics?.fromSequence ?? "—"} ~ {rtpMetrics?.toSequence ?? "—"} · 수신 {rtpMetrics?.receivedCount ?? 0}/{rtpMetrics?.expectedCount ?? 0}개 · 누락 {rtpMetrics?.missingCount ?? 0}개 · 중복 {rtpMetrics?.duplicateCount ?? 0}개.</small></details>
-      </div>
-    </section>
-    <ReceptionRecoveryLog network="TVWS" data={availability} />
-    <div className="camera-screen" aria-live="polite">
-      {playbackUri ? <VideoPlayback streamUri={playbackUri} enabled label="현장 카메라" onReceptionChange={receptionChange} />
-        : <p>{connecting ? "카메라에서 영상을 수신하고 있습니다…" : "연결된 카메라가 없습니다."}</p>}
+      <aside className="camera-tile-metrics" aria-label={`${title} 통신 지표`}>
+        <section><strong>통신 성공률</strong><b>{sharing?.successPercent==null ? "—" : `${sharing.successPercent.toFixed(1)}%`}</b><small>{sharingLabels[sharingState]}</small><small>{Math.floor((sharing?.observedMs ?? 0)/1000)} / 200초</small></section>
+        <section><strong>영상 갱신주기</strong><span>평균 <b>{frameSeconds(rtpMetrics?.averageIntervalMs)}</b></span><span>최대 <b>{frameSeconds(rtpMetrics?.maxIntervalMs)}</b></span><small>{updateLabels[indicators.update]}</small></section>
+      </aside>
     </div>
-    <small>카메라는 중계 서버에서 접근 가능한 네트워크에 있어야 합니다. 주소는 저장되지 않으며, 탭을 닫으면 연결이 종료됩니다.</small>
+    {error && <p className="camera-error" role="alert">{error}</p>}
+    <div className="camera-tile-controls">
+      <button type="button" disabled={!uri.trim() || uri.trim() === requestedUri} onClick={connect}>{connecting ? "연결 중…" : "영상 연결"}</button>
+      <button type="button" disabled={!requestedUri} onClick={() => { if(sharingRecorder.current)setSharing(sharingRecorder.current.stop(performance.now())); setRequestedUri(""); setPlaybackUri(""); setConnecting(false); setReceptionState("STOPPED"); }}>중지</button>
+      <details className="camera-address-settings"><summary>주소 편집</summary><form onSubmit={connect}>
+        <label htmlFor={addressId}>RTSP 주소</label>
+        <input id={addressId} type={showAddress ? "text" : "password"} value={uri} onChange={event => setUri(event.target.value)} autoComplete="off" spellCheck={false} required />
+        <label className="camera-address-toggle"><input type="checkbox" checked={showAddress} onChange={event => setShowAddress(event.target.checked)} />주소 표시</label>
+        <button type="submit" disabled={!uri.trim() || uri.trim() === requestedUri}>이 주소로 연결</button>
+      </form></details>
+    </div>
+    {expanded && <div className="camera-expanded-details"><ReceptionRecoveryLog network="TVWS" data={availability} /><small>마지막 RTP 수신 {frameTime(rtpMetrics?.lastPacketReceivedAt)} · 미수신 경과 {frameSeconds(rtpMetrics?.silenceMs)}</small><small>최근 200초 정상 수신 {((sharing?.receivedMs ?? 0)/1000).toFixed(1)}초 · 미수신 {((sharing?.interruptedMs ?? 0)/1000).toFixed(1)}초</small></div>}
   </section>;
 }

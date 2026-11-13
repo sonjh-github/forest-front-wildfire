@@ -9,7 +9,8 @@ import { fieldCoreStatusLabel, fieldEvent, isLocalFieldMode } from "../../http-a
 import { decideSemanticFallback } from "./semanticFallback";
 import LivePositionMap from "./LivePositionMap";
 import { pickSlenoRtkFocusCenter } from "./slenoMapFocus";
-import MapTimelinePlayer, { type MapTimelineSnapshot } from "./MapTimelinePlayer";
+import { type MapTimelineSnapshot } from "./MapTimelinePlayer";
+import CameraDock from "./CameraDock";
 import {
   OperationsPanel,
   type ExternalIntegrationStatus,
@@ -1820,15 +1821,7 @@ export default function UnifiedDisasterDashboard() {
                   tourStage={currentTourStep?.id ?? null}
                   onTerrainStateChange={setTerrainPresentationState}
                 />
-                <MapTimelinePlayer
-                  snapshots={timelineSnapshots}
-                  activeIndex={timelineIndex}
-                  playing={timelinePlaying}
-                  loading={timelineLoading}
-                  onPlayToggle={handleTimelinePlayToggle}
-                  onIndexChange={handleTimelineIndexChange}
-                  onLive={handleTimelineLive}
-                />
+                <CameraDock />
                 {liveLocations.length === 0 && <p>수신된 위치가 없습니다.</p>}
               </div>
               <OperationsPanel

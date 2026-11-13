@@ -1,0 +1,53 @@
+.location-map > .camera-dock {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 50;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+  pointer-events: none;
+}
+.camera-dock .camera-tile {
+  pointer-events: auto; min-width: 0; padding: 8px; gap: 6px; background: #f8fbfa;
+  border: 1px solid #9bb3a7; border-radius: 8px; box-shadow: 0 3px 15px #122f352b;
+}
+.camera-tile-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.camera-tile button { font: inherit; cursor: pointer; padding: 5px 8px; border: 1px solid #9cb1a6; border-radius: 4px; background: #fff; color: #244a3b; }
+.camera-tile button:disabled { opacity: .5; cursor: default; }
+.camera-tile-body { display: grid; grid-template-columns: minmax(0, 1fr) 116px; gap: 7px; min-height: 148px; }
+.camera-tile .camera-screen { position: relative; min-height: 0; border-radius: 4px; height: 148px; }
+.camera-tile .camera-screen .video-playback { width: 100%; height: 100%; min-height: 0; }
+.camera-tile .camera-screen video { width: 100%; height: 100%; max-height: none; object-fit: contain; }
+.camera-tile .camera-expand-surface { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; border-radius: 0; }
+.camera-expand-surface:focus-visible { outline: 3px solid #28a1dd; outline-offset: -3px; }
+.camera-tile-metrics { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.camera-tile-metrics > section { display: grid; gap: 3px; padding: 6px; background: #edf4f0; border-radius: 4px; font-size: 10px; }
+.camera-tile-metrics > section > b { font-size: 21px; color: #18573e; }
+.camera-tile-metrics span { display: flex; justify-content: space-between; gap: 3px; }
+.camera-tile-metrics small { font-size: 9px; line-height: 1.35; }
+.camera-tile-controls { display: flex; align-items: center; gap: 5px; font-size: 11px; flex-wrap: wrap; }
+.camera-address-settings { margin-left: auto; position: relative; }
+.camera-address-settings summary { cursor: pointer; padding: 4px; }
+.camera-tile .camera-address-settings form { position: absolute; bottom: 30px; right: 0; z-index: 3; width: min(340px, 70vw); background: #fff; border: 1px solid #8ca89a; border-radius: 6px; padding: 10px; box-shadow: 0 3px 15px #0003; }
+.camera-tile .camera-error { font-size: 10px; line-height: 1.3; max-height: 28px; overflow: auto; }
+.camera-dock .camera-tile.is-expanded {
+  position: fixed; inset: 24px; z-index: 3000; display: flex; flex-direction: column; padding: 16px; overflow: auto;
+  box-shadow: 0 0 0 100vmax #061420d9;
+}
+.camera-tile.is-expanded::before { content: ""; position: fixed; inset: 0; background: #061420d9; z-index: -1; }
+.camera-tile.is-expanded .camera-tile-header { font-size: 18px; }
+.camera-tile.is-expanded .camera-tile-body { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) 220px; }
+.camera-tile.is-expanded .camera-screen { height: 100%; min-height: 220px; }
+.camera-tile.is-expanded .camera-tile-metrics { gap: 12px; }
+.camera-tile.is-expanded .camera-tile-metrics > section { padding: 16px; font-size: 15px; gap: 12px; }
+.camera-tile.is-expanded .camera-tile-metrics small { font-size: 12px; }
+.camera-tile.is-expanded .camera-tile-metrics > section > b { font-size: 34px; }
+.camera-expanded-details { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.camera-expanded-details .network-availability { margin: 0; padding: 5px; }
+@media (max-width: 1000px) {
+  .camera-tile-body { grid-template-columns: minmax(0, 1fr) 100px; }
+  .camera-tile .camera-screen { height: 120px; }
+  .camera-tile-body { min-height: 120px; }
+}
+@media (max-width: 700px) {
+  .location-map > .camera-dock { left: 6px; right: 6px; bottom: 6px; gap: 6px; max-height: 44vh; overflow-y: auto; grid-template-columns: 1fr; }
+  .camera-dock .camera-tile.is-expanded { inset: 8px; }
+  .camera-tile.is-expanded .camera-tile-body { grid-template-columns: minmax(0, 1fr) 120px; }
+  .camera-tile.is-expanded .camera-tile-metrics > section { font-size: 11px; padding: 8px; }
+}
