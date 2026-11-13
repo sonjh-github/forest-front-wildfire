@@ -8,6 +8,9 @@
   border: 1px solid #9bb3a7; border-radius: 8px; box-shadow: 0 3px 15px #122f352b;
 }
 .camera-tile-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.camera-tile-actions { display: flex; gap: 5px; }
+.camera-dock .camera-tile.is-minimized { align-self: end; }
+.camera-tile.is-minimized > :not(.camera-tile-header) { display: none !important; }
 .camera-tile button { font: inherit; cursor: pointer; padding: 5px 8px; border: 1px solid #9cb1a6; border-radius: 4px; background: #fff; color: #244a3b; }
 .camera-tile button:disabled { opacity: .5; cursor: default; }
 .camera-tile-body { display: grid; grid-template-columns: minmax(0, 1fr) 116px; gap: 7px; min-height: 0; align-items: start; }

@@ -253,7 +253,8 @@ export default function VideoPlayback({
     const frame=()=>{report();frameAt=performance.now();report();frameId=video.requestVideoFrameCallback(frame);};
     if(typeof video.requestVideoFrameCallback==="function")frameId=video.requestVideoFrameCallback(frame);
     const timer=setInterval(()=>{
-      if(frameId===undefined && video.currentTime!==lastTime){frameAt=performance.now();lastTime=video.currentTime;}
+      // Hidden players may stop frame callbacks while playback and network reception continue.
+      if((frameId===undefined || video.getClientRects().length===0) && video.currentTime!==lastTime){frameAt=performance.now();lastTime=video.currentTime;}
       report();
     },250);
     const waiting=()=>{frameAt=null;report();};

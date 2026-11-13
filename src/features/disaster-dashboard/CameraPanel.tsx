@@ -14,6 +14,7 @@ export default function CameraPanel({initialUri, title}: {initialUri: string; ti
   const [uri, setUri] = useState(initialUri);
   const addressId = useId();
   const [expanded, setExpanded] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!expanded) return;
@@ -124,8 +125,11 @@ export default function CameraPanel({initialUri, title}: {initialUri: string; ti
     } catch { setError("rtsp:// 형식의 카메라 주소를 입력하세요."); }
   }
 
-  return <section ref={panelRef} tabIndex={-1} className={`camera-panel camera-tile${expanded ? " is-expanded" : ""}`} role={expanded ? "dialog" : "region"} aria-modal={expanded || undefined} aria-label={title}>
-    <header className="camera-tile-header"><strong>{title}</strong><button type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? `${title} 축소` : `${title} 확대`}>{expanded ? "축소 ✕" : "확대 ⛶"}</button></header>
+  return <section ref={panelRef} tabIndex={-1} className={`camera-panel camera-tile${expanded ? " is-expanded" : ""}${minimized ? " is-minimized" : ""}`} role={expanded ? "dialog" : "region"} aria-modal={expanded || undefined} aria-label={title}>
+    <header className="camera-tile-header"><strong>{title}</strong><div className="camera-tile-actions">
+      <button type="button" aria-expanded={!minimized} aria-label={`${title} ${minimized ? "다시 펼치기" : "최소화"}`} onClick={() => { setExpanded(false); setMinimized(value => !value); }}>{minimized ? "펼치기 ▴" : "최소화 −"}</button>
+      <button type="button" onClick={() => { setMinimized(false); setExpanded(value => !value); }} aria-label={expanded ? `${title} 축소` : `${title} 확대`}>{expanded ? "축소 ✕" : "확대 ⛶"}</button>
+    </div></header>
     <div className="camera-tile-body">
       <div className="camera-screen">
         {playbackUri ? <VideoPlayback streamUri={playbackUri} enabled label={title} onReceptionChange={receptionChange} />
