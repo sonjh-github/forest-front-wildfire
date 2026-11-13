@@ -2516,7 +2516,7 @@
 
 /* 현재 실시간: 중앙 하단에서 범례 왼쪽까지 */
 .unified-disaster-board.is-field-mode
-.location-map [class*="playback"] {
+.location-map > [class*="playback"] {
   position: absolute !important;
 
   left: 18px !important;
