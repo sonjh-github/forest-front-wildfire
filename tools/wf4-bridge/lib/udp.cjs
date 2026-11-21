@@ -5,10 +5,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const DEFAULT_KEY = crypto.createHash('md5').update(Buffer.alloc(32)).digest();
 
-function buildHello(contextId, timestamp, csvSuffix) {
+function buildHello(contextId, timestamp, csvSuffix, localAddress) {
   if (csvSuffix === undefined) {
     const id = crypto.createHash('md5').update(os.hostname()).digest('hex').slice(0, 16).toUpperCase();
-    const mac = Object.values(os.networkInterfaces()).flat().find(n => !n.internal && n.mac !== '00:00:00:00:00:00')?.mac || '00:00:00:00:00:00';
+    const interfaces = Object.values(os.networkInterfaces()).flat();
+    const adapter = localAddress ? interfaces.find(n => n.address === localAddress) : interfaces.find(n => !n.internal && n.mac !== '00:00:00:00:00:00');
+    const mac = adapter?.mac || '00:00:00:00:00:00';
     csvSuffix = `,,HDSign,${id},,${id},MAC::${mac.replaceAll(':', '-').toUpperCase()}`;
   }
   if (typeof csvSuffix !== 'string' || !csvSuffix.startsWith(',,HDSign,') || /[\r\n\0]/.test(csvSuffix)) throw new Error('Invalid connection template');
@@ -104,7 +106,11 @@ async function openSession(host, port = 6101, { traceFile = null, traceLimit = 1
         reply = decode(data, DEFAULT_KEY);
       }
       if (!reply.response || reply.contextId !== contextId) return;
-      if (reply.status !== 0 && reply.status !== 6) throw new Error(`UDP command 0x${reply.command.toString(16)} rejected: status ${reply.status}; RX=${data.toString('hex')}`);
+      if (reply.status !== 0 && reply.status !== 6) {
+        const error = new Error(`UDP command 0x${reply.command.toString(16)} rejected: status ${reply.status}; RX=${data.toString('hex')}`);
+        error.code = 'UDP_REJECTED'; error.command = reply.command; error.status = reply.status;
+        throw error;
+      }
       pending.resolve(reply);
     } catch (error) {
       if (!error.message.includes('RX=')) error.message += `; command=0x${pending.command.toString(16)} sequence=${pending.sequence}; RX=${data.toString('hex')}`;
@@ -124,12 +130,18 @@ async function openSession(host, port = 6101, { traceFile = null, traceLimit = 1
       const finish = (error, reply) => { clearTimeout(timer); pending = undefined; error ? reject(error) : resolve(reply); };
       const timer = setTimeout(() => finish(new Error(`UDP command 0x${command.toString(16)} timeout; TX=${tx.toString('hex')}`)), 3000);
       pending = { command, sequence: current, resolve: reply => finish(null, reply), reject: error => finish(error) };
-      socket.send(tx, port, host, error => { if (error && pending?.sequence === current) pending.reject(error); });
+      socket.send(tx, error => { if (error && pending?.sequence === current) pending.reject(error); });
     });
   }
   try {
+    // Resolve the actual route before choosing the MAC advertised in negotiation.
+    // Connecting a UDP socket does not send a controller command.
+    await new Promise((resolve, reject) => {
+      socket.once('error', reject);
+      socket.connect(port, host, () => { socket.off('error', reject); resolve(); });
+    });
     // Reproduce the complete observed context ID + CSV log + NUL request body.
-    const reply = await request(0, buildHello(contextId, undefined, helloSuffix));
+    const reply = await request(0, buildHello(contextId, undefined, helloSuffix, socket.address().address));
     if (reply.payload.length < 24) throw new Error('Incomplete HDSign negotiation reply');
     clientId = reply.payload.readUInt32LE(0);
     contextId = reply.payload.readUInt32LE(4);

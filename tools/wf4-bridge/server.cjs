@@ -45,7 +45,9 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       reply(200, result);
     } catch (error) {
       const status = error instanceof TypeError ? 400 : ['BUSY', 'WRONG_DEVICE'].includes(error.code) ? 409 : 502;
-      const message = /timeout/i.test(error.message) ? 'WF4가 응답하지 않습니다. 보드 전원과 WF4 Wi-Fi 연결을 확인하세요.' : error.message.split(';')[0];
+      const message = error.command === 0 && error.status === 129
+        ? '전광판이 연결 협상을 거절했습니다 (0x0 / status 129). 기존 PC와 다른 프로그램의 HDSign·전광판 연결 도구를 종료한 뒤 이 PC에서 다시 장치 인식을 눌러 주세요.'
+        : /timeout/i.test(error.message) ? 'WF4가 응답하지 않습니다. 보드 전원과 WF4 Wi-Fi 연결을 확인하세요.' : error.message.split(';')[0];
       reply(status, { error: message });
     } finally {
       if (fs.existsSync(logDirectory)) {
