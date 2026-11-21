@@ -2,6 +2,7 @@
   "name": "forest-front-demo",
   "private": true,
   "version": "0.1.0",
+  "engines": { "node": "26.13.1" },
   "type": "module",
   "scripts": {
     "dev": "vite build --configLoader runner && vite preview --configLoader runner --host 0.0.0.0 --port 15173 --strictPort",

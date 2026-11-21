@@ -23,11 +23,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26.13.1
           cache: npm
 
       - run: npm ci
       - run: npm test
+      - run: node --test tools/wf4-bridge/test/*.check.cjs
+      - run: sh -n tools/wf4-bridge/start.sh
       - run: npm run build
 
       - name: Verify production image

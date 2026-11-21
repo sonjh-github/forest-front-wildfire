@@ -31,6 +31,11 @@ test('production origin, read-only identification, fixed geometry and a single n
   });
   const base = `http://127.0.0.1:${server.address().port}`;
   const post = (route, body, origin = ALLOWED_ORIGIN) => fetch(base + '/api/wf4/' + route, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const health = await fetch(base + '/health', { headers: { Origin: ALLOWED_ORIGIN } });
+  assert.equal(health.status, 200);
+  assert.equal(health.headers.get('Access-Control-Allow-Origin'), ALLOWED_ORIGIN);
+  assert.equal((await health.json()).service, 'forest-wf4-bridge');
+  assert.equal(packets.length, 0, 'setup health check never contacts the board');
   assert.equal((await post('discover', {}, 'https://example.com')).status, 403);
   assert.equal(packets.length, 0);
   const preflight = await fetch(base + '/api/wf4/discover', { method: 'OPTIONS', headers: { Origin: ALLOWED_ORIGIN, 'Access-Control-Request-Private-Network': 'true' } });

@@ -51,6 +51,17 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
   return server;
 }
 if (require.main === module) {
-  createBridge().listen(8790, '127.0.0.1', () => console.log('전광판 연결 도구 실행 중 · 산불 서비스에서 장치 인식을 누르세요. 종료: Ctrl+C'));
+  const requiredVersion = require('./package.json').engines.node;
+  if (process.versions.node !== requiredVersion) {
+    console.error(`Node.js ${requiredVersion} 설치가 필요합니다. 현재 버전: ${process.versions.node}`);
+    process.exitCode = 1;
+  } else {
+    const server = createBridge();
+    server.on('error', error => {
+      console.error(error.code === 'EADDRINUSE' ? '8790 포트를 사용 중입니다. 이미 실행한 연결 도구가 있는지 확인하고 대시보드에서 연결 도구 실행 확인을 누르세요.' : `연결 도구 실행 실패: ${error.message}`);
+      process.exitCode = 1;
+    });
+    server.listen(8790, '127.0.0.1', () => console.log('전광판 연결 도구 실행 중 · 산불 서비스에서 장치 인식을 누르세요. 이 창을 열어 두세요. 종료: Ctrl+C'));
+  }
 }
 module.exports = { createBridge, FIXED, ALLOWED_ORIGIN };

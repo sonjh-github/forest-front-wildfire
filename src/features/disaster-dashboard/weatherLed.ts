@@ -11,18 +11,20 @@ export function weatherLedText(observation: WeatherObservation): string {
 export interface LedDevice { connected: boolean; model: string; firmware: string; width: number; height: number }
 export interface LedReceipt { acked: boolean; skipped: boolean; frameCount: number; durationMs: number }
 
-export async function ledRequest<T>(path: "discover" | "scroll", body: object, signal?: AbortSignal): Promise<T> {
+export async function ledRequest<T>(path: "discover" | "scroll" | "health", body: object, signal?: AbortSignal): Promise<T> {
   let response: Response;
+  const health = path === "health";
+  const timeout = AbortSignal.timeout(health ? 5000 : 30_000);
   try {
-    response = await fetch(`${BRIDGE}/api/wf4/${path}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      credentials: "omit", cache: "no-store", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+    response = await fetch(health ? `${BRIDGE}/health` : `${BRIDGE}/api/wf4/${path}`, {
+      method: health ? "GET" : "POST", headers: health ? undefined : { "Content-Type": "application/json" }, body: health ? undefined : JSON.stringify(body),
+      credentials: "omit", cache: "no-store", signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw new Error("전광판 연결 도구(start.cmd)를 실행하고, 브라우저의 로컬 네트워크 접근을 허용하세요. PC의 WF4 Wi-Fi 연결도 확인하세요.");
+    throw new Error("연결 도구 설치·설정에서 도구를 다운로드해 실행하세요. 실행 중이라면 브라우저의 로컬 네트워크 접근 권한을 확인하세요.");
   }
-  const result = await response.json();
+  const result = await response.json().catch(() => { throw new Error("연결 도구의 응답을 확인할 수 없습니다. 다운로드한 연결 도구가 실행 중인지 확인하세요."); });
   if (!response.ok) throw new Error(result.error || "전광판 송신에 실패했습니다.");
   return result as T;
 }

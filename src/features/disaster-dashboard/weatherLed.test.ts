@@ -1,8 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { createWeatherDelivery, weatherLedText } from "./weatherLed";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createWeatherDelivery, ledRequest, weatherLedText } from "./weatherLed";
 import { normalizeWeatherObservation } from "./weatherObservation";
+afterEach(() => vi.unstubAllGlobals());
 
 describe("기상 전광판", () => {
+  it("연결 도구 확인은 화면 송신 없이 GET으로 조회하고 오프라인이면 설정 경로를 안내한다", async () => {
+    const request = vi.fn(async () => new Response(JSON.stringify({ service: "forest-wf4-bridge" })));
+    vi.stubGlobal("fetch", request);
+    await expect(ledRequest("health", {})).resolves.toEqual({ service: "forest-wf4-bridge" });
+    expect(request).toHaveBeenCalledWith("http://127.0.0.1:8790/health", expect.objectContaining({ method: "GET", body: undefined, credentials: "omit" }));
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("offline"); }));
+    await expect(ledRequest("health", {})).rejects.toThrow("연결 도구 설치·설정");
+  });
   it("스크린샷의 네 지표를 한 줄로 만들고 누락값을 0으로 바꾸지 않는다", () => {
     const observation = normalizeWeatherObservation({ stationId: "test", stationName: "예산", observedAt: "2026-11-19T00:00:00Z", source: "Open-Meteo", temperatureC: 3.3, humidityPct: 75, windSpeedMps: 3.41, windDirectionDeg: 320 }, "LIVE")!;
     expect(weatherLedText(observation)).toBe("기온 3.3°C · 상대습도 75% · 평균 풍속 3.41m/s · 풍향 320°");

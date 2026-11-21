@@ -8,3 +8,11 @@
 .weather-led-panel label { display:flex; align-items:center; gap:7px; font-size:14px; color:#214d3e; }
 .weather-led-panel .weather-led-error { color:#b42318; }
 .weather-led-preview { min-width:0; overflow:auto; white-space:nowrap; background:#101b16; color:#fa726b; border-radius:6px; padding:12px; font:700 16px WF4NanumSquare,sans-serif; }
+.weather-led-setup { border:1px solid #dce8e1; border-radius:6px; background:#f8fcfa; color:#214d3e; font-size:14px; }
+.weather-led-setup summary { cursor:pointer; padding:10px; }
+.weather-led-setup-body { display:grid; gap:12px; padding:0 10px 12px; }
+.weather-led-setup-body select { min-width:0; flex:1; padding:6px; border:1px solid #b9cec3; border-radius:4px; background:white; color:inherit; font:inherit; }
+.weather-led-setup-body ol { display:grid; gap:12px; margin:0; padding-left:22px; line-height:1.6; }
+.weather-led-setup-body a { color:#17634b; text-decoration:underline; text-underline-offset:3px; }
+.weather-led-setup-body .weather-led-download { display:inline-block; padding:7px 9px; border-radius:5px; background:#e2f0e8; font-weight:600; }
+.weather-led-setup-body code { overflow-wrap:anywhere; }

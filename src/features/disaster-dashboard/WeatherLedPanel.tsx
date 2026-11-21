@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { WeatherObservation } from "./weatherObservation";
 import { createWeatherDelivery, ledRequest, weatherLedBitmap, weatherLedText, type LedDevice, type LedReceipt } from "./weatherLed";
+import WeatherLedSetup from "./WeatherLedSetup";
 
 export default function WeatherLedPanel({ observation, fresh, eventId }: { observation: WeatherObservation | null; fresh: boolean; eventId: string }) {
   const [device, setDevice] = useState<LedDevice | null>(null);
@@ -57,6 +58,7 @@ export default function WeatherLedPanel({ observation, fresh, eventId }: { obser
 
   return <section className="weather-led-panel" aria-label="기상정보 전광판">
     <strong>기상정보 전광판</strong>
+    <WeatherLedSetup />
     <div className="weather-led-preview" title={text}>{text}</div>
     <button type="button" onClick={() => void recognize()} disabled={recognizing || sending}>{recognizing ? "인식 중…" : "전광판 장치 인식"}</button>
     <label><input type="checkbox" checked={automatic} onChange={event => setAutomatic(event.target.checked)} />기상정보 갱신 시 자동 송신</label>
