@@ -21,7 +21,7 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       response.setHeader('Access-Control-Allow-Private-Network', 'true');
     }
     if (request.method === 'OPTIONS') { response.writeHead(204); return response.end(); }
-    if (request.method === 'GET' && request.url === '/health') return reply(200, { service: 'forest-wf4-bridge', deviceName: TARGET_DEVICE, ...FIXED });
+    if (request.method === 'GET' && request.url === '/health') return reply(200, { service: 'forest-wf4-bridge', deviceName: TARGET_DEVICE, passwordAuthentication: true, ...FIXED });
     if (request.method !== 'POST' || !['/api/wf4/discover', '/api/wf4/scroll'].includes(request.url)) return reply(404, { error: '지원하지 않는 경로입니다.' });
     let traceFile;
     try {
@@ -31,6 +31,7 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       let body;
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new TypeError('JSON 형식이 올바르지 않습니다.'); }
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('JSON 객체가 필요합니다.');
+      if (request.url === '/api/wf4/discover' && Object.hasOwn(body, 'password')) sender.setPassword(body.password);
       fs.mkdirSync(logDirectory, { recursive: true });
       traceFile = path.join(logDirectory, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.json`);
       const device = await sender.identify({ traceFile });
@@ -41,12 +42,12 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       }
       const result = request.url === '/api/wf4/discover'
         ? device
-        : await sender.sendScroll({ bitmap: body.bitmap, stripWidth: body.stripWidth, step: 4, ...FIXED, traceFile });
+        : await sender.sendScroll({ bitmap: body.bitmap, stripWidth: body.stripWidth, step: 1, ...FIXED, traceFile });
       reply(200, result);
     } catch (error) {
       const status = error instanceof TypeError ? 400 : ['BUSY', 'WRONG_DEVICE'].includes(error.code) ? 409 : 502;
       const message = error.command === 0 && error.status === 129
-        ? '전광판이 연결 협상을 거절했습니다 (0x0 / status 129). 기존 PC와 다른 프로그램의 HDSign·전광판 연결 도구를 종료한 뒤 이 PC에서 다시 장치 인식을 눌러 주세요.'
+        ? '기기 잠금 암호를 확인하고 전광판 장치 인식을 다시 눌러 주세요 (0x0 / status 129). 최신 연결 도구가 필요합니다.'
         : /timeout/i.test(error.message) ? 'WF4가 응답하지 않습니다. 보드 전원과 WF4 Wi-Fi 연결을 확인하세요.' : error.message.split(';')[0];
       reply(status, { error: message });
     } finally {
@@ -65,7 +66,7 @@ if (require.main === module) {
     console.error(`Node.js ${requiredVersion} 설치가 필요합니다. 현재 버전: ${process.versions.node}`);
     process.exitCode = 1;
   } else {
-    const server = createBridge();
+    const server = createBridge({ board: { host: '192.168.4.1', port: 6101, password: process.env.WF4_DEVICE_PASSWORD ?? '' } });
     server.on('error', error => {
       console.error(error.code === 'EADDRINUSE' ? '8790 포트를 사용 중입니다. 이미 실행한 연결 도구가 있는지 확인하고 대시보드에서 연결 도구 실행 확인을 누르세요.' : `연결 도구 실행 실패: ${error.message}`);
       process.exitCode = 1;

@@ -15,7 +15,7 @@ export interface LedReceipt { acked: boolean; skipped: boolean; frameCount: numb
 export async function ledRequest<T>(path: "discover" | "scroll" | "health", body: object, signal?: AbortSignal): Promise<T> {
   let response: Response;
   const health = path === "health";
-  const timeout = AbortSignal.timeout(health ? 5000 : 30_000);
+  const timeout = AbortSignal.timeout(health ? 5000 : path === "scroll" ? 120_000 : 30_000);
   try {
     response = await fetch(health ? `${BRIDGE}/health` : `${BRIDGE}/api/wf4/${path}`, {
       method: health ? "GET" : "POST", headers: health ? undefined : { "Content-Type": "application/json" }, body: health ? undefined : JSON.stringify(body),

@@ -23,9 +23,10 @@ function buildPixelProgram(mask, { width: screenWidth = SCREEN_WIDTH, height: sc
   if (!Number.isInteger(frameCount) || frameCount < 1 || frameCount > 30) throw new TypeError('frameCount must be an integer from 1 to 30');
   return buildAnimatedProgram(Array(frameCount).fill(mask), { width: screenWidth, height: screenHeight });
 }
-function buildAnimatedProgram(masks, { width: screenWidth = SCREEN_WIDTH, height: screenHeight = SCREEN_HEIGHT } = {}) {
+function buildAnimatedProgram(masks, { width: screenWidth = SCREEN_WIDTH, height: screenHeight = SCREEN_HEIGHT, frameIntervalMs = 100 } = {}) {
   if (!Number.isInteger(screenWidth) || screenWidth < 64 || screenWidth > 1280 || screenWidth % 64 !== 0 || !Number.isInteger(screenHeight) || screenHeight < 1 || screenHeight > 256) throw new Error('Invalid native program geometry');
-  if (!Array.isArray(masks) || masks.length < 1 || masks.length > 512 || masks.some(mask => mask.length !== screenWidth * screenHeight)) throw new TypeError('Invalid animation frames');
+  if (!Number.isInteger(frameIntervalMs) || frameIntervalMs < 10 || frameIntervalMs > 1000) throw new TypeError('Invalid animation frame interval');
+  if (!Array.isArray(masks) || masks.length < 1 || masks.length > 2048 || masks.some(mask => mask.length !== screenWidth * screenHeight)) throw new TypeError('Invalid animation frames');
   const frameCount = masks.length;
   if (323 + screenWidth / 8 * screenHeight * frameCount > 2 * 1024 * 1024) throw new TypeError('애니메이션은 2MB 이하로 만들어 주세요.');
   const source = fs.readFileSync(path.join(__dirname, 'program-template.bin'));
@@ -39,6 +40,7 @@ function buildAnimatedProgram(masks, { width: screenWidth = SCREEN_WIDTH, height
     header.writeUInt16BE(i * width, 4); header.writeUInt16BE(0, 6);
     header.writeUInt16BE(width, 8); header.writeUInt16BE(screenHeight, 10);
     header.writeUInt16BE(frameCount, 32);
+    header.writeUInt16BE(frameIntervalMs, 50);
     header.writeUInt32BE(frames[0].length * frameCount, 40);
     return Buffer.concat([header, ...frames]);
   });

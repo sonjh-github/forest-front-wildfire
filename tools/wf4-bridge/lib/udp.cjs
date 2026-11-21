@@ -5,6 +5,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const DEFAULT_KEY = crypto.createHash('md5').update(Buffer.alloc(32)).digest();
 
+// HDSign 0x46A4B0 appends this salt before MD5; verified on the locked WF4.
+function authenticationKey(password = '') {
+  if (typeof password !== 'string' || Buffer.byteLength(password, 'utf8') > 128 || password.includes('\0')) throw new TypeError('기기 잠금 암호 형식이 올바르지 않습니다.');
+  return password ? crypto.createHash('md5').update(password + '64ACFEB8B6FE4EF082DB8F3CD428EB20', 'utf8').digest() : DEFAULT_KEY;
+}
+
 function buildHello(contextId, timestamp, csvSuffix, localAddress) {
   if (csvSuffix === undefined) {
     const id = crypto.createHash('md5').update(os.hostname()).digest('hex').slice(0, 16).toUpperCase();
@@ -60,9 +66,9 @@ function decode(data, key) {
   return { response, clientId: data.readUInt32LE(5), contextId: data.readUInt32LE(9), marker: data.readUInt32LE(13), sequence: data.readUInt32LE(18), command: data[22], flags: data[17], status: response ? data[23] : 0, payload: (data[17] & 1) && body.length ? decrypt(body, key) : body };
 }
 
-async function openSession(host, port = 6101, { traceFile = null, traceLimit = 128, helloSuffix } = {}) {
+async function openSession(host, port = 6101, { traceFile = null, traceLimit = 128, helloSuffix, password = '' } = {}) {
+  let key = authenticationKey(password);
   const socket = dgram.createSocket('udp4');
-  let key = DEFAULT_KEY;
   let clientId = 0;
   let contextId = 1000;
   let sequence = 0;
@@ -149,4 +155,4 @@ async function openSession(host, port = 6101, { traceFile = null, traceLimit = 1
     return { request, close, flushTrace, clientId, contextId };
   } catch (error) { close(); throw error; }
 }
-module.exports = { DEFAULT_KEY, encode, decode, buildHello, openSession };
+module.exports = { DEFAULT_KEY, authenticationKey, encode, decode, buildHello, openSession };

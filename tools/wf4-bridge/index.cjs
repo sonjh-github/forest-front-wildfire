@@ -1,7 +1,7 @@
 const net = require('node:net');
 const crypto = require('node:crypto');
 const { performance } = require('node:perf_hooks');
-const { openSession } = require('./lib/udp.cjs');
+const { openSession, authenticationKey } = require('./lib/udp.cjs');
 const { buildPixelProgram, buildAnimatedProgram, programCommands } = require('./lib/program.cjs');
 const { scrollInfo, scrollFrame } = require('./lib/scroll.cjs');
 
@@ -73,7 +73,9 @@ function buildScrollCommands(options, transferId = crypto.randomInt(65536)) {
     bitmap[i] = input[i] ? 1 : 0;
   }
   if (!bitmap.some(Boolean)) throw new TypeError('표시할 텍스트 픽셀이 없습니다.');
-  const program = buildAnimatedProgram(Array.from({ length: info.frameCount }, (_, i) => scrollFrame(bitmap, info, i)), frame);
+  // Preserve the previous 4px / 100ms speed while advancing one pixel per frame.
+  info.frameIntervalMs = info.step * 25;
+  const program = buildAnimatedProgram(Array.from({ length: info.frameCount }, (_, i) => scrollFrame(bitmap, info, i)), { ...frame, frameIntervalMs: info.frameIntervalMs });
   return { frame, program, commands: commandsForProgram(frame, program, transferId), info };
 }
 const active = new Set();
@@ -87,6 +89,8 @@ async function exclusive(options, action) {
 }
 function createPixelSender(options = {}) {
   const target = connection(options);
+  let password = options.password ?? '';
+  authenticationKey(password);
   const idleTimeoutMs = integer(options.idleTimeoutMs ?? 30000, 'idleTimeoutMs', 1, 300000);
   let session, idleTimer, configured = null, lastHash = null, disposed = false;
   function disconnect() {
@@ -98,7 +102,7 @@ function createPixelSender(options = {}) {
       if (disposed) throw new Error('Pixel sender is closed');
       clearTimeout(idleTimer);
       try {
-        session ??= await openSession(target.host, target.port, { traceFile: callOptions.traceFile ?? null, traceLimit: 1024, helloSuffix: options.helloSuffix });
+        session ??= await openSession(target.host, target.port, { traceFile: callOptions.traceFile ?? null, traceLimit: 1024, helloSuffix: options.helloSuffix, password });
         return await action(session);
       } catch (error) {
         session?.flushTrace(callOptions.traceFile ?? null);
@@ -125,10 +129,15 @@ function createPixelSender(options = {}) {
       const pending = skipped ? [] : initialized ? commands : commands.slice(4);
       for (const { command, payload } of pending) await current.request(command, payload);
       configured = signature; lastHash = hash;
-      return { acked: true, ...target, width: frame.width, height: frame.height, litPixels: frame.pixels?.reduce((n, p) => n + p, 0), programBytes: program.length, commandCount: pending.length, initialized, skipped, durationMs: Math.round(performance.now() - started), transport: 'HDSign UDP', mode: scrolling ? 'saved-animation' : 'saved-program', frameCount: info?.frameCount, step: info?.step };
+      return { acked: true, ...target, width: frame.width, height: frame.height, litPixels: frame.pixels?.reduce((n, p) => n + p, 0), programBytes: program.length, commandCount: pending.length, initialized, skipped, durationMs: Math.round(performance.now() - started), transport: 'HDSign UDP', mode: scrolling ? 'saved-animation' : 'saved-program', frameCount: info?.frameCount, step: info?.step, frameIntervalMs: info?.frameIntervalMs };
     });
   }
   return {
+    setPassword(value) {
+      authenticationKey(value);
+      if (active.has(`${target.host}:${target.port}`)) { const error = new Error('전송 완료 후 기기 암호를 변경하세요.'); error.code = 'BUSY'; throw error; }
+      if (value !== password) { disconnect(); password = value; }
+    },
     sendPixels: send,
     sendScroll: frameOptions => send(frameOptions, true),
     identify: (probeOptions = {}) => usingSession({ ...options, ...probeOptions }, async current => {

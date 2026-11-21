@@ -6,6 +6,7 @@
 .weather-led-panel > strong { font-size:14px; color:#214d3e; }
 .weather-led-panel p, .weather-led-panel small { margin:0; color:#547066; font-size:12px; line-height:1.6; }
 .weather-led-panel label { display:flex; align-items:center; gap:7px; font-size:14px; color:#214d3e; }
+.weather-led-password input { min-width:0; flex:1; width:100%; border:1px solid #b9cec3; border-radius:4px; padding:8px; font:inherit; }
 .weather-led-panel .weather-led-error { color:#b42318; }
 .weather-led-preview { min-width:0; overflow:auto; white-space:nowrap; background:#101b16; color:#fa726b; border-radius:6px; padding:12px; font:700 16px WF4NanumSquare,sans-serif; }
 .weather-led-setup { border:1px solid #dce8e1; border-radius:6px; background:#f8fcfa; color:#214d3e; font-size:14px; }

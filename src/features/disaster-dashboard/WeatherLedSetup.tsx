@@ -24,9 +24,9 @@ export default function WeatherLedSetup() {
     setResult("");
     setFailed(false);
     try {
-      const health = await ledRequest<{ service: string; deviceName: string }>("health", {}, lifetime.current?.signal);
+      const health = await ledRequest<{ service: string; deviceName: string; passwordAuthentication?: boolean }>("health", {}, lifetime.current?.signal);
       if (health.service !== "forest-wf4-bridge") throw new Error("연결 도구를 확인할 수 없습니다. 다운로드한 도구를 다시 실행하세요.");
-      if (health.deviceName !== WF4_DEVICE_NAME) throw new Error("연결 도구 업데이트가 필요합니다. 기존 도구를 종료하고 새 ZIP을 다운로드해 실행하세요.");
+      if (health.deviceName !== WF4_DEVICE_NAME || !health.passwordAuthentication) throw new Error("연결 도구 업데이트가 필요합니다. 기존 도구를 종료하고 새 ZIP을 다운로드해 실행하세요.");
       if (lifetime.current?.signal.aborted) return;
       setResult("연결 도구 실행 중입니다. WF4 Wi-Fi에 연결한 뒤 전광판 장치 인식을 누르세요.");
     } catch (error) {
