@@ -132,11 +132,13 @@ function createPixelSender(options = {}) {
     sendPixels: send,
     sendScroll: frameOptions => send(frameOptions, true),
     identify: (probeOptions = {}) => usingSession({ ...options, ...probeOptions }, async current => {
-      await current.request(5, Buffer.from([0]));
+      const inquiry = await current.request(5, Buffer.from([0]));
+      // Online inquiry byte 2..7 contains the six-byte Wi-Fi MAC (verified capture).
+      const mac = inquiry.payload.length >= 8 ? inquiry.payload.subarray(2, 8).toString('hex') : null;
       const reply = await current.request(0x1b, Buffer.from('000c000000600000000e0001', 'hex'));
       const match = /\b(HD_WF\w*)\s+(V\d+\.\d+\.\d+)\b/.exec(reply.payload.toString('ascii'));
       if (!match) throw new Error('WF 계열 전광판의 모델 정보를 확인하지 못했습니다.');
-      return { connected: true, ...target, model: match[1], firmware: match[2], panelCount: 4, width: 256, height: 32 };
+      return { connected: true, ...target, mac, deviceName: mac ? `WF4_${mac}` : null, model: match[1], firmware: match[2], panelCount: 4, width: 256, height: 32 };
     }),
     probe: (probeOptions = {}) => usingSession({ ...options, ...probeOptions }, async current => {
       const reply = await current.request(5, Buffer.from([0]));

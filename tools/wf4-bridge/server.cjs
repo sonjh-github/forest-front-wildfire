@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { createPixelSender } = require('./index.cjs');
 const ALLOWED_ORIGIN = 'https://wildfire.forest.tobeunicorn.kr';
+const TARGET_DEVICE = 'WF4_441bf6eef410';
 const FIXED = { panelWidth: 64, panelHeight: 32, columns: 4, rows: 1, width: 256, height: 32, direction: 'left' };
 function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirectory = path.join(__dirname, 'logs') } = {}) {
   const sender = createPixelSender(board);
@@ -20,7 +21,7 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       response.setHeader('Access-Control-Allow-Private-Network', 'true');
     }
     if (request.method === 'OPTIONS') { response.writeHead(204); return response.end(); }
-    if (request.method === 'GET' && request.url === '/health') return reply(200, { service: 'forest-wf4-bridge', ...FIXED });
+    if (request.method === 'GET' && request.url === '/health') return reply(200, { service: 'forest-wf4-bridge', deviceName: TARGET_DEVICE, ...FIXED });
     if (request.method !== 'POST' || !['/api/wf4/discover', '/api/wf4/scroll'].includes(request.url)) return reply(404, { error: '지원하지 않는 경로입니다.' });
     let traceFile;
     try {
@@ -32,12 +33,18 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('JSON 객체가 필요합니다.');
       fs.mkdirSync(logDirectory, { recursive: true });
       traceFile = path.join(logDirectory, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.json`);
+      const device = await sender.identify({ traceFile });
+      if (device.deviceName !== TARGET_DEVICE) {
+        const error = new Error(`${TARGET_DEVICE} 전용입니다. 해당 Wi-Fi에 연결하세요. 다른 장치에는 송신하지 않았습니다.`);
+        error.code = 'WRONG_DEVICE';
+        throw error;
+      }
       const result = request.url === '/api/wf4/discover'
-        ? await sender.identify({ traceFile })
+        ? device
         : await sender.sendScroll({ bitmap: body.bitmap, stripWidth: body.stripWidth, step: 4, ...FIXED, traceFile });
       reply(200, result);
     } catch (error) {
-      const status = error instanceof TypeError ? 400 : error.code === 'BUSY' ? 409 : 502;
+      const status = error instanceof TypeError ? 400 : ['BUSY', 'WRONG_DEVICE'].includes(error.code) ? 409 : 502;
       const message = /timeout/i.test(error.message) ? 'WF4가 응답하지 않습니다. 보드 전원과 WF4 Wi-Fi 연결을 확인하세요.' : error.message.split(';')[0];
       reply(status, { error: message });
     } finally {

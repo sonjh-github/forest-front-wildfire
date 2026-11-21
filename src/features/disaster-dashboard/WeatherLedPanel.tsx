@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { WeatherObservation } from "./weatherObservation";
-import { createWeatherDelivery, ledRequest, weatherLedBitmap, weatherLedText, type LedDevice, type LedReceipt } from "./weatherLed";
+import { createWeatherDelivery, ledRequest, weatherLedBitmap, weatherLedText, WF4_DEVICE_NAME, type LedDevice, type LedReceipt } from "./weatherLed";
 import WeatherLedSetup from "./WeatherLedSetup";
 
 export default function WeatherLedPanel({ observation, fresh, eventId }: { observation: WeatherObservation | null; fresh: boolean; eventId: string }) {
@@ -46,6 +46,7 @@ export default function WeatherLedPanel({ observation, fresh, eventId }: { obser
     try {
       const found = await ledRequest<LedDevice>("discover", {}, lifetime.current?.signal);
       if (!found.connected || found.width !== 256 || found.height !== 32) throw new Error("4장 전광판의 장치 정보를 확인하지 못했습니다.");
+      if (found.deviceName !== WF4_DEVICE_NAME) throw new Error(`${WF4_DEVICE_NAME} 전용입니다. 해당 Wi-Fi에 연결하고 최신 연결 도구를 실행하세요.`);
       if (lifetime.current?.signal.aborted) return;
       delivery.current?.reset();
       setDevice(found);

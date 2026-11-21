@@ -2,13 +2,14 @@ import type { WeatherObservation } from "./weatherObservation";
 
 const BRIDGE = "http://127.0.0.1:8790";
 export const LED_HEIGHT = 32;
+export const WF4_DEVICE_NAME = "WF4_441bf6eef410";
 
 export function weatherLedText(observation: WeatherObservation): string {
   const value = (number: number | null) => number !== null && Number.isFinite(number) ? String(Number(number.toFixed(2))) : "—";
   return `기온 ${value(observation.temperatureC)}°C · 상대습도 ${value(observation.humidityPct)}% · 평균 풍속 ${value(observation.windSpeedMps)}m/s · 풍향 ${value(observation.windDirectionDeg)}°`;
 }
 
-export interface LedDevice { connected: boolean; model: string; firmware: string; width: number; height: number }
+export interface LedDevice { connected: boolean; deviceName: string; model: string; firmware: string; width: number; height: number }
 export interface LedReceipt { acked: boolean; skipped: boolean; frameCount: number; durationMs: number }
 
 export async function ledRequest<T>(path: "discover" | "scroll" | "health", body: object, signal?: AbortSignal): Promise<T> {
