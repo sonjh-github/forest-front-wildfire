@@ -3,9 +3,10 @@ import type { WeatherObservation } from "./weatherObservation";
 import { createWeatherDelivery, ledRequest, weatherLedBitmap, weatherLedText, WF4_DEVICE_NAME, type LedDevice, type LedReceipt } from "./weatherLed";
 import WeatherLedSetup from "./WeatherLedSetup";
 
+const password = "qwer1234";
+
 export default function WeatherLedPanel({ observation, fresh, eventId }: { observation: WeatherObservation | null; fresh: boolean; eventId: string }) {
   const [device, setDevice] = useState<LedDevice | null>(null);
-  const [password, setPassword] = useState("");
   const [recognizing, setRecognizing] = useState(false);
   const [sending, setSending] = useState(false);
   const [automatic, setAutomatic] = useState(true);
@@ -66,7 +67,7 @@ export default function WeatherLedPanel({ observation, fresh, eventId }: { obser
     <strong>기상정보 전광판</strong>
     <WeatherLedSetup />
     <div className="weather-led-preview" title={text}>{text}</div>
-    <label className="weather-led-password">기기 잠금 암호<input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="off" placeholder="잠금 설정 시 입력" disabled={recognizing || sending} /></label>
+    <label className="weather-led-password">기기 잠금 암호<input type="password" value={password} readOnly autoComplete="off" /></label>
     <button type="button" onClick={() => void recognize()} disabled={recognizing || sending}>{recognizing ? "인식 중…" : "전광판 장치 인식"}</button>
     <label><input type="checkbox" checked={automatic} onChange={event => setAutomatic(event.target.checked)} />기상정보 갱신 시 자동 송신</label>
     <button type="button" disabled={!device || !observation || !fresh || sending || recognizing} onClick={() => { delivery.current?.reset(); delivery.current?.enqueue(key, text); }}>{sending ? "송신 중…" : "전광판으로 보내기"}</button>
