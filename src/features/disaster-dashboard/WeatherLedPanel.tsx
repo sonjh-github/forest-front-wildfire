@@ -47,8 +47,8 @@ export default function WeatherLedPanel({ observation, fresh, eventId }: { obser
     setFailure("");
     try {
       if (password) {
-        const health = await ledRequest<{ passwordAuthentication?: boolean }>("health", {}, lifetime.current?.signal);
-        if (!health.passwordAuthentication) throw new Error("기기 암호를 지원하는 최신 연결 도구가 필요합니다. 기존 도구를 종료하고 새 ZIP을 다운로드해 실행하세요.");
+        const health = await ledRequest<{ passwordAuthentication?: boolean; synchronizedAnimation?: boolean }>("health", {}, lifetime.current?.signal);
+        if (!health.passwordAuthentication || !health.synchronizedAnimation) throw new Error("최신 연결 도구 1.3.1 이상이 필요합니다. 기존 도구를 종료하고 새 ZIP을 다운로드해 실행하세요.");
       }
       const found = await ledRequest<LedDevice>("discover", password ? { password } : {}, lifetime.current?.signal);
       if (!found.connected || found.width !== 256 || found.height !== 32) throw new Error("4장 전광판의 장치 정보를 확인하지 못했습니다.");

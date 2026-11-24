@@ -35,7 +35,10 @@ test('production origin, read-only identification, fixed geometry and a single n
   const health = await fetch(base + '/health', { headers: { Origin: ALLOWED_ORIGIN } });
   assert.equal(health.status, 200);
   assert.equal(health.headers.get('Access-Control-Allow-Origin'), ALLOWED_ORIGIN);
-  assert.equal((await health.json()).service, 'forest-wf4-bridge');
+  const bridgeInfo = await health.json();
+  assert.equal(bridgeInfo.service, 'forest-wf4-bridge');
+  assert.equal(bridgeInfo.synchronizedAnimation, true);
+  assert.equal(bridgeInfo.version, '1.3.1');
   assert.equal(packets.length, 0, 'setup health check never contacts the board');
   assert.equal((await post('discover', {}, 'https://example.com')).status, 403);
   assert.equal(packets.length, 0);

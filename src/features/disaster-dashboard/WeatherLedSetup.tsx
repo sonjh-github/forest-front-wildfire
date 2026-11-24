@@ -24,9 +24,9 @@ export default function WeatherLedSetup() {
     setResult("");
     setFailed(false);
     try {
-      const health = await ledRequest<{ service: string; deviceName: string; passwordAuthentication?: boolean }>("health", {}, lifetime.current?.signal);
+      const health = await ledRequest<{ service: string; deviceName: string; passwordAuthentication?: boolean; synchronizedAnimation?: boolean }>("health", {}, lifetime.current?.signal);
       if (health.service !== "forest-wf4-bridge") throw new Error("연결 도구를 확인할 수 없습니다. 다운로드한 도구를 다시 실행하세요.");
-      if (health.deviceName !== WF4_DEVICE_NAME || !health.passwordAuthentication) throw new Error("연결 도구 업데이트가 필요합니다. 기존 도구를 종료하고 새 ZIP을 다운로드해 실행하세요.");
+      if (health.deviceName !== WF4_DEVICE_NAME || !health.passwordAuthentication || !health.synchronizedAnimation) throw new Error("연결 도구 업데이트가 필요합니다. 기존 도구를 종료하고 새 ZIP을 다운로드해 실행하세요.");
       if (lifetime.current?.signal.aborted) return;
       setResult("연결 도구 실행 중입니다. WF4 Wi-Fi에 연결한 뒤 전광판 장치 인식을 누르세요.");
     } catch (error) {
@@ -46,7 +46,7 @@ export default function WeatherLedSetup() {
       </label>
       <ol>
         <li><a href="https://nodejs.org/en/download/archive/v26.13.1" target="_blank" rel="noreferrer">Node.js 26.13.1 설치</a><p>26.13.1이 이미 설치됐다면 다음 단계로 진행하세요. 설치 후에는 실행 창을 새로 여세요.</p></li>
-        <li><a className="weather-led-download" href="/wf4-bridge.zip" download={`WF4-${platforms[platform]}.zip`}>{platforms[platform]} 연결 도구 다운로드</a><p>ZIP 파일의 압축을 모두 풀어 주세요.</p></li>
+        <li><a className="weather-led-download" href="/wf4-bridge.zip?v=1.3.1" download={`WF4-${platforms[platform]}-1.3.1.zip`}>{platforms[platform]} 연결 도구 다운로드</a><p>ZIP 파일의 압축을 모두 풀어 주세요.</p></li>
         <li>{platform === "windows" ? <><code>start.cmd</code>를 더블클릭하세요. 실행 창은 열어 두세요.</> : <>압축을 푼 폴더의 터미널에서 <code>sh ./start.sh</code>를 실행하고 창을 열어 두세요.</>}</li>
         <li>PC를 <strong>{WF4_DEVICE_NAME}</strong> Wi-Fi에 연결하고 인터넷 연결도 유지하세요. 아래에서 도구 실행을 확인한 뒤 전광판 장치 인식을 누르세요. 다른 WF4 장치에는 송신하지 않습니다.</li>
       </ol>

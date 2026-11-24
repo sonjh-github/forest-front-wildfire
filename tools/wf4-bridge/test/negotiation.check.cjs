@@ -61,6 +61,6 @@ test('one-pixel scrolling preserves speed and does not silently skip pixels on l
   const small = Array(32 * 8).fill(0); small[0] = 1;
   const result = buildScrollCommands({ bitmap: small, stripWidth: 8, width: 256, height: 32, step: 1 });
   assert.equal(result.info.step / result.info.frameIntervalMs, 4 / 100);
-  assert.equal(result.program.readUInt16BE(97 + 50), 25);
+  assert.equal(result.program.readUInt16BE(29 + result.program.readUInt32BE(81) + 50), 25);
   assert.throws(() => scrollInfo({ width: 256, height: 32, stripWidth: 2048, step: 1 }), /문구가 너무 깁니다/);
 });

@@ -21,7 +21,7 @@ function createBridge({ board = { host: '192.168.4.1', port: 6101 }, logDirector
       response.setHeader('Access-Control-Allow-Private-Network', 'true');
     }
     if (request.method === 'OPTIONS') { response.writeHead(204); return response.end(); }
-    if (request.method === 'GET' && request.url === '/health') return reply(200, { service: 'forest-wf4-bridge', deviceName: TARGET_DEVICE, passwordAuthentication: true, ...FIXED });
+    if (request.method === 'GET' && request.url === '/health') return reply(200, { service: 'forest-wf4-bridge', deviceName: TARGET_DEVICE, passwordAuthentication: true, synchronizedAnimation: true, version: require('./package.json').version, ...FIXED });
     if (request.method !== 'POST' || !['/api/wf4/discover', '/api/wf4/scroll'].includes(request.url)) return reply(404, { error: '지원하지 않는 경로입니다.' });
     let traceFile;
     try {

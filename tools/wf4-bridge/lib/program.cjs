@@ -31,22 +31,21 @@ function buildAnimatedProgram(masks, { width: screenWidth = SCREEN_WIDTH, height
   if (323 + screenWidth / 8 * screenHeight * frameCount > 2 * 1024 * 1024) throw new TypeError('애니메이션은 2MB 이하로 만들어 주세요.');
   const source = fs.readFileSync(path.join(__dirname, 'program-template.bin'));
   if (source.length !== 4163 || source.toString('ascii', 0, 2) !== 'HC') throw new Error('Unexpected captured program template');
-  const prefix = Buffer.from(source.subarray(0, 97));
-  const width = screenWidth / 2;
-  const areas = [97, 2130].map((offset, i) => {
-    const header = Buffer.from(source.subarray(offset, offset + 113));
-    if (header.toString('ascii', 0, 2) !== 'HA' || header.readUInt16BE(32) !== 30) throw new Error('Unexpected native image item');
-    const frames = masks.map(mask => encodeAreaFrame(mask, i * width, 0, width, screenHeight, screenWidth));
-    header.writeUInt16BE(i * width, 4); header.writeUInt16BE(0, 6);
-    header.writeUInt16BE(width, 8); header.writeUInt16BE(screenHeight, 10);
-    header.writeUInt16BE(frameCount, 32);
-    header.writeUInt16BE(frameIntervalMs, 50);
-    header.writeUInt32BE(frames[0].length * frameCount, 40);
-    return Buffer.concat([header, ...frames]);
-  });
-  prefix.writeUInt32BE(68, 81);
-  prefix.writeUInt32BE(68 + areas[0].length, 85);
-  return Buffer.concat([prefix, ...areas]);
+  // The captured program has two independently timed animation areas. A single
+  // full-screen item gives all four physical panels one frame counter and clock.
+  // HP has a 52-byte base plus one offset and one playback field per area.
+  const prefix = Buffer.concat([source.subarray(0, 85), source.subarray(89, 93)]);
+  prefix[33] = 1;
+  prefix.writeUInt32BE(prefix.length - 29, 81);
+  const header = Buffer.from(source.subarray(97, 210));
+  if (header.toString('ascii', 0, 2) !== 'HA' || header.readUInt16BE(32) !== 30) throw new Error('Unexpected native image item');
+  const frames = masks.map(mask => encodeAreaFrame(mask, 0, 0, screenWidth, screenHeight, screenWidth));
+  header.writeUInt16BE(0, 4); header.writeUInt16BE(0, 6);
+  header.writeUInt16BE(screenWidth, 8); header.writeUInt16BE(screenHeight, 10);
+  header.writeUInt16BE(frameCount, 32);
+  header.writeUInt16BE(frameIntervalMs, 50);
+  header.writeUInt32BE(frames[0].length * frameCount, 40);
+  return Buffer.concat([prefix, header, ...frames]);
 }
 
 function programCommands(data, id) {
